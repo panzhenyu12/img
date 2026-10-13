@@ -399,6 +399,23 @@ fn semantic_mask_value(mask: &Value, x: f32, y: f32, width: u32, height: u32) ->
     crate::mask::coverage(mask, x, y, width, height)
 }
 
+fn semantic_aliases(semantic: &str) -> Option<&'static [&'static str]> {
+    Some(match semantic {
+        "face" => &["face", "faceOutline", "skin"],
+        "skin" => &["skin", "face", "faceOutline"],
+        "eyes" => &["eyes", "leftEye", "rightEye"],
+        "brows" => &["brows", "leftBrow", "rightBrow"],
+        "underEyes" => &["underEyes", "leftUnderEye", "rightUnderEye"],
+        "lips" => &["lips", "lip"],
+        "teeth" => &["teeth"],
+        "hair" => &["hair"],
+        "accessories" => &["accessories"],
+        "ears" => &["ears"],
+        "skinProtection" => &["skinProtection"],
+        _ => return None,
+    })
+}
+
 fn semantic_weight(
     params: &Value,
     bbox: Option<LandmarkBox>,
@@ -419,18 +436,7 @@ fn semantic_weight(
             return Some(semantic_mask_value(mask, x, y, width, height));
         }
     }
-    let aliases: &[&str] = match semantic {
-        "face" => &["face", "faceOutline", "skin"],
-        "skin" => &["skin", "face", "faceOutline"],
-        "eyes" => &["eyes", "leftEye", "rightEye"],
-        "brows" => &["brows", "leftBrow", "rightBrow"],
-        "underEyes" => &["underEyes", "leftUnderEye", "rightUnderEye"],
-        "lips" => &["lips", "lip"],
-        "teeth" => &["teeth"],
-        "hair" => &["hair"],
-        "skinProtection" => &["skinProtection"],
-        _ => return None,
-    };
+    let aliases = semantic_aliases(semantic)?;
     if let Some(masks) = params.get("semanticMasks").and_then(Value::as_object) {
         let mut found = false;
         let mut result: f32 = 0.0;
@@ -450,6 +456,46 @@ fn semantic_weight(
             .filter_map(|name| inferred_semantic_weight(box_, name, x, y))
             .reduce(f32::max)
     })
+}
+
+struct PreparedSemantic<'a> {
+    masks: Vec<crate::mask::PreparedMask<'a>>,
+    aliases: &'static [&'static str],
+    bbox: Option<LandmarkBox>,
+}
+impl<'a> PreparedSemantic<'a> {
+    fn new(params: &'a Value, bbox: Option<LandmarkBox>, name: &str) -> Self {
+        let mut aliases = semantic_aliases(name).unwrap_or(&[]);
+        let masks = params.get("semanticMasks");
+        if name == "skin" && masks.and_then(|m| m.get("skin")).is_some() {
+            aliases = &["skin"];
+        }
+        let prepared = aliases
+            .iter()
+            .filter_map(|name| masks.and_then(|m| m.get(*name)))
+            .map(crate::mask::PreparedMask::new)
+            .collect();
+        Self {
+            masks: prepared,
+            aliases,
+            bbox,
+        }
+    }
+    fn coverage(&self, x: f32, y: f32, width: u32, height: u32) -> Option<f32> {
+        if !self.masks.is_empty() {
+            return self
+                .masks
+                .iter()
+                .map(|m| m.coverage(x, y, width, height))
+                .reduce(f32::max);
+        }
+        self.bbox.and_then(|b| {
+            self.aliases
+                .iter()
+                .filter_map(|name| inferred_semantic_weight(b, name, x, y))
+                .reduce(f32::max)
+        })
+    }
 }
 
 fn semantic_exclusion(
@@ -508,6 +554,24 @@ impl LocalSelection {
         let region = Region::read(params.get("region"));
         let mut selection = Self::region(source, params);
         let semantic_enabled = bbox.is_some() || params.get("semanticMasks").is_some();
+        let skin_region = PreparedSemantic::new(params, bbox, "skin");
+        let exclusions: Vec<_> = [
+            "eyes",
+            "brows",
+            "lips",
+            "teeth",
+            "hair",
+            "accessories",
+            "ears",
+            "skinProtection",
+        ]
+        .into_iter()
+        .map(|name| PreparedSemantic::new(params, bbox, name))
+        .collect();
+        let frozen_mask = params
+            .get("protectMask")
+            .map(crate::mask::PreparedMask::new);
+        let selected_mask = params.get("mask").map(crate::mask::PreparedMask::new);
         for py in selection.y..selection.y + selection.height {
             for px in selection.x..selection.x + selection.width {
                 let nx = (px as f32 + 0.5) / source.width as f32;
@@ -516,29 +580,28 @@ impl LocalSelection {
                     selection.weights.push((0.0, 0.0));
                     continue;
                 }
-                let skin =
-                    semantic_weight(params, bbox, "skin", nx, ny, source.width, source.height)
-                        .unwrap_or(1.0);
+                let skin = skin_region
+                    .coverage(nx, ny, source.width, source.height)
+                    .unwrap_or(1.0);
+                if skin <= 1e-4 {
+                    selection.weights.push((0.0, 0.0));
+                    continue;
+                }
                 let protected = if semantic_enabled {
-                    semantic_exclusion(
-                        params,
-                        bbox,
-                        &["eyes", "brows", "lips", "teeth", "hair", "skinProtection"],
-                        nx,
-                        ny,
-                        source.width,
-                        source.height,
-                    )
+                    exclusions
+                        .iter()
+                        .filter_map(|mask| mask.coverage(nx, ny, source.width, source.height))
+                        .fold(0.0, f32::max)
                 } else {
                     0.0
                 };
-                let frozen = params
-                    .get("protectMask")
-                    .map(|mask| crate::mask::coverage(mask, nx, ny, source.width, source.height))
+                let frozen = frozen_mask
+                    .as_ref()
+                    .map(|mask| mask.coverage(nx, ny, source.width, source.height))
                     .unwrap_or(0.0);
-                let selected = params
-                    .get("mask")
-                    .map(|mask| crate::mask::coverage(mask, nx, ny, source.width, source.height))
+                let selected = selected_mask
+                    .as_ref()
+                    .map(|mask| mask.coverage(nx, ny, source.width, source.height))
                     .unwrap_or(1.0);
                 let alpha = source.pixels
                     [(py as usize * source.width as usize + px as usize) * 4 + 3]
@@ -941,6 +1004,118 @@ fn atmospheric_dehaze(source: &RgbaImage, params: &Value) -> RgbaImage {
     output
 }
 
+/// Mask-normalized Fast Guided Filter (He & Sun, 2015). Fit RGB against a
+/// common luminance guide on a bounded analysis raster, then interpolate the
+/// linear coefficients and evaluate against the full-resolution guide. This
+/// preserves broad shading and edges while smoothing small skin variation;
+/// unlike a Gaussian residual gate, a dark speck is not automatically an edge.
+struct SkinGuidedBase {
+    width: usize,
+    height: usize,
+    rg: Vec<[f64; 4]>,
+    b: Vec<[f64; 4]>,
+}
+
+impl SkinGuidedBase {
+    fn sample(&self, x: u32, y: u32, selection: &LocalSelection, light: f32) -> [f32; 3] {
+        let px = ((x as f64 + 0.5) * self.width as f64 / selection.width as f64 - 0.5)
+            .clamp(0.0, (self.width - 1) as f64);
+        let py = ((y as f64 + 0.5) * self.height as f64 / selection.height as f64 - 0.5)
+            .clamp(0.0, (self.height - 1) as f64);
+        let x0 = px.floor() as usize;
+        let y0 = py.floor() as usize;
+        let x1 = (x0 + 1).min(self.width - 1);
+        let y1 = (y0 + 1).min(self.height - 1);
+        let tx = px - x0 as f64;
+        let ty = py - y0 as f64;
+        let sample = |values: &[[f64; 4]], c| {
+            values[y0 * self.width + x0][c] * (1.0 - tx) * (1.0 - ty)
+                + values[y0 * self.width + x1][c] * tx * (1.0 - ty)
+                + values[y1 * self.width + x0][c] * (1.0 - tx) * ty
+                + values[y1 * self.width + x1][c] * tx * ty
+        };
+        [
+            (sample(&self.rg, 0) * light as f64 + sample(&self.rg, 1)) as f32,
+            (sample(&self.rg, 2) * light as f64 + sample(&self.rg, 3)) as f32,
+            (sample(&self.b, 0) * light as f64 + sample(&self.b, 1)) as f32,
+        ]
+    }
+}
+
+fn skin_guided_base(
+    source: &RgbaImage,
+    selection: &LocalSelection,
+    smooth: f32,
+    face_width: f32,
+) -> SkinGuidedBase {
+    let scale = (512.0 / selection.width.max(selection.height) as f32).min(1.0);
+    let width = ((selection.width as f32 * scale).round() as usize).max(1);
+    let height = ((selection.height as f32 * scale).round() as usize).max(1);
+    // Area accumulation, rather than nearest-neighbor downsampling: protected
+    // or transparent RGB never enters the statistics, even at reduced scale.
+    let mut colors = vec![[0.0f64; 4]; width * height];
+    for (i, &(_, weight)) in selection.weights.iter().enumerate() {
+        if weight <= 1e-4 {
+            continue;
+        }
+        let x = i % selection.width as usize;
+        let y = i / selection.width as usize;
+        let ax = x * width / selection.width as usize;
+        let ay = y * height / selection.height as usize;
+        let index =
+            ((y + selection.y as usize) * source.width as usize + x + selection.x as usize) * 4;
+        let cell = &mut colors[ay * width + ax];
+        for (c, value) in cell.iter_mut().enumerate().take(3) {
+            *value += source.pixels[index + c] as f64 * weight as f64;
+        }
+        cell[3] += weight as f64;
+    }
+    let eligible: Vec<bool> = colors.iter().map(|c| c[3] > 1e-4).collect();
+    for color in &mut colors {
+        if color[3] > 1e-4 {
+            for c in 0..3 {
+                color[c] /= color[3];
+            }
+        }
+    }
+    let guide: Vec<f64> = colors
+        .iter()
+        .map(|c| luma(c[0] as f32, c[1] as f32, c[2] as f32) as f64)
+        .collect();
+    let radius = ((face_width * scale * 0.035).round() as usize).clamp(1, 32);
+    let moments_a: Vec<[f64; 4]> = colors
+        .iter()
+        .zip(&guide)
+        .map(|(c, &l)| [l, l * l, c[0], c[1]])
+        .collect();
+    let moments_b: Vec<[f64; 4]> = colors
+        .iter()
+        .zip(&guide)
+        .map(|(c, &l)| [c[2], l * c[0], l * c[1], l * c[2]])
+        .collect();
+    let means_a = guided_box_means(&moments_a, &eligible, width, height, radius);
+    let means_b = guided_box_means(&moments_b, &eligible, width, height, radius);
+    let epsilon = (4.0 + 10.0 * smooth as f64).powi(2);
+    let mut rg = vec![[0.0; 4]; width * height];
+    let mut b = vec![[0.0; 4]; width * height];
+    for i in 0..rg.len() {
+        let ma = means_a[i];
+        let mb = means_b[i];
+        let variance = (ma[1] - ma[0] * ma[0]).max(0.0);
+        let ar = (mb[1] - ma[0] * ma[2]) / (variance + epsilon);
+        let ag = (mb[2] - ma[0] * ma[3]) / (variance + epsilon);
+        let ab = (mb[3] - ma[0] * mb[0]) / (variance + epsilon);
+        rg[i] = [ar, ma[2] - ar * ma[0], ag, ma[3] - ag * ma[0]];
+        b[i] = [ab, mb[0] - ab * ma[0], 0.0, 0.0];
+    }
+    SkinGuidedBase {
+        width,
+        height,
+        rg: guided_box_means(&rg, &eligible, width, height, radius),
+        b: guided_box_means(&b, &eligible, width, height, radius),
+    }
+}
+
 pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
     let values = p.get("adjustments").unwrap_or(p);
     let smooth = positive(values, "smooth");
@@ -953,8 +1128,10 @@ pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
     if selection.width == 0 || selection.height == 0 {
         return source.clone();
     }
-    let blur =
-        (smooth > 0.0).then(|| selection_low_frequency(source, &selection, 1.0 + smooth * 5.0));
+    let face_width = bbox
+        .map(|b| b.width * source.width as f32)
+        .unwrap_or(selection.width as f32);
+    let base = (smooth > 0.0).then(|| skin_guided_base(source, &selection, smooth, face_width));
     let mut out = source.clone();
     for (local_index, &(weight, _)) in selection.weights.iter().enumerate() {
         if weight <= 0.0001 {
@@ -963,23 +1140,22 @@ pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
         let x = local_index as u32 % selection.width + selection.x;
         let y = local_index as u32 / selection.width + selection.y;
         let index = (y as usize * source.width as usize + x as usize) * 4;
+        if source.pixels[index + 3] == 0 {
+            continue;
+        }
         let pixel = &mut out.pixels[index..index + 4];
         let original = [pixel[0] as f32, pixel[1] as f32, pixel[2] as f32];
         let mut rgb = original;
-        if let Some(blur) = &blur {
-            let low = blur.get_pixel(x - selection.x, y - selection.y).0;
+        if let Some(base) = &base {
+            let low = base.sample(
+                x - selection.x,
+                y - selection.y,
+                &selection,
+                luma(original[0], original[1], original[2]),
+            );
             for c in 0..3 {
-                // Sparse/fully protected neighborhoods keep the original;
-                // do not divide numerical noise by an almost-zero weight.
-                let base = if low[3] > 1e-4 {
-                    low[c] / low[3]
-                } else {
-                    original[c]
-                };
-                let difference = original[c] - base;
-                // Edge-aware softening reduces small noise but retains feature edges.
-                let edge = (1.0 - (difference.abs() / 55.0).min(1.0)).powi(2);
-                rgb[c] -= difference * smooth * (1.0 - texture * 0.7) * edge * weight;
+                let difference = original[c] - low[c];
+                rgb[c] -= difference * smooth * (1.0 - texture * 0.9) * weight;
             }
         }
         let light = luma(rgb[0], rgb[1], rgb[2]);
@@ -2124,6 +2300,93 @@ mod tests {
         assert!(amplitude(&smoothed) < amplitude(&retained));
         assert!(amplitude(&retained) <= amplitude(&detail));
         assert!(retained.pixels.chunks_exact(4).all(|p| p[3] == 79));
+    }
+
+    #[test]
+    fn guided_skin_reduces_small_dark_spots_without_flattening_shading() {
+        let width = 128;
+        let height = 80;
+        let mut pixels = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                let base = 130 + x / 4;
+                let spot = x == 60 && y == 40;
+                let value = if spot { base - 70 } else { base };
+                pixels.extend_from_slice(&[
+                    value as u8,
+                    (value - 15) as u8,
+                    (value - 30) as u8,
+                    173,
+                ]);
+            }
+        }
+        let source = RgbaImage::new(width, height, pixels).unwrap();
+        let output = skin(&source, &json!({"smooth":100,"texture":0}));
+        let spot = (40 * width as usize + 60) * 4;
+        assert!(
+            output.pixels[spot] > source.pixels[spot] + 25,
+            "a small dark spot must be softened, not mistaken for a silhouette edge"
+        );
+        for x in [20usize, 100] {
+            let i = (20 * width as usize + x) * 4;
+            assert!(
+                (output.pixels[i] as i32 - source.pixels[i] as i32).abs() <= 1,
+                "broad affine shading must survive skin smoothing"
+            );
+        }
+        assert!(output.pixels.chunks_exact(4).all(|p| p[3] == 173));
+    }
+
+    #[test]
+    fn guided_skin_suppresses_fine_noise_and_preserves_strong_edges() {
+        let width = 128u32;
+        let height = 64u32;
+        let source = RgbaImage::new(
+            width,
+            height,
+            (0..height)
+                .flat_map(|y| {
+                    (0..width).flat_map(move |x| {
+                        let base = if x < 64 { 105i32 } else { 205 };
+                        let noise = if (x + y) % 2 == 0 { 8 } else { -8 };
+                        [
+                            (base + noise) as u8,
+                            (base + noise - 10) as u8,
+                            (base + noise - 20) as u8,
+                            255,
+                        ]
+                    })
+                })
+                .collect(),
+        )
+        .unwrap();
+        let output = skin(&source, &json!({"smooth":100,"texture":0}));
+        let original_contrast = (source.pixels[(32 * 128 + 80) * 4] as i32
+            - source.pixels[(32 * 128 + 20) * 4] as i32)
+            .abs();
+        let edited_contrast = (output.pixels[(32 * 128 + 80) * 4] as i32
+            - output.pixels[(32 * 128 + 20) * 4] as i32)
+            .abs();
+        assert!(
+            edited_contrast >= original_contrast - 2,
+            "separate skin lighting regions retain contrast"
+        );
+        let before_noise = (source.pixels[(32 * 128 + 20) * 4] as i32
+            - source.pixels[(32 * 128 + 21) * 4] as i32)
+            .abs();
+        let after_noise = (output.pixels[(32 * 128 + 20) * 4] as i32
+            - output.pixels[(32 * 128 + 21) * 4] as i32)
+            .abs();
+        assert!(
+            after_noise <= before_noise / 2,
+            "fine color variation must actually decrease"
+        );
+        let boundary_contrast =
+            output.pixels[(32 * 128 + 64) * 4] as i32 - output.pixels[(32 * 128 + 63) * 4] as i32;
+        assert!(
+            boundary_contrast >= 85,
+            "the lighting edge must stay sharp without Gaussian bleeding"
+        );
     }
 
     #[test]

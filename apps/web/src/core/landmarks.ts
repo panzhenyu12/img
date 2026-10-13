@@ -15,6 +15,7 @@ export interface DetectedPart {
   points: DetectionPoint[];
   landmarks: DetectionPoint[];
   protectMask?: InlineMask;
+  partMask?: RasterMask;
 }
 export interface DetectedPerson {
   id: string;
@@ -93,7 +94,7 @@ export function measuredLimbSupport(part: DetectedPart, mask: RasterMask, imageW
     if (separated < 2) return undefined;
   }
   const nx = -dy / length, ny = dx / length;
-  const spans: Array<{t:number;radius:number}> = [];
+  const spans: Array<{t:number;radius:number;sides:number[]}> = [];
   for (const t of [.2, .3, .4, .5, .6, .7, .8]) {
     const x = a.x * imageWidth + dx * t, y = a.y * imageHeight + dy * t;
     if (rasterCoverage(mask, x / imageWidth, y / imageHeight) < .5) continue;
@@ -101,7 +102,7 @@ export function measuredLimbSupport(part: DetectedPart, mask: RasterMask, imageW
       for (let d = 1; d <= length * .7; d++) if (rasterCoverage(mask, (x + nx * sign * d) / imageWidth, (y + ny * sign * d) / imageHeight) < .5) return d;
       return Infinity;
     });
-    const near = Math.min(...sides); if (Number.isFinite(near)) spans.push({t,radius:near});
+    const near = Math.min(...sides); if (Number.isFinite(near)) spans.push({t,radius:near,sides});
   }
   if (spans.length < 2) return undefined;
   const median = (items: number[]) => [...items].sort((x,y)=>x-y)[Math.floor(items.length/2)];
@@ -114,8 +115,54 @@ export function measuredLimbSupport(part: DetectedPart, mask: RasterMask, imageW
     // visible lower leg indicates a skirt/occlusion, not a complete calf.
     if (radius > length*.42 || proximal.length>=2 && distal.length>=2 && median(proximal)>length*.25 && median(proximal)>median(distal)*2.3) return undefined;
   }
-  const half = Math.max(3, radius * 1.45 + 2);
-  return [offset(a, nx * half / imageWidth, ny * half / imageHeight), offset(b, nx * half / imageWidth, ny * half / imageHeight), offset(b, -nx * half / imageWidth, -ny * half / imageHeight), offset(a, -nx * half / imageWidth, -ny * half / imageHeight)];
+  const half = [0,1].map(side => {
+    const visible = spans.map(span=>span.sides[side]).filter(value=>Number.isFinite(value)&&value<=radius*3);
+    return Math.max(3,(visible.length?Math.max(...visible):radius)*1.45+2);
+  });
+  return [offset(a, nx * half[1] / imageWidth, ny * half[1] / imageHeight), offset(b, nx * half[1] / imageWidth, ny * half[1] / imageHeight), offset(b, -nx * half[0] / imageWidth, -ny * half[0] / imageHeight), offset(a, -nx * half[0] / imageWidth, -ny * half[0] / imageHeight)];
+}
+/** Torso/waist bones lie inside clothing. Their old guessed-width polygon
+ * froze the actual shirt silhouette, so only interior fabric moved. Measure
+ * both exterior sides in pixels and keep a distinct, wider edit support. */
+export function measuredTorsoSupport(part: DetectedPart, mask: RasterMask, imageWidth: number, imageHeight: number): DetectionPoint[] | undefined {
+  if (!['waist','hips','torso'].includes(part.id)) return undefined;
+  if (part.landmarks.length < (part.id==='torso'?4:part.id==='waist'?3:2)) return undefined;
+  let a: DetectionPoint, b: DetectionPoint, center: DetectionPoint;
+  if (part.id==='waist') {
+    [a,center,b]=part.landmarks;
+  } else if(part.id==='torso') {
+    a=midpoint(part.landmarks[0],part.landmarks[1]);
+    b=midpoint(part.landmarks[2],part.landmarks[3]);
+    center=midpoint(a,b);
+  } else {
+    const [left,right]=part.landmarks;
+    center=midpoint(left,right);
+    const dx=(right.x-left.x)*imageWidth,dy=(right.y-left.y)*imageHeight;
+    const span=Math.max(Math.hypot(dx,dy),1);
+    const half=Math.max(part.region.height*imageHeight*.5,4);
+    // Pixel normals must be converted separately on each image axis. An
+    // equal normalized x/y offset tilts the hip axis in a tall photograph.
+    a={x:center.x+dy/span*half/imageWidth,y:center.y-dx/span*half/imageHeight};
+    b={x:center.x-dy/span*half/imageWidth,y:center.y+dx/span*half/imageHeight};
+  }
+  if(!validPoint(a)||!validPoint(b)||!validPoint(center)) return undefined;
+  const dx=(b.x-a.x)*imageWidth,dy=(b.y-a.y)*imageHeight,boneLength=Math.hypot(dx,dy);
+  if(boneLength<4)return undefined;
+  const ux=dx/boneLength,uy=dy/boneLength,nx=-uy,ny=ux;
+  const length=part.id==='waist'?boneLength*.65:boneLength;
+  const cx=center.x*imageWidth,cy=center.y*imageHeight;
+  const radii:[number[],number[]]=[[],[]];
+  for(const t of [-.35,-.2,0,.2,.35]){
+    const x=cx+ux*length*t,y=cy+uy*length*t;
+    if(rasterCoverage(mask,x/imageWidth,y/imageHeight)<.5)continue;
+    for(const [side,sign]of[[-1,-1],[1,1]] as const){
+      for(let d=1;d<=Math.min(imageWidth,imageHeight)*.48;d++)if(rasterCoverage(mask,(x+nx*sign*d)/imageWidth,(y+ny*sign*d)/imageHeight)<.5){radii[side<0?0:1].push(d);break;}
+    }
+  }
+  if(radii.some(side=>side.length<2))return undefined;
+  const negative=Math.max(...radii[0])*1.24+5,positive=Math.max(...radii[1])*1.24+5;
+  const start={x:(cx-ux*length*.5)/imageWidth,y:(cy-uy*length*.5)/imageHeight},end={x:(cx+ux*length*.5)/imageWidth,y:(cy+uy*length*.5)/imageHeight};
+  return [offset(start,-nx*negative/imageWidth,-ny*negative/imageHeight),offset(end,-nx*negative/imageWidth,-ny*negative/imageHeight),offset(end,nx*positive/imageWidth,ny*positive/imageHeight),offset(start,nx*positive/imageWidth,ny*positive/imageHeight)];
 }
 function torsoPolygon(points: DetectionPoint[], shoulderPad = 0.08): DetectionPoint[] {
   const leftShoulder = point(points, 11); const rightShoulder = point(points, 12);
@@ -338,7 +385,7 @@ export async function detectPeople(source: HTMLImageElement | HTMLCanvasElement,
         const pairedThigh = part.id.endsWith('thigh') ? candidates.find(other => other.id === (part.id.startsWith('left') ? 'right-thigh' : 'left-thigh')) : undefined;
         const measured = limb ? measuredLimbSupport(part, subjectMask, imageWidth, imageHeight, pairedThigh) : undefined;
         if (limb && !measured) { unavailableParts.push({ id: part.id, label: part.label, reason: '独立肢体轮廓不可见，可能被衣物或其他身体部位遮挡' }); return []; }
-        const support = measured ?? part.points.map(p => ({ x: clamp(cx+(p.x-cx)*1.5), y: clamp(cy+(p.y-cy)*1.5) }));
+        const support = measured ?? measuredTorsoSupport(part,subjectMask,imageWidth,imageHeight) ?? part.points.map(p => ({ x: clamp(cx+(p.x-cx)*1.5), y: clamp(cy+(p.y-cy)*1.5) }));
         const protectMask = ['waist','hips','torso'].includes(part.id) ? occludingArmProtection(points,imageWidth,imageHeight,part.id!=='torso') : undefined;
         return [{ ...part, points: support, region: regionForPolygon(support), protectMask }];
       });

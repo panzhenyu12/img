@@ -104,7 +104,7 @@ export function portraitParametersFor(tool: ToolId, context: PortraitCapabilitie
   return definition.parameters;
 }
 /** Semantic Pose operations expose only controls implemented for that area.
- * An unset bodyPart is the existing hand-selected compatibility mode. Height,
+ * A subject silhouette is required for nonzero reshaping. Height,
  * legLength and posture need a distinct axial/structural algorithm and must
  * never be advertised as contour width controls on a detected part. */
 export function bodyParameterKeys(part?: string): readonly string[] | null {
@@ -126,7 +126,7 @@ export function bodyParametersFor(part?: string): Parameter[] {
 export function bodyPartDescription(part?: string): string {
   if (part === 'full-body') return '全身粗细参数按 Pose 部位分别调整。建议选择腰部、胯部或单侧肢体，检查并修正自动选区；身高、腿长与体态暂未接入语义重塑。';
   if (part) return '当前只显示该部位支持的粗细参数。中轴和关节端点保持，边缘逐渐归零；自动选区可用套索修正。';
-  return '手工选区采用近似局部形变。自动检测并选择具体身体部位，可使用 Pose 语义调整。';
+  return '身体重塑需要真实主体轮廓与关键点；手工自由推拉请使用液化。自动检测并选择具体身体部位，可使用 Pose 语义调整。';
 }
 /** The AI gateway must use this allow-list, rather than invent parameter names. */
 export const PARAMETER_REGISTRY = Object.fromEntries(TOOLS.filter((tool) => tool.type).map((tool) => [tool.type, {
@@ -145,9 +145,9 @@ export const COMMON_PARAMETER_KEYS = ['region', 'mask', 'protectMask', 'opacity'
 export const OPERATION_PARAMETER_KEYS: Record<OperationType, readonly string[]> = {
   identity: [], crop: ['x', 'y', 'width', 'height'], rotate: ['degrees', 'expand'], flip: ['axis'], resize: ['width', 'height'],
   perspective: ['corners'], 'warp.grid': ['points', 'controlPoints'], 'warp.liquify': ['strokes'],
-  'face.adjust': ['adjustments', 'landmarks', 'semanticMasks', 'subjectMask'], 'feature.adjust': ['adjustments', 'landmarks', 'semanticMasks'], 'body.adjust': ['adjustments', 'landmarks', 'bodyPart', 'subjectMask'], 'clothing.adjust': ['adjustments', 'landmarks'],
+  'face.adjust': ['adjustments', 'landmarks', 'semanticMasks', 'subjectMask'], 'feature.adjust': ['adjustments', 'landmarks', 'semanticMasks'], 'body.adjust': ['adjustments', 'landmarks', 'bodyPart', 'subjectMask', 'partMask'], 'clothing.adjust': ['adjustments', 'landmarks'],
   'skin.retouch': [...TOOL_BY_ID.skin.parameters.map((item) => item.key), 'landmarks', 'semanticMasks'],
-  'repair.clone': ['strokes'], 'repair.heal': ['strokes'], 'repair.inpaint': ['radius', 'iterations'], 'paint.brush': ['color', 'strokes'],
+  'repair.clone': ['strokes'], 'repair.heal': ['strokes'], 'repair.inpaint': ['radius', 'iterations', 'method', 'execution', 'maxSide', 'contextPadding', 'maskDilation', 'seamBlend', 'contextMode'], 'paint.brush': ['color', 'strokes'],
   'color.basic': TOOL_BY_ID.color.parameters.map((item) => item.key), 'color.curves': ['channel', 'points'], 'color.hsl': ['hsl', 'channels', 'hue', 'saturation', 'lightness'],
   'filter.film': ['preset', 'seed', ...TOOL_BY_ID.film.parameters.map((item) => item.key)], 'filter.lut': ['size', 'data', 'amount', 'domainMin', 'domainMax'],
 };

@@ -1,0 +1,135 @@
+# 多样本人脸算法效果记录
+
+日期：2026-10-13。最长边缩至768px。像素脸部控制轮廓与整头前景alpha分开；有序36点只作解剖定位。输出再检测的脸宽只作辅助测量，不能代替照片边缘视觉验收。
+
+| 照片 | 参数 | 像素检查 | 颧侧宽度px（重新检测） | 支持区外变化 | 头部轮廓外2px变化（含颈部） | 真实场景背景变化 | 皮肤mask外变化 |
+|---|---|---|---|---|---|---|---|
+| portrait-makeup | eyeSize=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyeWidth=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyeHeight=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyeSpacing=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyeTilt=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyeCorner=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyelid=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyeInnerCorner=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | eyeOuterCorner=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | darkCircle=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | browLength=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | browWidth=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | browThickness=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | browPeak=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | browTail=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | browColor=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | browSpacing=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | noseBridge=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | noseWings=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | noseLength=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | noseTip=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | noseStraight=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | nostril=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | noseRoot=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | noseBase=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | mouthWidth=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | mouthHeight=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | upperLip=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | lowerLip=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | lipColor=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | philtrum=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | teethWhiten=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | lipPeak=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | lipCorner=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | lipBrightness=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | lipSaturation=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 0 | 0 | - |
+| portrait-makeup | smooth=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 21935 | 0 | 0 |
+| portrait-makeup | texture=0 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 28462 | 0 | 0 |
+| portrait-makeup | whiten=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 30322 | 0 | 0 |
+| portrait-makeup | warmth=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 29994 | 0 | 0 |
+| portrait-makeup | redness=60 | 通过像素保护检查，待视觉复核 | 231.66 → 未检出 | 0 | 29779 | 0 | 0 |
+| portrait-dark | eyeSize=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyeWidth=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyeHeight=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyeSpacing=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyeTilt=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyeCorner=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyelid=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyeInnerCorner=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | eyeOuterCorner=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | darkCircle=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | browLength=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | browWidth=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | browThickness=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | browPeak=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | browTail=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | browColor=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | browSpacing=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | noseBridge=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | noseWings=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | noseLength=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | noseTip=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | noseStraight=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | nostril=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | noseRoot=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | noseBase=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | mouthWidth=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | mouthHeight=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | upperLip=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | lowerLip=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | lipColor=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | philtrum=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | teethWhiten=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | lipPeak=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | lipCorner=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | lipBrightness=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | lipSaturation=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 0 | 0 | - |
+| portrait-dark | smooth=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 8872 | 0 | 0 |
+| portrait-dark | texture=0 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 10583 | 0 | 0 |
+| portrait-dark | whiten=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 7188 | 0 | 0 |
+| portrait-dark | warmth=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 6420 | 0 | 0 |
+| portrait-dark | redness=60 | 通过像素保护检查，待视觉复核 | 170.25 → 未检出 | 0 | 5976 | 0 | 0 |
+| portrait-roll | eyeSize=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyeWidth=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyeHeight=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyeSpacing=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyeTilt=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyeCorner=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyelid=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyeInnerCorner=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | eyeOuterCorner=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | darkCircle=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | browLength=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | browWidth=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | browThickness=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | browPeak=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | browTail=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | browColor=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | browSpacing=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | noseBridge=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | noseWings=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | noseLength=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | noseTip=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | noseStraight=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | nostril=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | noseRoot=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | noseBase=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | mouthWidth=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | mouthHeight=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | upperLip=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | lowerLip=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | lipColor=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | philtrum=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | teethWhiten=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | lipPeak=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | lipCorner=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | lipBrightness=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | lipSaturation=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 0 | 0 | - |
+| portrait-roll | smooth=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 9354 | 0 | 0 |
+| portrait-roll | texture=0 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 12519 | 0 | 0 |
+| portrait-roll | whiten=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 13046 | 0 | 0 |
+| portrait-roll | warmth=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 12982 | 0 | 0 |
+| portrait-roll | redness=60 | 通过像素保护检查，待视觉复核 | 177.75 → 未检出 | 0 | 12929 | 0 | 0 |
+
+
+
+皮肤包含明确的颈部语义层，因此头部轮廓外变化不等于场景背景变化。保留该原始指标，另以完整person alpha与原始skin mask核对真正背景和skin边界；未放宽阈值。
+
+逐参数原图、输出、差分与原/输出检测轮廓保存于 /Users/modao/work/img/test/results/feature-skin-algorithms。像素检查通过不代表自然度已达标。五官与皮肤批测中零变化参数仅记录，需要判断照片是否存在目标（如牙齿）、当前参数是否有上下文（texture需smooth>0），不能当作自然效果通过。

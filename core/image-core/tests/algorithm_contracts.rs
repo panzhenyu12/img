@@ -415,7 +415,7 @@ fn segmented_body_controls_move_silhouette_and_preserve_background() {
         assert!(count(&wide) > count(&src), "wide contour {part}/{key}");
         for y in 0..h {
             for x in 0..w {
-                if !(34..86).contains(&x) || !(24..136).contains(&y) {
+                if alpha[(y * w + x) as usize] == 0 {
                     assert_eq!(
                         pixel(&slim, x, y),
                         pixel(&src, x, y),

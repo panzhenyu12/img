@@ -12,10 +12,15 @@ make test      # Rust、Go test/vet、TypeScript 和生产构建
 make e2e       # 浏览器实际操作、像素验证与双端一致性
 make quality   # 多张真实照片对比；保留 FAIL / UNVERIFIED
 make agent     # 可选 DeepAgents 服务，前台运行
+make background-models # 可选 LaMa 本地服务环境与权重
+make background # 可选 LaMa 服务，另一个终端前台保持运行
+make background-test # 本地模型包装合同验证
 make stop      # 停止本工程记录的 Web/API 进程
 ```
 
 Web：<http://127.0.0.1:5173>；API：<http://127.0.0.1:8080>；MCP：<http://127.0.0.1:8080/mcp>；可选 Agent：<http://127.0.0.1:8090>。代码更新后的 API 重启使用 `make stop && make dev`。需要 Node 24+、Go、Rust/rustup、Python 3；AI 服务另需 uv。自动检测模型由 `make models` 放到本地静态目录。
+
+可选 LaMa 服务：<http://127.0.0.1:8091>，默认 CPU、本地权重推理；Go 使用 `IMG_BACKGROUND_WORKER_URL` 配置。手工选区可直接调用，不依赖 DeepAgent、LLM 或密钥。客户端模式在浏览器运行独立 ONNX 模型，服务端模式需上述 Worker；缺模型时仍可使用传统填补、仿制等手工工具。安装与限制见 [FUNC-016](doc/func/FUNC-016-local-model-inpaint.md)。
 
 ## 已实现的 Demo 功能
 
@@ -37,6 +42,7 @@ Web：<http://127.0.0.1:5173>；API：<http://127.0.0.1:8080>；MCP：<http://12
 apps/web/             React + TypeScript + Vite / Playwright
 services/api/         Go Gin + Viper + 官方 MCP SDK
 services/agent/       可选 Python DeepAgents + FastAPI
+services/background-worker/ 可选 Python LaMa CPU + FastAPI
 core/image-core/      Rust WASM / image-render native CLI
 schemas/              EditGraph / Operation / mask / 参数目录
 scripts/              启停、模型安装、目录生成、多照片诊断
@@ -51,8 +57,8 @@ doc/qa/              验收记录与截图
 
 ## 当前边界
 
-目前为 CPU WASM/native + Canvas 2D，没有 wgpu/WebGPU、瓦片或 30FPS 大图性能验收。脸部与身体轮廓使用前景 alpha 分离及背景窄带重建，五官基于实际语义部位和像素坐标。单测验证方向、轮廓/面积、背景、冻结和透明度；真实照片效果仍未通过全部验收，部分样片有色缝、遮挡定位或背景取样缺口。见 [算法验证与缺口](doc/qa/algorithm-validation.md) 与 [当前测试/性能记录](doc/qa/current-validation.md)。
+传统图像核心为 CPU WASM/native + Canvas 2D，尚未使用 wgpu 或进行瓦片/30FPS 大图性能验收。浏览器 LaMa 可尝试 WebGPU 并在本地回退 WASM，本机实测为 WASM，GPU 性能尚未验证。脸部与身体轮廓使用前景 alpha 分离及背景窄带重建，五官基于实际语义部位和像素坐标。单测验证方向、轮廓/面积、背景、冻结和透明度；真实照片效果仍未通过全部验收，部分样片有色缝、遮挡定位或背景取样缺口。见 [算法验证与缺口](doc/qa/algorithm-validation.md) 与 [当前测试/性能记录](doc/qa/current-validation.md)。
 
-去人使用 exemplar 纹理块补全，街景可移除选中人物，复杂纹理仍有接缝，尚无生成式语义重建。衣物功能是褶皱细纹弱化，不能重建严重褶皱或版型。不能以“像素变化”“单测通过”声称自然度达到专业或世界领先水平。
+去人提供传统 exemplar 与可选 LaMa 权重推理；原权重已核对，公共蒙版与保护合同已验证，复杂纹理/建筑自然度仍单独验收，见 [LaMa QA](doc/qa/algorithm-audit-lama.md)。不能以“像素变化”“单测通过”声称专业自然度或世界领先水平。衣物功能是褶皱细纹弱化，不能重建严重褶皱或版型。
 
 工程 JSON 只保存操作，恢复需提供原图。无账号、数据库、云同步、RAW/16-bit/ICC 和完整 PSD 图层。8 种胶片风格用于效果模拟，未声称精确复刻富士官方配方。已加载页面可独立手工编辑；首次离线打开仍需本地服务器，未实现 PWA。

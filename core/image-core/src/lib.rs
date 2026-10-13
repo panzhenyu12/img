@@ -8,15 +8,18 @@ mod body;
 mod color;
 mod engine;
 mod face;
+pub(crate) mod face_matting;
 mod geometry;
 mod inpaint;
 mod mask;
+mod model_inpaint;
 mod paint;
 mod validation;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
 pub use engine::{apply_graph, apply_graph_json, EditGraph, GraphOperation};
+pub use model_inpaint::{composite_model_inpaint, prepare_model_inpaint, InpaintMasks};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RgbaImage {

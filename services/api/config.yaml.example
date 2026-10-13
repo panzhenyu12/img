@@ -8,3 +8,6 @@ render:
   binary: ""
   timeout: "2m"
   concurrency: 2
+background:
+  # Optional model worker; manual/exemplar tools work without it.
+  worker_url: "http://127.0.0.1:8091"

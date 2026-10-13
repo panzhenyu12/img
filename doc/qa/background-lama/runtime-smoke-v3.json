@@ -1,0 +1,28 @@
+{
+  "preprocessVersion": "area-mask-v3",
+  "coldAfterRestartMs": 11381.07,
+  "cachedMs": 312.56,
+  "outsideChanged": 0,
+  "protectedChanged": 0,
+  "alphaChanged": 0,
+  "changedPixels": 5276,
+  "cacheExactRgba": true,
+  "clientRejection": {
+    "status": 422,
+    "body": {
+      "error": {
+        "code": "invalid_operation",
+        "message": "image-core rejected the editing parameters: client LaMa must be exported in the browser; explicitly choose execution=server to use backend export"
+      }
+    }
+  },
+  "workerHealth": {
+    "status": "ok",
+    "model": "lama-big-torchscript",
+    "device": "cpu",
+    "modelPresent": true,
+    "loaded": true,
+    "llmRequired": false
+  },
+  "scope": "Runtime smoke after Go/Worker restart; not additional perceptual acceptance"
+}

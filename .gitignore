@@ -14,3 +14,9 @@ apps/web/playwright-report/
 services/agent/.venv/
 services/agent/__pycache__/
 test/results/
+.models/
+services/background-worker/.venv/
+services/background-worker/__pycache__/
+services/background-worker/.pytest_cache/
+__pycache__/
+*.pyc

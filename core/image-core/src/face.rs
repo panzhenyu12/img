@@ -5,10 +5,14 @@
 //! A manual or legacy mesh contour remains a geometric approximation.
 
 use crate::engine::{byte, percent};
-use crate::mask::{coverage, Region};
+use crate::mask::{coverage, PreparedMask, Region};
 use crate::{ImageError, RgbaImage};
 use serde_json::{json, Value};
+use std::borrow::Cow;
 use std::collections::VecDeque;
+
+#[path = "face_mls.rs"]
+mod mls;
 
 type Point = (f32, f32);
 const CONTOUR_KEYS: &[&str] = &[
@@ -75,6 +79,17 @@ fn closest(p: Point, a: Point, b: Point) -> (f32, f32) {
     let t = (dot(sub(p, a), segment) / dot(segment, segment).max(1e-6)).clamp(0.0, 1.0);
     let d = sub(p, add(a, scale(segment, t)));
     (dot(d, d).sqrt(), t)
+}
+fn inside(p: Point, polygon: &[Point]) -> bool {
+    let mut inside = false;
+    for i in 0..polygon.len() {
+        let a = polygon[i];
+        let b = polygon[(i + 1) % polygon.len()];
+        if (a.1 > p.1) != (b.1 > p.1) && p.0 < (b.0 - a.0) * (p.1 - a.1) / (b.1 - a.1) + a.0 {
+            inside = !inside;
+        }
+    }
+    inside
 }
 /// Signed pixel distance gives a consistent one-pixel antialias fringe on
 /// both square and tall images; normalized polygon feather does not.
@@ -258,9 +273,10 @@ struct ContourField<'a> {
     target: &'a [Point],
     anchors: &'a [Anchor],
     support: f32,
+    mls: mls::RigidMls,
 }
 impl ContourField<'_> {
-    fn inverse(&self, p: Point) -> Point {
+    fn inverse_unanchored(&self, p: Point) -> (Point, f32) {
         let mut distance = f32::MAX;
         let mut movement = (0.0, 0.0);
         for i in 0..self.target.len() {
@@ -273,11 +289,79 @@ impl ContourField<'_> {
                 movement = add(scale(a, 1.0 - t), scale(b, t));
             }
         }
-        let mut weight = 1.0 - smoothstep(0.0, self.support, distance);
+        let rigid = sub(self.mls.map(p), p);
+        // Exact contour-segment inverse sampling is a portrait adaptation:
+        // enforce the requested raster boundary in a narrow three-pixel band,
+        // while rigid MLS distributes interior motion with fixed features.
+        movement = add(
+            scale(movement, 1.0 - smoothstep(0.0, 3.0, distance)),
+            scale(rigid, smoothstep(0.0, 3.0, distance)),
+        );
+        let weight = 1.0 - smoothstep(0.0, self.support, distance);
+        (scale(movement, weight), distance)
+    }
+    fn anchor_weight(&self, p: Point) -> f32 {
+        let mut weight = 1.0;
         for anchor in self.anchors {
             weight *= 1.0 - anchor.freeze(p);
         }
-        scale(movement, weight)
+        weight
+    }
+}
+
+/// A four-pixel sampling grid avoids solving all MLS handles for every
+/// interior pixel; grid caching is an implementation optimization.
+/// The actual contour band stays exact, and feature protection is evaluated
+/// at the true pixel rather than interpolated across protected features.
+struct ContourGrid {
+    origin: Point,
+    step: f32,
+    width: usize,
+    height: usize,
+    samples: Vec<Option<(Point, f32)>>,
+}
+impl ContourGrid {
+    fn new(origin: Point, w: usize, h: usize) -> Self {
+        let step = 4.0;
+        let width = w.div_ceil(step as usize) + 1;
+        let height = h.div_ceil(step as usize) + 1;
+        let samples = vec![None; width * height];
+        Self {
+            origin,
+            step,
+            width,
+            height,
+            samples,
+        }
+    }
+    fn inverse(&mut self, field: &ContourField<'_>, p: Point) -> Point {
+        let x = ((p.0 - self.origin.0) / self.step).clamp(0.0, (self.width - 1) as f32);
+        let y = ((p.1 - self.origin.1) / self.step).clamp(0.0, (self.height - 1) as f32);
+        let (x0, y0) = (x.floor() as usize, y.floor() as usize);
+        let (x1, y1) = ((x0 + 1).min(self.width - 1), (y0 + 1).min(self.height - 1));
+        let (tx, ty) = (x - x0 as f32, y - y0 as f32);
+        let mut movement = (0.0, 0.0);
+        let mut distance = 0.0;
+        for (x, y, weight) in [
+            (x0, y0, (1.0 - tx) * (1.0 - ty)),
+            (x1, y0, tx * (1.0 - ty)),
+            (x0, y1, (1.0 - tx) * ty),
+            (x1, y1, tx * ty),
+        ] {
+            let index = y * self.width + x;
+            let sample = *self.samples[index].get_or_insert_with(|| {
+                field.inverse_unanchored((
+                    self.origin.0 + x as f32 * self.step,
+                    self.origin.1 + y as f32 * self.step,
+                ))
+            });
+            movement = add(movement, scale(sample.0, weight));
+            distance += sample.1 * weight;
+        }
+        if distance < 3.0 + self.step * 2.0_f32.sqrt() {
+            movement = field.inverse_unanchored(p).0;
+        }
+        scale(movement, field.anchor_weight(p))
     }
 }
 
@@ -303,6 +387,7 @@ fn reconstruct(
     frozen: &[bool],
     donor_excluded: &[bool],
     underlayer_known: &[bool],
+    estimated_background: Option<&RgbaImage>,
 ) -> Result<RgbaImage, ImageError> {
     let w = source.width as usize;
     let h = source.height as usize;
@@ -362,10 +447,14 @@ fn reconstruct(
         if known[i] {
             continue;
         }
-        let donors: Vec<usize> = neighbors(i, w, h)
-            .filter(|&n| known[n] && !protected[n] && layer[n] == layer[i])
-            .collect();
-        if donors.is_empty() {
+        let mut donors = [0_usize; 4];
+        let mut donor_count = 0;
+        for n in neighbors(i, w, h).filter(|&n| known[n] && !protected[n] && layer[n] == layer[i]) {
+            donors[donor_count] = n;
+            donor_count += 1;
+        }
+        let donors = &donors[..donor_count];
+        if donor_count == 0 {
             continue;
         }
         // Premultiplied averaging also propagates transparent backdrops.
@@ -394,33 +483,77 @@ fn reconstruct(
             }
         }
     }
-    if holes.iter().enumerate().any(|(i, &hole)| hole && !known[i]) {
-        return Err(invalid(
-            "face contour requires clean, unprotected background beside the revealed edge",
-        ));
-    }
-    // Relax the narrow band without changing even one exterior backdrop pixel.
-    for _ in 0..8 {
-        let before = result.pixels.clone();
-        for i in 0..count {
-            if !target[i] || !known[i] {
-                continue;
-            }
-            let donors: Vec<usize> = neighbors(i, w, h)
-                .filter(|&n| !protected[n] && known[n] && layer[n] == layer[i])
-                .collect();
-            if donors.is_empty() {
-                continue;
-            }
-            for c in 0..4 {
-                let mean = donors
-                    .iter()
-                    .map(|&n| before[n * 4 + c] as f32)
-                    .sum::<f32>()
-                    / donors.len() as f32;
-                result.pixels[i * 4 + c] = byte(before[i * 4 + c] as f32 * 0.25 + mean * 0.75);
+    for (i, &hole) in holes.iter().enumerate() {
+        if hole && !known[i] {
+            if let Some(background) = estimated_background {
+                // An uncertain interior alpha island has no direct exterior
+                // donor. The paper's F/B estimator supplies a regularized
+                // background estimate; it is not recovered hidden texture.
+                result.pixels[i * 4..i * 4 + 4]
+                    .copy_from_slice(&background.pixels[i * 4..i * 4 + 4]);
+                known[i] = true;
+            } else {
+                return Err(invalid(
+                    "face contour requires clean, unprotected background beside the revealed edge",
+                ));
             }
         }
+    }
+    // Harmonic color extrapolation in float eliminates nearest-donor Voronoi
+    // stripes. Eight byte-quantized iterations leave visible vertical blocks
+    // on a shortened chin; solve only actual exposed pixels to convergence.
+    // The neck and scene layers never mix.
+    let hole_indices: Vec<usize> = (0..count).filter(|&i| holes[i] && known[i]).collect();
+    let mut colors: Vec<[f32; 4]> = result
+        .pixels
+        .chunks_exact(4)
+        .map(|p| {
+            let a = p[3] as f32 / 255.0;
+            [
+                p[0] as f32 * a,
+                p[1] as f32 * a,
+                p[2] as f32 * a,
+                p[3] as f32,
+            ]
+        })
+        .collect();
+    for _ in 0..128 {
+        let mut residual = 0.0_f32;
+        for parity in 0..2 {
+            for &i in &hole_indices {
+                if ((i % w + i / w) & 1) != parity {
+                    continue;
+                }
+                let mut sum = [0.0; 4];
+                let mut donor_count = 0;
+                for n in neighbors(i, w, h)
+                    .filter(|&n| !protected[n] && known[n] && layer[n] == layer[i])
+                {
+                    for c in 0..4 {
+                        sum[c] += colors[n][c];
+                    }
+                    donor_count += 1;
+                }
+                if donor_count == 0 {
+                    continue;
+                }
+                for (channel, total) in colors[i].iter_mut().zip(sum) {
+                    let value = total / donor_count as f32;
+                    residual = residual.max((value - *channel).abs());
+                    *channel = value;
+                }
+            }
+        }
+        if residual < 0.05 {
+            break;
+        }
+    }
+    for i in hole_indices {
+        let a = colors[i][3] / 255.0;
+        for (c, &channel) in colors[i].iter().take(3).enumerate() {
+            result.pixels[i * 4 + c] = if a > 1e-6 { byte(channel / a) } else { 0 };
+        }
+        result.pixels[i * 4 + 3] = byte(colors[i][3]);
     }
     Ok(result)
 }
@@ -506,6 +639,21 @@ fn validate_isoline(
 }
 
 pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, ImageError> {
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut profile_start = std::time::Instant::now();
+    macro_rules! mark {
+        ($label:expr) => {
+            #[cfg(not(target_arch = "wasm32"))]
+            if std::env::var_os("FACE_CORE_PROFILE").is_some() {
+                eprintln!(
+                    "face core {} {:.1} ms",
+                    $label,
+                    profile_start.elapsed().as_secs_f64() * 1000.0
+                );
+                profile_start = std::time::Instant::now();
+            }
+        };
+    }
     let values = params.get("adjustments").unwrap_or(params);
     for key in ["faceHeight", "midface", "doubleChin"] {
         if percent(values, key).abs() > 1e-6 {
@@ -607,12 +755,68 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         validate_isoline(matte, &polygon, source, "faceContour")?;
     }
     let target = target_contour(&polygon, frame, values);
+    // A purely shrinking operation must not fill concave notches which were
+    // outside the original foreground. Moving every x toward the center is
+    // insufficient to prove polygon containment for parsed concave contours.
+    let contraction_only = [
+        ("faceWidth", 1.0),
+        ("temples", 1.0),
+        ("cheekbones", 1.0),
+        ("jaw", 1.0),
+        ("chinPoint", 1.0),
+        ("foreheadWidth", -1.0),
+        ("chinWidth", -1.0),
+        ("forehead", -1.0),
+        ("chin", -1.0),
+    ]
+    .iter()
+    .all(|&(key, sign)| percent(values, key) * sign >= -1e-6);
+    let target_bounds = target.iter().fold(
+        (f32::MAX, f32::MAX, f32::MIN, f32::MIN),
+        |(l, t, r, b), p| (l.min(p.0), t.min(p.1), r.max(p.0), b.max(p.1)),
+    );
     let anchors = anchors(semantics, frame, w, h);
+    let mut handles = Vec::new();
+    let mut lengths = vec![0.0];
+    for i in 0..polygon.len() {
+        let length = sub(polygon[(i + 1) % polygon.len()], polygon[i]);
+        lengths.push(lengths.last().copied().unwrap_or(0.0) + length.0.hypot(length.1));
+    }
+    let perimeter = lengths.last().copied().unwrap_or(1.0);
+    for k in 0..64 {
+        let at = perimeter * k as f32 / 64.0;
+        let edge = lengths
+            .partition_point(|&d| d <= at)
+            .saturating_sub(1)
+            .min(polygon.len() - 1);
+        let t = (at - lengths[edge]) / (lengths[edge + 1] - lengths[edge]).max(1e-6);
+        let next = (edge + 1) % polygon.len();
+        handles.push((
+            add(scale(target[edge], 1.0 - t), scale(target[next], t)),
+            add(scale(polygon[edge], 1.0 - t), scale(polygon[next], t)),
+        ));
+    }
+    for anchor in &anchors {
+        for offset in [
+            (0.0, 0.0),
+            (-anchor.rx, 0.0),
+            (anchor.rx, 0.0),
+            (0.0, -anchor.ry),
+            (0.0, anchor.ry),
+        ] {
+            let p = add(
+                anchor.center,
+                add(scale(anchor.across, offset.0), scale(anchor.down, offset.1)),
+            );
+            handles.push((p, p));
+        }
+    }
     let field = ContourField {
         source: &polygon,
         target: &target,
         anchors: &anchors,
         support: (frame.width() * 0.28).max(3.0),
+        mls: mls::RigidMls::new(handles),
     };
     let manual = semantic_outline.is_none();
     // Older detector projects stored the same oval twice. Interpret that
@@ -620,9 +824,10 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let redundant_outline = params
         .get("mask")
         .is_some_and(|m| m.get("points") == outline.get("points"));
-    let mut support_params = params.clone();
+    let mut support_params = Cow::Borrowed(params);
     if manual || redundant_outline {
         support_params
+            .to_mut()
             .as_object_mut()
             .expect("validated params")
             .remove("mask");
@@ -633,7 +838,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             let top = polygon.iter().map(|p| p.1).fold(f32::MAX, f32::min) - pad;
             let right = polygon.iter().map(|p| p.0).fold(f32::MIN, f32::max) + pad;
             let bottom = polygon.iter().map(|p| p.1).fold(f32::MIN, f32::max) + pad;
-            support_params["region"] = json!({"x":left.max(0.0)/w,"y":top.max(0.0)/h,"width":(right.min(w)-left.max(0.0))/w,"height":(bottom.min(h)-top.max(0.0))/h});
+            support_params.to_mut()["region"] = json!({"x":left.max(0.0)/w,"y":top.max(0.0)/h,"width":(right.min(w)-left.max(0.0))/w,"height":(bottom.min(h)-top.max(0.0))/h});
         }
     }
     let region = Region::read(support_params.get("region"));
@@ -677,6 +882,18 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         .min(h) as usize;
     let (cw, ch) = (right - left, bottom - top);
     let count = cw * ch;
+    let mut grid = ContourGrid::new((left as f32 + 0.5, top as f32 + 0.5), cw, ch);
+    let source_matte = face_matte.map(PreparedMask::new);
+    let contour_mask = contour_matte.map(PreparedMask::new);
+    let person_mask = params.get("subjectMask").map(PreparedMask::new);
+    let protect_mask = params.get("protectMask").map(PreparedMask::new);
+    let neck_mask = semantics.and_then(|m| m.get("neck")).map(PreparedMask::new);
+    let output_mask = support_params.get("mask").map(PreparedMask::new);
+    let fixed_masks: Vec<_> = ["accessories", "ears", "hair"]
+        .iter()
+        .filter_map(|key| semantics.and_then(|m| m.get(key)))
+        .map(PreparedMask::new)
+        .collect();
     let mut input = source.clone();
     if symmetry > 1e-6 {
         let mut symmetry_params = params.clone();
@@ -688,38 +905,64 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     }
     let mut crop_pixels = Vec::with_capacity(count * 4);
     let mut subject = Vec::with_capacity(count);
+    let mut face_membership = Vec::with_capacity(count);
     let mut frozen = Vec::with_capacity(count);
     let mut protection = Vec::with_capacity(count);
     let mut donor_excluded = Vec::with_capacity(count);
     let mut underlayer_known = Vec::with_capacity(count);
+    mark!("prepare");
     for y in top..bottom {
         for x in left..right {
             let p = (x as f32 + 0.5, y as f32 + 0.5);
             let i = (y * source.width as usize + x) * 4;
             crop_pixels.extend_from_slice(&input.pixels[i..i + 4]);
             subject.push(
-                face_matte
-                    .map(|m| coverage(m, p.0 / w, p.1 / h, source.width, source.height))
+                source_matte
+                    .as_ref()
+                    .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
                     .unwrap_or_else(|| alpha(p, &polygon)),
             );
-            donor_excluded.push(params.get("subjectMask").is_some_and(|m| {
-                coverage(m, p.0 / w, p.1 / h, source.width, source.height) > 1.0 / 255.0
-            }));
+            face_membership.push(
+                contour_mask
+                    .as_ref()
+                    .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
+                    .unwrap_or_else(|| alpha(p, &polygon)),
+            );
+            let person_coverage = person_mask
+                .as_ref()
+                .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
+                .unwrap_or(0.0);
+            donor_excluded.push(person_coverage > 1.0 / 255.0);
             underlayer_known.push(
                 subject.last().copied().unwrap_or(1.0) <= 1e-6
-                    && semantics.and_then(|m| m.get("neck")).is_some_and(|m| {
-                        coverage(m, p.0 / w, p.1 / h, source.width, source.height) > 0.8
+                    && neck_mask.as_ref().is_some_and(|m| {
+                        m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.8
                     }),
             );
-            let protected = params
-                .get("protectMask")
-                .map(|m| coverage(m, p.0 / w, p.1 / h, source.width, source.height))
+            let protected = protect_mask
+                .as_ref()
+                .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
                 .unwrap_or(0.0);
-            frozen.push(protected >= 1.0 - 1e-6);
+            let accessory = fixed_masks
+                .iter()
+                .any(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            // A confidently classified non-neck person pixel is not a soft
+            // facial fringe, even if approximate head alpha overlaps it.
+            // Keep other people, clothing and undetected ears fixed.
+            let other_person = person_coverage >= 0.8
+                && face_membership.last().copied().unwrap_or(1.0) < 0.5
+                && !neck_mask.as_ref().is_some_and(|m| {
+                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.5
+                });
+            frozen.push(protected >= 1.0 - 1e-6 || accessory || other_person);
             protection.push(protected);
         }
     }
     let crop = RgbaImage::new(cw as u32, ch as u32, crop_pixels)?;
+    mark!("crop masks");
+    let color_layers = crate::face_matting::estimate(&crop, &subject);
+    mark!("F/B estimate");
+    let foreground = color_layers.as_ref().map(|(f, _)| f).unwrap_or(&crop);
     let mut samples = vec![([0.0; 4], 0.0); count];
     let mut changed = vec![false; count];
     let mut holes = vec![false; count];
@@ -730,29 +973,38 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             if frozen[i] || !region.contains(p.0 / w, p.1 / h) {
                 continue;
             }
-            let selection = support_params
-                .get("mask")
-                .map(|m| coverage(m, p.0 / w, p.1 / h, source.width, source.height))
+            let selection = output_mask
+                .as_ref()
+                .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
                 .unwrap_or(1.0);
             if selection <= 1e-6 {
                 continue;
             }
-            let movement = scale(field.inverse(p), selection * (1.0 - protection[i]));
+            // Deform the facial layer, not the whole head texture. Existing
+            // hair/ears/background outside the source face remain fixed unless
+            // the target contour explicitly covers that previously exterior
+            // region. Raster holes do not become an invented filled polygon.
+            if face_membership[i] < if contour_matte.is_some() { 1e-6 } else { 0.5 }
+                && (contraction_only
+                    || !(p.0 >= target_bounds.0
+                        && p.1 >= target_bounds.1
+                        && p.0 <= target_bounds.2
+                        && p.1 <= target_bounds.3
+                        && !inside(p, &polygon)
+                        && inside(p, &target)))
+            {
+                continue;
+            }
+            let movement = scale(grid.inverse(&field, p), selection * (1.0 - protection[i]));
             if movement.0.abs() + movement.1.abs() < 1e-5 {
                 continue;
             }
             let sample = sample(
-                &crop,
+                foreground,
                 &subject,
                 x as f32 + movement.0,
                 y as f32 + movement.1,
             );
-            // A shrinking foreground must never repaint an already exterior
-            // pixel through its antialias fringe. Expansion may cover that
-            // pixel; contraction only reconstructs the original interior.
-            if subject[i] < 0.5 && sample.1 <= subject[i] {
-                continue;
-            }
             // Background with zero old and new foreground is always bit-exact.
             if subject[i] <= 1e-6 && sample.1 <= 1e-6 {
                 continue;
@@ -762,6 +1014,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             holes[i] = subject[i] > 1e-6 && sample.1 < 1.0 - 1e-6;
         }
     }
+    mark!("sample grid");
     let background = if holes.iter().any(|&h| h) {
         reconstruct(
             &crop,
@@ -770,12 +1023,18 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             &frozen,
             &donor_excluded,
             &underlayer_known,
+            color_layers.as_ref().map(|(_, b)| b),
         )?
     } else {
         crop.clone()
     };
+    mark!("reconstruct");
     let mut rendered = input.clone();
     for i in 0..count {
+        if frozen[i] {
+            let j = ((top + i / cw) * source.width as usize + left + i % cw) * 4;
+            rendered.pixels[j..j + 4].copy_from_slice(&source.pixels[j..j + 4]);
+        }
         if !changed[i] {
             continue;
         }
@@ -795,7 +1054,16 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     }
     // ROI/protection/opacity/blend are applied once over the expanded support,
     // never again clipped by the original foreground alpha in engine.rs.
-    Ok(crate::mask::composite(source, &rendered, &support_params))
+    mark!("compose layers");
+    let output = crate::mask::composite(source, &rendered, &support_params);
+    #[cfg(not(target_arch = "wasm32"))]
+    if std::env::var_os("FACE_CORE_PROFILE").is_some() {
+        eprintln!(
+            "face core final composite {:.1} ms",
+            profile_start.elapsed().as_secs_f64() * 1000.0
+        );
+    }
+    Ok(output)
 }
 
 #[cfg(test)]
@@ -1289,6 +1557,19 @@ mod tests {
                 "outer hair/background at {x}"
             );
         }
+        for i in 0..160 * 240 {
+            if p["semanticMasks"]["faceContourMask"]["data"][i]
+                .as_u64()
+                .unwrap()
+                == 0
+            {
+                assert_eq!(
+                    &output.pixels[i * 4..i * 4 + 4],
+                    &source.pixels[i * 4..i * 4 + 4],
+                    "contraction changed original exterior pixel {i}"
+                );
+            }
+        }
         for x in before.0..after.0 - 1 {
             let i = (120 * 160 + x) * 4;
             assert!(
@@ -1390,6 +1671,82 @@ mod tests {
                     assert_eq!(&out.pixels[i..i + 4], &source.pixels[i..i + 4]);
                 }
             }
+        }
+    }
+    #[test]
+    fn every_accessory_and_ear_pixel_stays_frozen_during_face_reshaping() {
+        let (mut source, p) = portrait(160, 240);
+        let mut p = raster_params(&source, p);
+        let mut accessories = vec![0_u8; 160 * 240];
+        let mut ears = accessories.clone();
+        for y in 95..165 {
+            for x in 43..47 {
+                let i = y * 160 + x;
+                accessories[i] = 255;
+                source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[
+                    245,
+                    (y * 3 % 255) as u8,
+                    8,
+                    255,
+                ]);
+            }
+            for x in 112..118 {
+                let i = y * 160 + x;
+                ears[i] = 255;
+                source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[
+                    230,
+                    140,
+                    (y * 7 % 255) as u8,
+                    255,
+                ]);
+            }
+        }
+        p["semanticMasks"]["accessories"] =
+            json!({"shape":"raster","width":160,"height":240,"data":accessories});
+        p["semanticMasks"]["ears"] = json!({"shape":"raster","width":160,"height":240,"data":ears});
+        for adjustments in [
+            json!({"faceWidth":100}),
+            json!({"faceWidth":-100}),
+            json!({"jaw":100,"chin":100}),
+        ] {
+            p["adjustments"] = adjustments;
+            let output = adjust(&source, &p).unwrap();
+            for i in 0..160 * 240 {
+                if accessories[i] > 0 || ears[i] > 0 {
+                    assert_eq!(
+                        &output.pixels[i * 4..i * 4 + 4],
+                        &source.pixels[i * 4..i * 4 + 4],
+                        "protected accessory/ear {i}"
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    #[ignore = "manual native kernel benchmark uses local cached photo graphs"]
+    fn native_cached_face_kernel_benchmark() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test/results/face-core-mls-matting");
+        let name = std::env::var("FACE_BENCH_CASE").unwrap_or_else(|_| "portrait-makeup".into());
+        let decoded = image::open(root.join(format!("{name}-source.png")))
+            .unwrap()
+            .to_rgba8();
+        let source = RgbaImage::new(decoded.width(), decoded.height(), decoded.into_raw()).unwrap();
+        let graph: Value = serde_json::from_str(
+            &std::fs::read_to_string(root.join(format!("{name}-faceWidth-60.json"))).unwrap(),
+        )
+        .unwrap();
+        let params = &graph["operations"][0]["params"];
+        for _ in 0..3 {
+            let start = std::time::Instant::now();
+            let out = adjust(&source, params).unwrap();
+            assert_ne!(source.pixels, out.pixels);
+            eprintln!(
+                "{name} {}x{} kernel {:.1} ms",
+                source.width,
+                source.height,
+                start.elapsed().as_secs_f64() * 1000.0
+            );
         }
     }
 }

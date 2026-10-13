@@ -6,6 +6,7 @@ export type RenderKind = 'preview' | 'export' | 'background';
 export interface RenderOptions { signal?: AbortSignal; kind?: RenderKind }
 interface RenderTask {
   id: number; kind: RenderKind; source: ImagePixels; graphJson: string;
+  modelGraph: boolean;
   resolve: (image: ImagePixels) => void; reject: (error: Error) => void;
   signal?: AbortSignal; onAbort?: () => void; settled: boolean;
 }
@@ -91,13 +92,20 @@ function pump() {
     target.postMessage(message, [pixels.buffer]);
   } catch (error) { failAll(error instanceof Error ? error : new Error(String(error))); }
 }
-function cancel(task: RenderTask) {
+function cancel(task: RenderTask, sourceChanged = false) {
+  const wasSettled = task.settled;
   rejectTask(task, abortError());
   if (task === active) {
     if (task.kind === 'preview') {
-      // WASM runs synchronously inside the worker, so a cancellation message
-      // cannot interrupt its pixel loop. Termination really stops CPU work.
-      cancelledPreviews++; terminateWorker(); active = null; pump();
+      if (!wasSettled) cancelledPreviews++;
+      // Model sessions and successful candidates live inside this Worker.
+      // Keep the current model render running while sliders replace its
+      // caller, then dispatch the latest preview with the reusable candidate.
+      // A new photograph must not wait behind the old model calculation.
+      if (!task.modelGraph || sourceChanged) {
+        // Synchronous Rust work can only be interrupted by termination.
+        terminateWorker(); active = null; pump();
+      }
     }
     // Explicit abort of an export/background task rejects its caller, but the
     // active computation must finish before dispatching another message.
@@ -117,12 +125,13 @@ export function renderImage(source: ImagePixels, graph: EditGraph, options: Rend
   try { const { source: _metadata, ...protocol } = graph; graphJson = JSON.stringify(protocol); }
   catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); }
   return new Promise((resolve, reject) => {
-    const task: RenderTask = { id: ++requestId, kind: options.kind ?? 'preview', source, graphJson, resolve, reject, signal: options.signal, settled: false };
+    const modelGraph = graph.operations.some(op => op.type === 'repair.inpaint' && op.params.method === 'lama' && op.enabled !== false && Number(op.params.opacity ?? 100) > 0);
+    const task: RenderTask = { id: ++requestId, kind: options.kind ?? 'preview', source, graphJson, modelGraph, resolve, reject, signal: options.signal, settled: false };
     if (task.signal) { task.onAbort = () => cancel(task); task.signal.addEventListener('abort', task.onAbort, { once: true }); }
     if (task.kind === 'preview') {
       if (latestPreview) rejectTask(latestPreview, abortError('预览已被更新参数替代'));
       latestPreview = task;
-      if (active?.kind === 'preview') cancel(active);
+      if (active?.kind === 'preview') cancel(active, active.source !== source);
     } else (task.kind === 'export' ? exportsQueue : backgroundQueue).push(task);
     pump();
   });

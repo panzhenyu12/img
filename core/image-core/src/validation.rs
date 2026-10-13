@@ -9,6 +9,8 @@ const SEMANTIC_MASK_NAMES: &[&str] = &[
     "faceContourMask",
     "skin",
     "neck",
+    "accessories",
+    "ears",
     "skinProtection",
     "eyes",
     "leftEye",
@@ -364,6 +366,7 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
             "bodyPart",
             "semanticMasks",
             "subjectMask",
+            "partMask",
         ],
         "skin.retouch" => &[
             "smooth",
@@ -375,7 +378,17 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
             "semanticMasks",
         ],
         "repair.clone" | "repair.heal" => &["strokes"],
-        "repair.inpaint" => &["radius", "iterations"],
+        "repair.inpaint" => &[
+            "radius",
+            "iterations",
+            "method",
+            "execution",
+            "maxSide",
+            "contextPadding",
+            "maskDilation",
+            "seamBlend",
+            "contextMode",
+        ],
         "paint.brush" => &["color", "strokes"],
         "color.basic" => &[
             "exposure",
@@ -485,6 +498,22 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
                     ));
                 }
                 mask(value)?;
+            }
+            "partMask" => {
+                if op.kind != "body.adjust" || op.params.get("bodyPart").is_none() {
+                    return Err(error(
+                        "partMask requires a semantic body.adjust operation".into(),
+                    ));
+                }
+                mask(value)?;
+            }
+            "method" => {
+                if !value
+                    .as_str()
+                    .is_some_and(|m| ["exemplar", "lama"].contains(&m))
+                {
+                    return Err(error("inpaint method must be exemplar or lama".into()));
+                }
             }
             "semanticMasks" => semantic_masks(value)?,
             "blendMode" => {
@@ -730,6 +759,78 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
         "repair.inpaint" => {
             number(&op.params, "radius", 0.00001, 1.0, false)?;
             number(&op.params, "iterations", 1.0, 64.0, false)?;
+            for key in [
+                "execution",
+                "maxSide",
+                "contextPadding",
+                "maskDilation",
+                "seamBlend",
+                "contextMode",
+            ] {
+                if op.params.get(key).is_some()
+                    && op.params.get("method").and_then(Value::as_str) != Some("lama")
+                {
+                    return Err(error(format!("{key} requires inpaint method=lama")));
+                }
+            }
+            number(&op.params, "maxSide", 256.0, 2048.0, false)?;
+            number(&op.params, "contextPadding", 64.0, 1024.0, false)?;
+            number(&op.params, "maskDilation", 0.0, 32.0, false)?;
+            if let Some(value) = op.params.get("execution") {
+                if !value
+                    .as_str()
+                    .is_some_and(|v| ["client", "server"].contains(&v))
+                {
+                    return Err(error("execution must be client or server".into()));
+                }
+            }
+            if op.params.get("execution").and_then(Value::as_str) == Some("client") {
+                if op
+                    .params
+                    .get("maxSide")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(512.0)
+                    > 512.0
+                {
+                    return Err(error("client LaMa supports maxSide up to 512".into()));
+                }
+                if op
+                    .params
+                    .get("seamBlend")
+                    .and_then(Value::as_str)
+                    .unwrap_or("none")
+                    != "none"
+                {
+                    return Err(error(
+                        "client LaMa currently supports seamBlend=none".into(),
+                    ));
+                }
+            }
+            for key in ["maxSide", "contextPadding", "maskDilation"] {
+                if op
+                    .params
+                    .get(key)
+                    .is_some_and(|v| v.as_f64().is_some_and(|n| n.fract() != 0.0))
+                {
+                    return Err(error(format!("{key} must be an integer")));
+                }
+            }
+            if let Some(value) = op.params.get("contextMode") {
+                if !value
+                    .as_str()
+                    .is_some_and(|v| ["full", "crop"].contains(&v))
+                {
+                    return Err(error("contextMode must be full or crop".into()));
+                }
+            }
+            if let Some(value) = op.params.get("seamBlend") {
+                if !value
+                    .as_str()
+                    .is_some_and(|v| ["none", "poisson"].contains(&v))
+                {
+                    return Err(error("seamBlend must be none or poisson".into()));
+                }
+            }
         }
         "paint.brush" => {
             let color = op
@@ -812,6 +913,21 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
             keys(values, allowed, "adjustments")?;
             for key in object(values, "adjustments")?.keys() {
                 number(values, key, -100.0, 100.0, false)?;
+            }
+            if op.kind == "body.adjust"
+                && op.enabled
+                && op
+                    .params
+                    .get("opacity")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(100.0)
+                    > 0.0
+                && object(values, "adjustments")?
+                    .values()
+                    .any(|v| v.as_f64().unwrap_or(0.0) != 0.0)
+                && op.params.get("subjectMask").is_none()
+            {
+                return Err(error("body reshaping requires a subjectMask describing the true subject silhouette; a rectangular ROI cannot isolate the background".into()));
             }
             if let Some(landmark_values) = op.params.get("landmarks") {
                 landmarks(landmark_values)?;
@@ -922,6 +1038,31 @@ mod tests {
     use super::*;
     use crate::{apply_graph_json, RgbaImage};
     use serde_json::json;
+    #[test]
+    fn inpaint_execution_options_are_explicit_and_validated_even_when_disabled() {
+        let make = |params: Value, enabled| {
+            serde_json::from_value::<GraphOperation>(
+                json!({"type":"repair.inpaint","enabled":enabled,"params":params}),
+            )
+            .unwrap()
+        };
+        for params in [
+            json!({"method":"lama","execution":"client","maxSide":512}),
+            json!({"method":"lama","execution":"server","maxSide":2048,"seamBlend":"poisson"}),
+            json!({"method":"exemplar"}),
+        ] {
+            assert!(operation(&make(params, true)).is_ok());
+        }
+        for params in [
+            json!({"method":"exemplar","execution":"client"}),
+            json!({"method":"lama","execution":"auto"}),
+            json!({"method":"lama","execution":"client","maxSide":1024}),
+            json!({"method":"lama","execution":"client","seamBlend":"poisson"}),
+            json!({"method":"lama","maxSide":511.5}),
+        ] {
+            assert!(operation(&make(params, false)).is_err());
+        }
+    }
     #[test]
     fn legacy_pending_parameters_are_rejected_instead_of_a_fake_pixel_effect() {
         for (kind, keys) in [

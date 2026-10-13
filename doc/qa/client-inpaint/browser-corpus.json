@@ -1,0 +1,62 @@
+[
+  {
+    "name": "street",
+    "width": 768,
+    "height": 576,
+    "coldMs": 99432.2000002861,
+    "cacheMs": 54,
+    "outside": 0,
+    "frozen": 0,
+    "alpha": 0,
+    "changed": 5413,
+    "cacheMismatch": 0,
+    "uploads": [],
+    "diagnostics": [
+      "client-inpaint {\"backend\":\"webgpu/wasm\",\"model\":\"1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6\",\"inferenceMs\":49074.300000190735,\"totalMs\":99158.7000002861,\"input\":[768,576],\"modelSize\":[512,512],\"box\":[0,0,768,576]}"
+    ],
+    "quality": "FAIL-under-8: see browser-client-review.md for visual assessment",
+    "backend_observed": "WASM; ORT silently removed unavailable WebGPU on this headless machine. Earlier diagnostic label recorded requested providers, not a hardware measurement.",
+    "isolation_observed": false
+  },
+  {
+    "name": "crowd",
+    "width": 1280,
+    "height": 854,
+    "coldMs": 50838.800000190735,
+    "cacheMs": 78.69999980926514,
+    "outside": 0,
+    "frozen": 0,
+    "alpha": 0,
+    "changed": 19925,
+    "cacheMismatch": 0,
+    "uploads": [],
+    "diagnostics": [
+      "client-inpaint {\"backend\":\"webgpu/wasm\",\"model\":\"1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6\",\"inferenceMs\":49074.300000190735,\"totalMs\":99158.7000002861,\"input\":[768,576],\"modelSize\":[512,512],\"box\":[0,0,768,576]}",
+      "client-inpaint {\"backend\":\"webgpu/wasm\",\"model\":\"1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6\",\"inferenceMs\":31388.800000190735,\"totalMs\":50717.90000009537,\"input\":[1280,854],\"modelSize\":[512,512],\"box\":[0,0,1280,854]}"
+    ],
+    "quality": "FAIL-under-8: see browser-client-review.md for visual assessment",
+    "backend_observed": "WASM; ORT silently removed unavailable WebGPU on this headless machine. Earlier diagnostic label recorded requested providers, not a hardware measurement.",
+    "isolation_observed": false
+  },
+  {
+    "name": "architecture",
+    "width": 1280,
+    "height": 853,
+    "coldMs": 54413.2000002861,
+    "cacheMs": 84.19999980926514,
+    "outside": 0,
+    "frozen": 0,
+    "alpha": 0,
+    "changed": 22491,
+    "cacheMismatch": 0,
+    "uploads": [],
+    "diagnostics": [
+      "client-inpaint {\"backend\":\"webgpu/wasm\",\"model\":\"1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6\",\"inferenceMs\":49074.300000190735,\"totalMs\":99158.7000002861,\"input\":[768,576],\"modelSize\":[512,512],\"box\":[0,0,768,576]}",
+      "client-inpaint {\"backend\":\"webgpu/wasm\",\"model\":\"1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6\",\"inferenceMs\":31388.800000190735,\"totalMs\":50717.90000009537,\"input\":[1280,854],\"modelSize\":[512,512],\"box\":[0,0,1280,854]}",
+      "client-inpaint {\"backend\":\"webgpu/wasm\",\"model\":\"1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6\",\"inferenceMs\":34683.800000190735,\"totalMs\":54295.90000009537,\"input\":[1280,853],\"modelSize\":[512,512],\"box\":[0,0,1280,853]}"
+    ],
+    "quality": "FAIL-under-8: see browser-client-review.md for visual assessment",
+    "backend_observed": "WASM; ORT silently removed unavailable WebGPU on this headless machine. Earlier diagnostic label recorded requested providers, not a hardware measurement.",
+    "isolation_observed": false
+  }
+]

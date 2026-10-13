@@ -458,17 +458,18 @@ test('绘色橡皮、修复、内容填补、渐变蒙版与工程恢复', async
 });
 
 test('AI提案预览、接受、拒绝、撤销与保护新的手工编辑', async ({ page, request }) => {
+  await importFixture(page); await page.locator('.ai-panel summary').click();
   const upload = page.waitForResponse(response => response.url().includes('/assets') && response.request().method() === 'POST');
-  await importFixture(page); const response = await upload;
+  await page.getByRole('button', {name:'连接 AI 服务（上传图片）',exact:true}).click(); const response = await upload;
   const sessionId = new URL(response.url()).pathname.split('/')[4];
-  await expect(page.locator('.statusbar')).toContainText('图片已就绪'); const original = await pixels(page);
+  await expect(page.locator('.statusbar')).toContainText('已连接 AI 服务'); const original = await pixels(page);
   const operation = { id: 'ai-color', type: 'color.basic', version: '1.0', enabled: true, origin: 'ai', label: 'AI 亮度', params: { brightness: 30 }, controlPoints: [] };
   const create = async (id: string) => {
     const session = await (await request.get(`http://127.0.0.1:8080/api/v1/sessions/${sessionId}`)).json();
     const created = await request.post(`http://127.0.0.1:8080/api/v1/sessions/${sessionId}/proposals`, { data: { baseRevision: session.revision, operations: [{ ...operation, id }], summary: '测试调亮提案' } });
     expect(created.status(), await created.text()).toBe(201); return created.json();
   };
-  await create('first'); await page.locator('.ai-panel summary').click();
+  await create('first');
   await page.getByRole('button', { name: '刷新提案', exact: true }).click();
   await page.getByRole('button', { name: '预览效果', exact: true }).click();
   await expect.poll(() => pixels(page)).not.toBe(original); await expect(page.locator('.counter')).toHaveText('0');

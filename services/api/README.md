@@ -23,6 +23,7 @@ go run ./cmd/server
 | `IMG_RENDER_BINARY` | 自动查找仓库 `core/image-core/target/release/image-render` |
 | `IMG_RENDER_TIMEOUT` | `2m`（包含排队时间） |
 | `IMG_RENDER_CONCURRENCY` | `2` |
+| `IMG_BACKGROUND_WORKER_URL` | `http://127.0.0.1:8091`（主程序默认，可配置其他地址） |
 
 Worker 不存在时，只有空编辑图的同格式源图可以下载；含任何 Operation（包括 disabled 和 identity）或需要转码的请求返回 `503 render_worker_unavailable`，不会静默绕过校验。
 
@@ -51,6 +52,7 @@ GET    /api/v1/tools
 GET    /api/v1/operations
 POST   /api/v1/tools/{toolName}/call
 GET    /healthz
+POST   /api/inpaint/model
 ```
 
 `preview/render` JSON：
@@ -62,6 +64,8 @@ GET    /healthz
 源 asset 必须匹配 session；为旧 demo 保留省略 `sourceAssetId/id/version/enabled` 的兼容。`format` 只允许 `png/jpeg`（`jpg` 别名）；Rust 未实现的参数、非法参数或 operation 返回 `422`。请求取消会杀掉 Worker，超时返回 `504`；每请求的 graph/input/output 临时目录在完成和失败后都清理。
 
 源字节直通只适用于没有任何 Operation 的同格式图。含节点均先执行 Rust 校验/渲染，disabled 和 identity 的坏键或非法值也返回 422。仅当全部节点 disabled 且同格式时，Rust 校验成功后返回源字节，保留关闭效果的原编码。enabled identity 始终使用 Rust 输出，因为其 blendMode 等通用合成参数可能产生实际效果。
+
+LaMa 是可选独立 Worker，见 [运行说明](../background-worker/README.md)。Go 模型代理接受 multipart `image/mask/protect_mask` 及 `max_side/context_mode/context_padding/mask_dilation/seam_blend`，返回原尺寸 PNG。完整图在模型节点前后执行 Rust 分段，模型候选也使用 Rust 公共合成。只缓存成功有效 PNG（64 MiB LRU），修改后段或 opacity 不重复推理。模型不可用明确返回 503，传统 `method=exemplar` 不受影响。`execution=client` 且 enabled/opacity>0 的节点不能由服务端静默执行，需浏览器导出或显式改为 `server`；禁用和零透明度仍验证所有参数。多个本地模型图层可能较慢，可显式设置 `IMG_RENDER_TIMEOUT=5m`。
 
 上传返回的 `width/height` 与 `inspect_asset.asset` 是展示方向尺寸。JPEG 使用 `goexif` 读取 EXIF Orientation，5/6/7/8 交换宽高，与浏览器和 Rust 的方向校正一致；Go 不旋转像素，源 JPEG 字节保留。可选 EXIF 不存在或损坏时使用 JPEG 原尺寸。
 

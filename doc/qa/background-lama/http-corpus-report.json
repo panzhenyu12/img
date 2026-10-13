@@ -1,0 +1,57 @@
+[
+  {
+    "case": "street",
+    "wall_ms": 82941.31,
+    "headers": {
+      "x-inpaint-model": "lama-big-torchscript",
+      "x-inpaint-device": "cpu",
+      "x-inpaint-inference-ms": "50810.71",
+      "x-inpaint-total-ms": "79877.77",
+      "x-inpaint-peak-rss-mb": "1726.55",
+      "x-inpaint-selected-pixels": "5422",
+      "x-inpaint-seam-blend": "none",
+      "x-inpaint-context-mode": "full"
+    },
+    "outside_changed_pixels": 0,
+    "protected_changed_pixels": 0,
+    "alpha_changed_pixels": 0,
+    "changed_target_pixels": 5417
+  },
+  {
+    "case": "crowd",
+    "wall_ms": 94354.86,
+    "headers": {
+      "x-inpaint-model": "lama-big-torchscript",
+      "x-inpaint-device": "cpu",
+      "x-inpaint-inference-ms": "91214.73",
+      "x-inpaint-total-ms": "92160.5",
+      "x-inpaint-peak-rss-mb": "2285.7",
+      "x-inpaint-selected-pixels": "20058",
+      "x-inpaint-seam-blend": "none",
+      "x-inpaint-context-mode": "full"
+    },
+    "outside_changed_pixels": 0,
+    "protected_changed_pixels": 0,
+    "alpha_changed_pixels": 0,
+    "changed_target_pixels": 20042
+  },
+  {
+    "case": "architecture",
+    "wall_ms": 38267.11,
+    "headers": {
+      "x-inpaint-model": "lama-big-torchscript",
+      "x-inpaint-device": "cpu",
+      "x-inpaint-inference-ms": "36578.69",
+      "x-inpaint-total-ms": "37064.2",
+      "x-inpaint-peak-rss-mb": "2285.7",
+      "x-inpaint-selected-pixels": "22491",
+      "x-inpaint-seam-blend": "none",
+      "x-inpaint-context-mode": "full"
+    },
+    "outside_changed_pixels": 0,
+    "protected_changed_pixels": 0,
+    "alpha_changed_pixels": 0,
+    "changed_target_pixels": 22491,
+    "clean_target_mae": 41.178
+  }
+]

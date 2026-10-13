@@ -7,14 +7,41 @@ import type { RasterMask } from './operations';
 // BiSeNet / CelebAMask-HQ: background, skin, brows, eyes, glasses,
 // ears, earrings, nose, inner mouth, lips, neck, necklace, cloth, hair, hat.
 const HEAD = new Set([1,2,3,4,5,6,7,8,9,10,11,12,13,17,18]);
-const FACE_CONTROL = new Set([1,2,3,4,5,6,7,8,9,10,11,12,13]);
-const SKIN = new Set([1,7,8,10,14]);
+// Ears, glasses and earrings are separate stationary layers. Including them
+// in the contour changes accessories instead of the cheek/jaw silhouette.
+const FACE_CONTROL = new Set([1,2,3,4,5,10,11,12,13]);
+const SKIN = new Set([1,10,14]);
 let session: Promise<ort.InferenceSession> | undefined;
 const clamp = (v: number) => Math.max(0,Math.min(1,v));
 // Class confidence is not physical opacity. Suppress probability tails on
 // certain background, retain a narrow antialias band and the exact .5 edge.
 function coverageAlpha(probability: number): number {
   const t=clamp((probability-.4)/.2);return t*t*(3-2*t);
+}
+
+/** Decode class probabilities once, with distinct control and foreground
+ * layers. A confidence is coverage for editing, not physical matting alpha. */
+export function decodeFaceClasses(logits: Float32Array, count: number): Record<string,Float32Array> {
+  if(count < 1 || logits.length !== 19*count) throw new Error('人像解析分类长度不匹配');
+  const groups: Record<string,Set<number>> = {
+    head: HEAD, faceControl: FACE_CONTROL, skin: SKIN,
+    neck: new Set([14]), hair: new Set([17]),
+    accessories: new Set([6,9]), ears: new Set([7,8]),
+    personAlpha: new Set(Array.from({length:18},(_,i)=>i+1)),
+  };
+  const layers = Object.fromEntries(Object.keys(groups).map(name=>[name,new Float32Array(count)]));
+  const classLayers = Array.from({length:19},(_,c)=>Object.entries(groups).filter(([,classes])=>classes.has(c)).map(([name])=>layers[name]));
+  const layerValues = Object.values(layers);
+  for(let i=0;i<count;i++) {
+    let max=-Infinity;for(let c=0;c<19;c++)max=Math.max(max,logits[c*count+i]);
+    let total=0;
+    for(let c=0;c<19;c++) {
+      const score=Math.exp(logits[c*count+i]-max);total+=score;
+      for(const layer of classLayers[c])layer[i]+=score;
+    }
+    for(const layer of layerValues)layer[i]/=total;
+  }
+  return layers;
 }
 
 function simplify(points: DetectionPoint[], epsilon: number): DetectionPoint[] {
@@ -113,16 +140,7 @@ export async function parseFace(source: HTMLImageElement | HTMLCanvasElement, pe
   const output=result[model.outputNames[0]],dims=output.dims;
   if(dims.length!==4||dims[1]!==19)throw new Error(`人像解析模型输出格式不匹配：${dims.join('×')}`);
   const [oh,ow]=[dims[2],dims[3]],count=ow*oh,logits=output.data as Float32Array;
-  const head=new Float32Array(count),faceControl=new Float32Array(count),skin=new Float32Array(count),neck=new Float32Array(count),hair=new Float32Array(count),personAlpha=new Float32Array(count);
-  for(let i=0;i<count;i++) {
-    let max=-Infinity;for(let c=0;c<19;c++)max=Math.max(max,logits[c*count+i]);
-    let total=0,hw=0,fw=0,sw=0,nw=0,aw=0,pw=0;
-    for(let c=0;c<19;c++) {
-      const score=Math.exp(logits[c*count+i]-max);total+=score;
-      if(HEAD.has(c))hw+=score;if(FACE_CONTROL.has(c))fw+=score;if(SKIN.has(c))sw+=score;if(c===14)nw+=score;if(c===17)aw+=score;if(c!==0)pw+=score;
-    }
-    head[i]=hw/total;faceControl[i]=fw/total;skin[i]=sw/total;neck[i]=nw/total;hair[i]=aw/total;personAlpha[i]=pw/total;
-  }
+  const {head,faceControl,skin,neck,hair,accessories,ears,personAlpha}=decodeFaceClasses(logits,count);
   // Long hair may extend beyond the initial face crop. Expand inference
   // instead of inventing a vertical foreground cut at an internal crop edge.
   const touches=(side:'left'|'right'|'top'|'bottom')=>{
@@ -141,5 +159,5 @@ export async function parseFace(source: HTMLImageElement | HTMLCanvasElement, pe
     return Math.round(coverageAlpha(sample(values,ow,oh,(px-x)/size*ow-.5,(py-y)/size*oh-.5))*255);
   })});
   const face=raster(head),faceContourMask=raster(faceControl);
-  return {semanticMasks:{face,faceOutline:{shape:'polygon',points:alphaOutline(face),feather:0,invert:false},faceContourMask,faceContour:{shape:'polygon',points:alphaOutline(faceContourMask),feather:0,invert:false},skin:raster(skin),neck:raster(neck),hair:raster(hair)},subjectMask:raster(personAlpha)};
+  return {semanticMasks:{face,faceOutline:{shape:'polygon',points:alphaOutline(face),feather:0,invert:false},faceContourMask,faceContour:{shape:'polygon',points:alphaOutline(faceContourMask),feather:0,invert:false},skin:raster(skin),neck:raster(neck),hair:raster(hair),accessories:raster(accessories),ears:raster(ears)},subjectMask:raster(personAlpha)};
 }

@@ -1,6 +1,6 @@
 # FUNC-014 背景多余人物与杂物去除
 
-状态：已验证（一期本地 Demo）
+状态：传统手工流程已验证；复杂背景自然度未通过完整验收
 
 关联需求：`REPAIR-004` 背景路人去除、`REPAIR-005` 杂物清理、`REPAIR-006` 主体保护。
 
@@ -60,13 +60,13 @@ Rust `inpaint.rs` 使用确定性的exemplar纹理补全：
 
 7项自动单测覆盖棋盘/横纵条纹原frequency和phase、保护/透明取样、小图自适应与无donor错误。真实街景release实测1.5–1.9秒，debug/release输出PNG一致；选中人物已移除，放大仍有块状接缝。见 [补全审计](../qa/algorithm-audit-inpaint.md)。
 
-这是一期 Demo 级传统算法，适合背景平面、小型路人和杂物。它不会凭空生成被遮挡的建筑、人物或复杂纹理；大面积遮挡、重复纹理、头发和人与主体严重相交的场景应使用更细的保护/仿制选区，后续再接可选 AI 生成式 inpainting。AI 只能追加或预览操作，不会阻塞手工流程。
+这是一期 Demo 级传统算法；结构规则的棋盘/条纹已验证，真实街景仍有接缝，不能据此宣称路人去除自然度普遍达标。大面积遮挡、复杂建筑、头发和目标与主体相交时，需单独检查结果。可选 LaMa 模型已另行接入，见 [FUNC-016](FUNC-016-local-model-inpaint.md)；传统入口保持 `method=exemplar`（省略 method 也使用传统算法），不依赖模型、LLM 或联网服务。
 
 ## 对账位置
 
 - Web 入口与选区交互：`apps/web/src/components/ToolPanel.tsx`、`apps/web/src/App.tsx`
 - Canvas polygon/保护画笔：`apps/web/src/components/CanvasStage.tsx`
-- Rust 填补：`core/image-core/src/geometry.rs`
+- Rust 填补：`core/image-core/src/inpaint.rs`
 - Operation 路由与校验：`core/image-core/src/engine.rs`、`core/image-core/src/validation.rs`
 
 ## 验收标准
@@ -91,8 +91,10 @@ Rust `inpaint.rs` 使用确定性的exemplar纹理补全：
 - [x] Polygon mask 与 protectMask Rust 执行
 - [x] WASM/native 共用与自动化验收
 - [ ] 语义主体自动分割
-- [ ] 生成式复杂背景重建
+- [x] 可选原 LaMa 权重推理入口，独立见 FUNC-016
+- [ ] 复杂背景重建自然度完整验收
 
 ## 变更记录
 
 - 2026-10-13：新增一期背景人物/杂物去除入口、保护主体流程和 polygon/protectMask 回归测试。
+- 2026-10-13：明确传统 exemplar 与可选 LaMa 的实现、证据和质量边界；撤销过于宽泛的自然度完成标记。

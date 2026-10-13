@@ -1,58 +1,107 @@
-# 真实脸缘变形目视核对
+# 真实脸缘、配饰保护与强下巴核对
 
-日期：2026-10-13。结论：7 张照片中 6 张成功产生真实皮肤脸缘内收，1 张侧脸未检测到。当前已纠正“只改背景”和下颌误补背景的实现错误；综合精修自然度仍未通过验收，不能把可运行、像素变化和专业效果等同。
+日期：2026-10-13。当前结论：六张重新检测的照片均能看到真实皮肤脸缘内收，`faceWidth=60` 的固定背景、头发、耳朵和配饰检查均为零变化。强下巴缩短仍有新露颈部的阴影补偿痕迹；九参数的普适自然度没有通过至少 8/10 的完成门槛。
 
-## 验证方式
+## 当前证据与复放
 
-输入为仓库 portrait fixture 与 [样片来源清单](../../test/images/manifest.json) 中六张不同照片。最长边限制为 1024px，浏览器运行 MediaPipe + BiSeNet 分割，将完整操作图交给 native `image-render`；六张成功图均单独设置 `faceWidth=60`，没有同时叠加磨皮或其他参数。对比图依次为原图、结果、RGB 差分×6。
+当前照片最长边 768px，重新运行 MediaPipe + BiSeNet，使用已排除耳朵/眼镜/耳饰的 `faceContourMask` 和新增 `ears/accessories` masks。照片为仓库 portrait fixture 及 [样片来源](../../test/images/manifest.json) 中长发、妆容、滚转、发丝交叠和眼镜街景。滚转照片来自同一张妆容照片，不计为独立人物。
 
-逐张查看脸颊皮肤/头发交界、下颌/脖子交界、眼鼻嘴、外侧头发和背景。这里的“看见轮廓移动”仅说明修复了原算法的结构错误，不代表高强度、所有脸型和遮挡下均自然。
-
-全量 source/output/graph 保留在本地 `test/results/native-face-contour`，大 raster 操作图不提交版本库。小型摘要见 [summary.json](native-face-contour/summary.json)。复放现有证据示例：
+Rust 路径为真正 rigid MLS + 精确边界反采样、F/B 颜色分离、独立保护层和颈部/背景补偿。小型 [JSON 摘要](face-contour-mls/summary.json) 与下面对比图属于本轮版本。全量 source/output/graph 保存在本地忽略提交的 `test/results/face-core-review`；新增 masks 的检测缓存为 `test/results/face-core-fresh`。旧 `native-face-contour` 证据是前一轮 1024px 最近线段场，不是当前 MLS 版本。
 
 ```bash
 core/image-core/target/release/image-render \
-  --input test/results/native-face-contour/portrait-makeup-source.png \
+  --input test/results/face-core-review/portrait-makeup-source.png \
   --output /tmp/portrait-makeup-replay.png \
-  --graph test/results/native-face-contour/portrait-makeup-graph.json
+  --graph test/results/face-core-review/portrait-makeup-faceWidth-60.json
 ```
 
-## 样片核对
+## 瘦脸逐图观察
 
-| 样片 | 观察 | 当前判断 |
+图的顺序为原图、结果、RGB 差分×6。检查全部原外部像素、发丝/耳朵/配饰的稳定性，再实际查看皮肤/头发及下颌/脖子交界。差分数量只能证明改变的位置，不能证明自然度。
+
+| 样片 | 固定背景变化 | 头发/耳朵/配饰变化 | 目视观察 |
+|---|---:|---:|---|
+| fixture-portrait | 0 | 0 / 0 / 0 | 两侧脸颊内收，五官稳定；修复了旧版凹轮廓覆盖一个背景像素的错误。细耳缘仍依赖分割准确性。 |
+| portrait-woman | 0 | 0 / 0 / 0 | 长发内侧的皮肤脸缘内收，原有外侧长发不被拉动。边带填补不能保证复杂发丝纹理自然。 |
+| portrait-makeup | 0 | 0 / 0 / 0 | 两侧皮肤边缘内收，耳饰留在原位置，旧黄色下颌三角未出现。 |
+| portrait-roll | 0 | 0 / 0 / 0 | 轮廓沿面部滚转轴改变，原头发和耳饰稳定；不是另一名人物。 |
+| portrait-hair | 0 | 0 / 0 / 0 | 脸侧皮肤/发丝边界内收，原有头发类别的输出像素稳定；边缘仍依赖像素分类。 |
+| portrait-glasses-street | 0 | 0 / 0 / 0 | 真实脸缘内收，眼镜/耳朵不参与控制曲线，也不被整体拉动。 |
+
+![短发正脸](face-contour-mls/fixture-portrait-faceWidth-60-comparison.png)
+
+![长发笑脸](face-contour-mls/portrait-woman-faceWidth-60-comparison.png)
+
+![妆容正脸](face-contour-mls/portrait-makeup-faceWidth-60-comparison.png)
+
+![面部滚转](face-contour-mls/portrait-roll-faceWidth-60-comparison.png)
+
+![发丝交叠](face-contour-mls/portrait-hair-faceWidth-60-comparison.png)
+
+![眼镜街景](face-contour-mls/portrait-glasses-street-faceWidth-60-comparison.png)
+
+## 强下巴的真实缺陷
+
+`chin=+100` 的下巴真正向下延长，覆盖原可见颈部。这个输出前景覆盖区域不能计为“固定背景被拉伸”；摘要中的 `bg` 按旧 head alpha 统计，包含颈部，因此此项 `bg>0` 不直接构成背景拉动证据。原 hair/ears/accessories 均保持原像素。
+
+![下巴延长](face-contour-mls/portrait-makeup-chin-100-comparison.png)
+
+`chin=-100` 的下巴真正上移。原 alpha fringe 参与擦除后，旧下巴弧线残影减少；浮点 harmonic 外推减少最近 donor 产生的垂直条块。但新露出的颈部偏平，和原有阴影仍不吻合。这是可见的效果缺陷，**未通过 8/10 门槛**，不能以几何方向正确、保护为零变化替代验收。
+
+![下巴缩短的未通过效果](face-contour-mls/portrait-makeup-chin--100-comparison.png)
+
+## 九参数正负真图矩阵
+
+同一张重新检测的妆容照片单独运行九参数的 `-60/+60`，共 18 次 native 输出；没有叠加磨皮或滤镜。全部 18 项 hair/ears/accessories 保护变化为 0，ROI 外变化为 0。外扩/下巴延长覆盖原颈部或背景的区域不能直接计作背景拉伸。小型 [矩阵摘要](face-contour-mls/nine-controls-summary.json) 保存逐项数值；完整操作图留在本地 `test/results/face-core-nine-controls`。
+
+每行分别为原图、-60、+60，直接看变化是否发生在真正目标部位。
+
+![脸宽、太阳穴、颧侧](face-contour-mls/nine-controls-1.png)
+
+![下颌、额头宽、下巴宽](face-contour-mls/nine-controls-2.png)
+
+![下巴尖、额头长、下巴长](face-contour-mls/nine-controls-3.png)
+
+| 参数 | 本次实际观察 | 尚缺的验收证据/缺陷 |
 |---|---|---|
-| fixture-portrait，短发正脸 | 两侧脸颊及下颌确实内收；中央眼鼻嘴位置目视稳定 | 基本轮廓变化成立；耳缘有局部位移和细边缘不平滑，综合自然度未验收 |
-| portrait-woman，长发笑脸 | 内侧皮肤脸缘收缩，外侧长发基本稳定；原先缺 donor 的错误已修复 | 基本轮廓变化成立；脸旁发丝和耳朵跟随，综合自然度未验收 |
-| portrait-makeup，妆容正脸 | 双侧皮肤脸缘内收；原黄色下颌背景线消除 | 基本轮廓变化成立；耳饰和鬓发跟随，配饰独立保护尚缺 |
-| portrait-dark，深肤色正脸 | 脸颊/下颌内收；原白色背景脖子线消除，露出部位恢复为颈部颜色 | 基本轮廓变化成立；细缝和补偿纹理自然度未验收 |
-| portrait-roll，同妆容样片滚转18° | 形变随面部坐标轴，皮肤脸缘内收；黄色下颌线消除 | 基本轮廓变化成立；不是独立新人物样本，仍存在近邻发丝/耳饰跟随 |
-| portrait-hair，发丝交叠 | 真正脸缘内收，外侧发型大部分稳定 | 基本轮廓变化成立；靠脸发丝仍被重采样，局部下颌边界较硬 |
-| profile-hoodie，侧脸 | 1024px 输入下 MediaPipe 未检测到人脸，未得到输出 | 检测失败，不能记为算法通过；手工路径尚未对该照片验收 |
+| `faceWidth` | 正值内收明显；负值变宽 | 负值右侧新脸缘出现黄/肤色混合细线，外扩到头发区域受冻结限制。 |
+| `temples` | 附近有局部变化，幅度较小 | 太阳穴与头发交界的真实轮廓移动证据不足，不能仅按 4–5 千变化像素计通过。 |
+| `cheekbones` | 颧侧皮肤边缘有变化 | 外扩到头发的遮盖规则、不同骨相和细边缘自然度未验收。 |
+| `jaw` | 下颌宽窄变化可见 | 负值边缘仍有色线，原头发冻结可能限制外扩；多人物颈部补偿未验收。 |
+| `foreheadWidth` | 额侧皮肤区域有变化 | 头发冻结使宽侧新轮廓受限，当前无法证明真实发际线重塑。 |
+| `chinWidth` | 下巴两侧宽度有变化 | 下巴/颈部交界的细纹与光照仍需复核，不据单张图给 8 分。 |
+| `chinPoint` | 下巴宽窄/尖度有变化 | 单张正脸不足以验收所有形状，轮廓颜色与阴影仍依赖不准确 alpha。 |
+| `forehead` | 缩短端在额头产生局部变化 | 加长端发际线基本未真正向头发内移动；头发保护和前景遮盖规则冲突，未通过。 |
+| `chin` | 端点真正上移/下移 | 缩短颈部阴影不匹配，延长新边缘可见黑点；未通过。 |
 
-## 前后对比
+这份矩阵揭示了分割概率不是物理 alpha 的实际影响：F/B 颜色估计公式通过合成软边测试，真实分类覆盖率输入仍会产生颜色线或暗点。后续需要真正的 alpha refinement 和前景遮盖头发的规则，不是更换论文名字或降低检查阈值。
 
-![短发正脸](native-face-contour/fixture-portrait-comparison.png)
+## 验收范围和未通过项
 
-![长发笑脸](native-face-contour/portrait-woman-comparison.png)
+| 项目 | 当前证据 | 至少 8/10 状态 |
+|---|---|---|
+| `faceWidth` 正值内收 | 六张 fresh 照片真实脸缘内收、全部保护指标；需扩大人物/强度样本复核细边缘 | 尚未独立评分验收 |
+| `chin` 缩短 | 真实照片强参数可见颈部光照不匹配 | 未通过 |
+| `chin` 延长 | 真实向下改变、无旧黄色三角；±60 矩阵可见新边缘暗点 | 未通过 |
+| `temples/cheekbones/jaw/chinWidth/chinPoint` | 正负几何、锚点、保护回归与完整九参数真图 ±60 矩阵 | 有已知缺陷，真实多人物自然度未验收 |
+| `forehead/foreheadWidth` 及向头发侧外扩 | 原头发输出一律冻结，可能限制目标前景覆盖原头发；现阶段不能保证发际线真实移动 | 未通过/待修复 |
+| 侧脸 | 前一轮 profile-hoodie 在 1024px 下未检测到；本轮未再次检测 | 检测失败记录保留，不能计通过 |
+| `faceHeight/midface/doubleChin` | 非零值明确拒绝，未实现解剖重建 | 未实现 |
 
-![妆容正脸](native-face-contour/portrait-makeup-comparison.png)
+没有为缺少真实照片证据的项填写 8 分。自动化性质与自然度分别核对，失败不被平均分或其他成功样片掩盖。
 
-![深肤色正脸](native-face-contour/portrait-dark-comparison.png)
+## 自动化与性能
 
-![面部滚转](native-face-contour/portrait-roll-comparison.png)
+当前 `face::` 20 项通过、1 项性能基准显式 ignored；另外 F/B 两项通过。`geometry::tests` 15 项通过，包含五官/对称对 hair、ears、accessories 的全部输出冻结和四个非零源采样 texel 保护，防止配饰被复制进邻近皮肤。手工 polygon 硬边与明确其他人物区域的两个回归也通过。
 
-![发丝交叠](native-face-contour/portrait-hair-comparison.png)
+```
+cargo test --manifest-path core/image-core/Cargo.toml face:: -- --nocapture
+cargo test --manifest-path core/image-core/Cargo.toml face_matting -- --nocapture
+cargo test --manifest-path core/image-core/Cargo.toml geometry::tests -- --nocapture
+```
 
-## 已修复的具体错误
+本轮六张图 native CLI 单操作约 368–692ms（包括 PNG 读取、JSON 解析、协议验证与输出）。强下巴在当前样片约 404–851ms；机器同时执行浏览器模型/编译时会变慢。makeup 768×677 的一次 native 分段观测为准备64ms、mask 裁切165ms、F/B236ms、MLS网格采样77ms、补偿34ms、层合成15ms、最终合成31ms，约620ms。运行时环境不同不能将这些数值当作稳定基准；目前没有证明达到 60fps。
 
-1. 外侧头发轮廓不能代替内侧脸缘。现在 `faceContourMask/faceContour` 控制真正面部边界，`face/faceOutline` 提供完整头部 alpha 和 donor 上下文。
-2. 分类置信度不是物理透明度。直接使用概率会把背景置信度尾部作为半透明人物，导致无可用背景 donor；现在先转换覆盖率，再提取匹配的 .5 轮廓。
-3. 真实渐变边缘不一定在三像素内覆盖 .25/.75。旧校验误拒绝与 alpha 精确一致的 marching-squares 边界，已改为等值线位置与局部跨越校验。
-4. 下颌收缩露出的可能是脖子。原实现排除所有人物 donor，再把补偿区域全部填成背景，导致深肤色白边、黄色背景样片黄边。现在 `neck` 提供真实已见颈部 donor，并与背景分层传播，避免互相污染。
-5. 长发背景重建须取得完整头部周围的上下文。仅裁切内脸缘附近会丢失干净 donor；现在裁切包括真实 head outline，portrait-woman 从无法输出变为可输出。
+`FACE_CORE_PROFILE=1` 可输出 native 各阶段时间；不会在 WASM 构建中调用系统时钟。检测模型耗时与每次数值修改耗时分开，检测可缓存；当前尚未跨滑块值缓存整套 F/B 图层。WASM 整体性能与浏览器真实交互由工程集成 QA 记录，不能套用论文 GPU FPS。
 
-## 自动化证据与限制
-
-`cargo test --manifest-path core/image-core/Cargo.toml face::tests -- --nocapture`：16 项通过。包括九个轮廓参数正负方向、特征/用户保护、roll、ROI/opacity、透明图像、长发内外缘分离、软等值线和脖子/背景独立补偿。其它五官、身体、修补与 WASM 的整体检查由全工程 QA 记录。
-
-本目视核对只验证 `faceWidth=60`，不能据此宣称所有九项参数都已通过真实照片自然度验收。局部传播不能恢复复杂隐蔽背景，分割错误和高强度带来的发丝/配饰变化仍是已知缺口。本轮保留上述失败与限制，不以降低检查范围或宣称全部通过结束验收。
+论文出处、真正移植公式、项目边界适配和未采用候选见 [研究记录](../research/face-warping-and-layered-matting.md)。

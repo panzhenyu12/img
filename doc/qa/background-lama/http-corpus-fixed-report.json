@@ -1,0 +1,41 @@
+[
+  {
+    "case": "crowd",
+    "wall_ms": 29150.2,
+    "headers": {
+      "x-inpaint-model": "lama-big-torchscript",
+      "x-inpaint-device": "cpu",
+      "x-inpaint-inference-ms": "19087.73",
+      "x-inpaint-total-ms": "27992.88",
+      "x-inpaint-peak-rss-mb": "2328.16",
+      "x-inpaint-selected-pixels": "20058",
+      "x-inpaint-seam-blend": "none",
+      "x-inpaint-context-mode": "full"
+    },
+    "preprocess": "area-mask-v2",
+    "outside_changed_pixels": 0,
+    "protected_changed_pixels": 0,
+    "alpha_changed_pixels": 0,
+    "changed_target_pixels": 19956
+  },
+  {
+    "case": "architecture",
+    "wall_ms": 22638.69,
+    "headers": {
+      "x-inpaint-model": "lama-big-torchscript",
+      "x-inpaint-device": "cpu",
+      "x-inpaint-inference-ms": "21173.03",
+      "x-inpaint-total-ms": "21888.9",
+      "x-inpaint-peak-rss-mb": "2426.18",
+      "x-inpaint-selected-pixels": "22491",
+      "x-inpaint-seam-blend": "none",
+      "x-inpaint-context-mode": "full"
+    },
+    "preprocess": "area-mask-v2",
+    "outside_changed_pixels": 0,
+    "protected_changed_pixels": 0,
+    "alpha_changed_pixels": 0,
+    "changed_target_pixels": 22491,
+    "clean_target_mae": 29.852
+  }
+]

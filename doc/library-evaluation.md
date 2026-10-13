@@ -45,4 +45,4 @@
   → Canvas 2D / PNG-JPEG
 ```
 
-当前人像位置采用 Face landmarks 的局部 RBF 与身体部位语义 mask；没有 Delaunay/MLS 外部库、GPU renderer 或衣物/皮肤分割模型。衣物轻中度去褶皱使用频率分离，传统填补可以手工移除简单杂物；复杂场景的大面积去人和缺失纹理需要生成式模型。具体实现对账见 [func/README.md](func/README.md)。
+当前人脸轮廓真正实现 Schaefer rigid MLS 公式及 Germer 多尺度 F/B 估计，未依赖未经核对的 rust_mls 包；Web采用BiSeNet ONNX类别解析，但分类覆盖不能当真实matting。身体采用Pose轴/真实subjectMask及独立目标partMask接口，FASHN/SCHP仍需部位封装和质量验收，低指标B0已否决。皮肤采用有蒙版Fast Guided Filter；衣物仍仅细褶皱弱化。LaMa服务端TorchScript已核原权重一致性；Carve固定512 ONNX可采用为浏览器推理模型，需二次封装预处理、保护、合成、缓存与错误恢复。直接torch.onnx.export实测不支持aten::fft_rfftn，不能把原Torch模型文件交给浏览器直接运行；Carve用矩阵DFT替换FFT，已做同输入数值核对。MAT/BrushNet/PowerPaint保持候选，未运行不得标记已采用。GPU renderer和学习式皮肤/衣物精修尚未完整交付。具体实现对账见 [func/README.md](func/README.md)。

@@ -1,6 +1,6 @@
 # 第一期开发计划与交付对账
 
-2026-10-13 算法整改更新：当前实现与验证以 [算法验证](qa/algorithm-validation.md) 和 [功能对账](func/FUNC-010-parameter-ledger.md) 为准。旧模板/RBF概述不能作为已完成语义重塑的证据。自动人脸增加本地BiSeNet ONNX解析，Rust分别使用完整head alpha和内脸skin/hair轮廓；身体非零调整必须提供部位、subjectMask与关键点，未验证结构参数拒绝。去人使用exemplar补全；真实照片的边缘色缝、遮挡和接缝仍未全部解决。
+2026-10-13 算法与双端更新：人脸已采用论文 rigid MLS、独立脸/头发/耳朵/配饰层与多尺度 F/B 估计；分类覆盖仍不是真实 matting。身体非零调整必须有真实 subjectMask，已删除无分割的背景拉伸路径；partMask 接口已通，自动 Pose 尚未解决衣物/手/头发部位归属。皮肤采用有蒙版的 Fast Guided Filter。去人保留传统 exemplar，并实现浏览器 ONNX LaMa 与 Go→本地 TorchScript Worker 双端推理，参数 execution 明确选择处理位置。实际效果仍有失败，逐功能 8 分目标尚未达到；当前状态见 [最新验证](qa/current-validation.md) 和 [质量目标](qa/quality-targets.md)。
 
 版本：v0.2 · 2026-10-12
 

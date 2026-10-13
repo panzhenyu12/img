@@ -1,0 +1,3005 @@
+[
+  {
+    "id": "portrait-makeup",
+    "labels": [
+      "frontal",
+      "makeup",
+      "plain-background"
+    ],
+    "source": {
+      "name": "portrait-makeup.jpg",
+      "width": 768,
+      "height": 677
+    },
+    "checks": [
+      {
+        "tool": "feature",
+        "key": "eyeSize",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4485,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3928,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeHeight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3824,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeSpacing",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4494,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeTilt",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4290,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2139,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyelid",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2287,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeInnerCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1554,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeOuterCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1635,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "darkCircle",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2588,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browLength",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 8255,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 7443,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browThickness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 6971,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browPeak",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5530,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browTail",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4076,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browColor",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1726,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browSpacing",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 8736,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseBridge",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1799,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseWings",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3222,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseLength",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4450,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseTip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3453,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseStraight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3028,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "nostril",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 926,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseRoot",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 588,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseBase",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 956,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "mouthWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 6096,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "mouthHeight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5681,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "upperLip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2514,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lowerLip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2343,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipColor",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2511,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "philtrum",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2834,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "teethWhiten",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipPeak",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1565,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2906,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipBrightness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2529,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipSaturation",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2404,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "smooth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 39101,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 21935,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "texture",
+        "value": 0,
+        "metrics": {
+          "changedFacePixels": 46936,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 28462,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "whiten",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 47943,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 30322,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "warmth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 47798,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 29994,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "redness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 47713,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 29779,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": null
+          }
+        }
+      }
+    ],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/feature-skin-algorithms/portrait-makeup"
+  },
+  {
+    "id": "portrait-dark",
+    "labels": [
+      "dark-skin",
+      "frontal",
+      "jacket"
+    ],
+    "source": {
+      "name": "portrait-dark.jpg",
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "tool": "feature",
+        "key": "eyeSize",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1901,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1660,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeHeight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1538,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeSpacing",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1971,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeTilt",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1879,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 879,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyelid",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 956,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeInnerCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 651,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeOuterCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 667,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "darkCircle",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1596,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browLength",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4950,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4512,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browThickness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4134,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browPeak",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3245,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browTail",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2660,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browColor",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1018,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browSpacing",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5189,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseBridge",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1153,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseWings",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2409,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseLength",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3021,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseTip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2525,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseStraight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1707,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "nostril",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 459,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseRoot",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 363,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseBase",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 520,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "mouthWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3922,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "mouthHeight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3892,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "upperLip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1605,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lowerLip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1548,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipColor",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1604,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "philtrum",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1916,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "teethWhiten",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipPeak",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 995,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1923,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipBrightness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1623,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipSaturation",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1587,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "smooth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 26061,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 8872,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "texture",
+        "value": 0,
+        "metrics": {
+          "changedFacePixels": 29570,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 10583,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "whiten",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 26883,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 7188,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "warmth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 26149,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 6420,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "redness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 25659,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 5976,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": null
+          }
+        }
+      }
+    ],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/feature-skin-algorithms/portrait-dark"
+  },
+  {
+    "id": "portrait-roll",
+    "labels": [
+      "derived",
+      "roll-18deg",
+      "makeup"
+    ],
+    "source": {
+      "name": "portrait-roll.jpg",
+      "width": 768,
+      "height": 721
+    },
+    "checks": [
+      {
+        "tool": "feature",
+        "key": "eyeSize",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2879,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2557,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeHeight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2468,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeSpacing",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2903,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeTilt",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2762,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1373,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyelid",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1465,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeInnerCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 993,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "eyeOuterCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1050,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": false,
+            "rightEye": false,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "darkCircle",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1734,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browLength",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5377,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4850,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browThickness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4467,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browPeak",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3607,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browTail",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2536,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browColor",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1172,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "browSpacing",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5616,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseBridge",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1195,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseWings",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2080,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseLength",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3075,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseTip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2211,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseStraight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2533,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "nostril",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 642,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseRoot",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 390,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "noseBase",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 655,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "mouthWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3988,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "mouthHeight",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3705,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "upperLip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1679,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lowerLip",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1521,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipColor",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1668,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "philtrum",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1890,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "teethWhiten",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipPeak",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1024,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipCorner",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1914,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipBrightness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1680,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "feature",
+        "key": "lipSaturation",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1634,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": false
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "smooth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 26545,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 9354,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "texture",
+        "value": 0,
+        "metrics": {
+          "changedFacePixels": 32050,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 12519,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "whiten",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 32669,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 13046,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "warmth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 32584,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 12982,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      },
+      {
+        "tool": "skin",
+        "key": "redness",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 32535,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 12929,
+          "changedKnownSceneBackgroundPixels": 0,
+          "changedOutsideOriginalSkinMaskPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": false,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": null
+          }
+        }
+      }
+    ],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/feature-skin-algorithms/portrait-roll"
+  }
+]

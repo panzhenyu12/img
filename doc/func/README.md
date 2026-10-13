@@ -49,12 +49,17 @@ FUNC-编号-功能短名.md
 - [FUNC-009 Go 渲染、任务与 MCP](FUNC-009-go-render-mcp.md)
 - [FUNC-010 116项参数逐项对账](FUNC-010-parameter-ledger.md)
 - [FUNC-011 人脸轮廓变形质量与验收](FUNC-011-face-contour-quality.md)
-- [FUNC-012 身体语义区域与局部身形调整](FUNC-012-body-semantic-masks.md)
+- [FUNC-012 身体轮廓分层重塑（真实图仍未达8分）](FUNC-012-body-semantic-masks.md)
 - [FUNC-013 衣物去褶皱与纹理保护](FUNC-013-clothing-wrinkle-retouch.md)
 - [FUNC-014 背景多余人物与杂物去除](FUNC-014-background-person-removal.md)
-- [FUNC-015 皮肤、肤色与妆容语义区域](FUNC-015-skin-and-makeup-quality.md)
+- [FUNC-015 皮肤、肤色与妆容（48项肤质/肤色检查，强磨皮自然度失败）](FUNC-015-skin-and-makeup-quality.md)
+- [FUNC-016 客户端与本地服务端 LaMa 填补](FUNC-016-local-model-inpaint.md)
 - [人像与衣物修图算法调研](../research/portrait-retouching-algorithms.md)
 - [一期验收证据](../qa/phase1-validation.md)
+- [当前工程验证与已知失败](../qa/current-validation.md)
+- [皮肤/肤色实拍复核与妆容证据边界](../qa/skin-guided-review.md)
 - [AI / MCP 集成方案](../mcp-ai-integration.md)
 
-一期实际交付以 [开发计划](../phase1-development-plan.md) 和 [FUNC-000](FUNC-000-project-status.md) 为准。完整功能清单记录长期需求，Pose 人体分割与独立身形重塑已接入；皮肤/衣物/头发解析、生成式修复、GPU、原生客户端和真实模型推荐未作为本期已验证。
+一期实际交付以 [开发计划](../phase1-development-plan.md)、[FUNC-000](FUNC-000-project-status.md) 及当前验证记录为准。完整功能清单记录长期需求。当前已接入 MediaPipe/Pose、BiSeNet 皮肤/头发等像素类别解析、独立前景轮廓路径及本地 LaMa；这些实现与工程通路通过不代表逐功能8分完成。
+
+皮肤48项仅验证肤质/肤色支持域与alpha，并有强磨皮蜡感、浅肤色层次与色偏失败；缓存缺新 accessories/ears 蒙版，唇/眉/牙齿妆容的独立证据仍不完整。身体宽衣/遮挡部位、轮廓软边、窄带纹理与复杂补全质量仍未全部达标；完整身体部位/服装解析、眼袋/泪沟结构、GPU及原生客户端仍属于后续目标。

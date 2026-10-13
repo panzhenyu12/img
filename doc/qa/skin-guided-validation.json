@@ -1,0 +1,434 @@
+[
+  {
+    "sample": "fixture-portrait",
+    "case": "smooth-natural",
+    "native_total_ms": 354.54,
+    "changed_pixels": 43067,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-smooth-natural-comparison.png"
+  },
+  {
+    "sample": "fixture-portrait",
+    "case": "smooth-strong",
+    "native_total_ms": 392.25,
+    "changed_pixels": 47329,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-smooth-strong-comparison.png"
+  },
+  {
+    "sample": "fixture-portrait",
+    "case": "texture-preserved",
+    "native_total_ms": 420.73,
+    "changed_pixels": 18808,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-texture-preserved-comparison.png"
+  },
+  {
+    "sample": "fixture-portrait",
+    "case": "whiten",
+    "native_total_ms": 243.17,
+    "changed_pixels": 47096,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-whiten-comparison.png"
+  },
+  {
+    "sample": "fixture-portrait",
+    "case": "warm",
+    "native_total_ms": 253.83,
+    "changed_pixels": 46474,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-warm-comparison.png"
+  },
+  {
+    "sample": "fixture-portrait",
+    "case": "cool",
+    "native_total_ms": 234.64,
+    "changed_pixels": 46492,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-cool-comparison.png"
+  },
+  {
+    "sample": "fixture-portrait",
+    "case": "red",
+    "native_total_ms": 239.63,
+    "changed_pixels": 46290,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-red-comparison.png"
+  },
+  {
+    "sample": "fixture-portrait",
+    "case": "neutralize-red",
+    "native_total_ms": 233.53,
+    "changed_pixels": 46295,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/fixture-portrait-neutralize-red-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "smooth-natural",
+    "native_total_ms": 287.62,
+    "changed_pixels": 61331,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-smooth-natural-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "smooth-strong",
+    "native_total_ms": 304.2,
+    "changed_pixels": 75249,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-smooth-strong-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "texture-preserved",
+    "native_total_ms": 301.84,
+    "changed_pixels": 17648,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-texture-preserved-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "whiten",
+    "native_total_ms": 247.35,
+    "changed_pixels": 62181,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-whiten-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "warm",
+    "native_total_ms": 229.43,
+    "changed_pixels": 56935,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-warm-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "cool",
+    "native_total_ms": 230.51,
+    "changed_pixels": 56935,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-cool-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "red",
+    "native_total_ms": 275.34,
+    "changed_pixels": 55055,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-red-comparison.png"
+  },
+  {
+    "sample": "portrait-dark",
+    "case": "neutralize-red",
+    "native_total_ms": 275.41,
+    "changed_pixels": 55055,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-dark-neutralize-red-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "smooth-natural",
+    "native_total_ms": 401.93,
+    "changed_pixels": 62566,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-smooth-natural-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "smooth-strong",
+    "native_total_ms": 419.1,
+    "changed_pixels": 85888,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-smooth-strong-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "texture-preserved",
+    "native_total_ms": 446.66,
+    "changed_pixels": 16790,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-texture-preserved-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "whiten",
+    "native_total_ms": 318.26,
+    "changed_pixels": 87203,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-whiten-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "warm",
+    "native_total_ms": 442.53,
+    "changed_pixels": 85884,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-warm-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "cool",
+    "native_total_ms": 344.64,
+    "changed_pixels": 85950,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-cool-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "red",
+    "native_total_ms": 351.66,
+    "changed_pixels": 85506,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-red-comparison.png"
+  },
+  {
+    "sample": "portrait-hair",
+    "case": "neutralize-red",
+    "native_total_ms": 346.88,
+    "changed_pixels": 85460,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-hair-neutralize-red-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "smooth-natural",
+    "native_total_ms": 507.39,
+    "changed_pixels": 100084,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-smooth-natural-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "smooth-strong",
+    "native_total_ms": 662.15,
+    "changed_pixels": 139424,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-smooth-strong-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "texture-preserved",
+    "native_total_ms": 494.3,
+    "changed_pixels": 24550,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-texture-preserved-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "whiten",
+    "native_total_ms": 351.46,
+    "changed_pixels": 141912,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-whiten-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "warm",
+    "native_total_ms": 384.45,
+    "changed_pixels": 139881,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-warm-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "cool",
+    "native_total_ms": 388.3,
+    "changed_pixels": 139881,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-cool-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "red",
+    "native_total_ms": 437.34,
+    "changed_pixels": 139084,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-red-comparison.png"
+  },
+  {
+    "sample": "portrait-makeup",
+    "case": "neutralize-red",
+    "native_total_ms": 349.49,
+    "changed_pixels": 139084,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-makeup-neutralize-red-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "smooth-natural",
+    "native_total_ms": 594.96,
+    "changed_pixels": 60918,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-smooth-natural-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "smooth-strong",
+    "native_total_ms": 374.61,
+    "changed_pixels": 82493,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-smooth-strong-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "texture-preserved",
+    "native_total_ms": 486.2,
+    "changed_pixels": 14903,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-texture-preserved-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "whiten",
+    "native_total_ms": 378.04,
+    "changed_pixels": 83048,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-whiten-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "warm",
+    "native_total_ms": 372.34,
+    "changed_pixels": 82204,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-warm-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "cool",
+    "native_total_ms": 382.51,
+    "changed_pixels": 82204,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-cool-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "red",
+    "native_total_ms": 394.02,
+    "changed_pixels": 81884,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-red-comparison.png"
+  },
+  {
+    "sample": "portrait-roll",
+    "case": "neutralize-red",
+    "native_total_ms": 388.99,
+    "changed_pixels": 81886,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-roll-neutralize-red-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "smooth-natural",
+    "native_total_ms": 405.11,
+    "changed_pixels": 52109,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-smooth-natural-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "smooth-strong",
+    "native_total_ms": 435.22,
+    "changed_pixels": 66045,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-smooth-strong-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "texture-preserved",
+    "native_total_ms": 403.71,
+    "changed_pixels": 13786,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-texture-preserved-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "whiten",
+    "native_total_ms": 320.81,
+    "changed_pixels": 65220,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-whiten-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "warm",
+    "native_total_ms": 315.78,
+    "changed_pixels": 64236,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-warm-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "cool",
+    "native_total_ms": 350.03,
+    "changed_pixels": 64241,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-cool-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "red",
+    "native_total_ms": 285.92,
+    "changed_pixels": 63857,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-red-comparison.png"
+  },
+  {
+    "sample": "portrait-woman",
+    "case": "neutralize-red",
+    "native_total_ms": 293.24,
+    "changed_pixels": 63857,
+    "outside_support_changed": 0,
+    "alpha_changed": 0,
+    "comparison": "test/results/skin-guided/portrait-woman-neutralize-red-comparison.png"
+  }
+]

@@ -1,6 +1,7 @@
 use crate::engine::{byte, number};
 use crate::RgbaImage;
 use serde_json::Value;
+use std::borrow::Cow;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Region {
@@ -57,7 +58,7 @@ pub(crate) fn coverage(mask: &Value, x: f32, y: f32, width: u32, height: u32) ->
         .or_else(|| mask.get("kind"))
         .and_then(Value::as_str)
         .unwrap_or("rect");
-    let mut value = match shape {
+    let value = match shape {
         "raster" => raster_coverage(mask, x, y),
         "linear" => {
             let from = mask.get("from");
@@ -142,6 +143,18 @@ pub(crate) fn coverage(mask: &Value, x: f32, y: f32, width: u32, height: u32) ->
             }
         }
     };
+    finish_coverage(mask, value, x, y, width, height, feather)
+}
+
+fn finish_coverage(
+    mask: &Value,
+    mut value: f32,
+    x: f32,
+    y: f32,
+    width: u32,
+    height: u32,
+    feather: f32,
+) -> f32 {
     // Shape selections become editable masks without changing their JSON
     // shape. Add/erase stamps therefore work on every initial shape.
     if let Some(strokes) = mask.get("strokes").and_then(Value::as_array) {
@@ -169,6 +182,180 @@ pub(crate) fn coverage(mask: &Value, x: f32, y: f32, width: u32, height: u32) ->
         1.0 - value
     } else {
         value
+    }
+}
+
+enum PreparedShape {
+    Polygon {
+        points: Vec<(f32, f32)>,
+        bounds: (f32, f32, f32, f32),
+    },
+    Raster {
+        width: usize,
+        height: usize,
+        data: Vec<f32>,
+    },
+    Other,
+}
+
+/// Compile JSON geometry once per pass. Polygon bounds avoid walking facial
+/// feature edges at every background pixel; raster alpha is decoded once.
+/// Coverage math and brush/inversion semantics stay byte-compatible.
+pub(crate) struct PreparedMask<'a> {
+    value: Cow<'a, Value>,
+    shape: PreparedShape,
+    feather: f32,
+    invert: bool,
+    has_strokes: bool,
+}
+impl<'a> PreparedMask<'a> {
+    pub fn new(value: &'a Value) -> Self {
+        let value = if value.is_array() {
+            Cow::Owned(serde_json::json!({"shape":"polygon","points":value}))
+        } else if value.get("shape").is_none()
+            && value.get("kind").is_none()
+            && value.get("points").is_some()
+        {
+            let mut mask = value.clone();
+            mask["shape"] = Value::String("polygon".into());
+            Cow::Owned(mask)
+        } else {
+            Cow::Borrowed(value)
+        };
+        let feather = number(&value, "feather", 0.0).clamp(0.0, 100.0) / 100.0 * 0.2;
+        let shape = match value
+            .get("shape")
+            .or_else(|| value.get("kind"))
+            .and_then(Value::as_str)
+        {
+            Some("polygon") => {
+                let points: Vec<(f32, f32)> = value
+                    .get("points")
+                    .and_then(Value::as_array)
+                    .map(|p| {
+                        p.iter()
+                            .map(|p| (number(p, "x", 0.0), number(p, "y", 0.0)))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let bounds = points.iter().fold(
+                    (
+                        f32::INFINITY,
+                        f32::INFINITY,
+                        f32::NEG_INFINITY,
+                        f32::NEG_INFINITY,
+                    ),
+                    |b, p| (b.0.min(p.0), b.1.min(p.1), b.2.max(p.0), b.3.max(p.1)),
+                );
+                PreparedShape::Polygon { points, bounds }
+            }
+            Some("raster") => {
+                let w = value.get("width").and_then(Value::as_u64).unwrap_or(0) as usize;
+                let h = value.get("height").and_then(Value::as_u64).unwrap_or(0) as usize;
+                let data: Vec<f32> = value
+                    .get("data")
+                    .and_then(Value::as_array)
+                    .map(|a| {
+                        a.iter()
+                            .map(|v| v.as_f64().unwrap_or(0.0) as f32 / 255.0)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                PreparedShape::Raster {
+                    width: w,
+                    height: h,
+                    data,
+                }
+            }
+            _ => PreparedShape::Other,
+        };
+        let invert = value
+            .get("invert")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let has_strokes = value
+            .get("strokes")
+            .and_then(Value::as_array)
+            .is_some_and(|s| !s.is_empty());
+        Self {
+            value,
+            shape,
+            feather,
+            invert,
+            has_strokes,
+        }
+    }
+    pub fn coverage(&self, x: f32, y: f32, width: u32, height: u32) -> f32 {
+        let value = match &self.shape {
+            PreparedShape::Other => return coverage(&self.value, x, y, width, height),
+            PreparedShape::Polygon { points, bounds } => {
+                if points.len() < 3
+                    || x < bounds.0 - self.feather * 0.5
+                    || y < bounds.1 - self.feather * 0.5
+                    || x > bounds.2 + self.feather * 0.5
+                    || y > bounds.3 + self.feather * 0.5
+                {
+                    0.0
+                } else {
+                    let mut inside = false;
+                    let mut distance = f32::MAX;
+                    for i in 0..points.len() {
+                        let (ax, ay) = points[i];
+                        let (bx, by) = points[(i + 1) % points.len()];
+                        if (ay > y) != (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax {
+                            inside = !inside;
+                        }
+                        if self.feather > 0.0 {
+                            distance = distance.min(segment_distance(x, y, ax, ay, bx, by));
+                        }
+                    }
+                    if self.feather > 0.0 {
+                        smooth_step(
+                            -self.feather * 0.5,
+                            self.feather * 0.5,
+                            if inside { distance } else { -distance },
+                        )
+                    } else if inside {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+            }
+            PreparedShape::Raster {
+                width: w,
+                height: h,
+                data,
+            } => {
+                if !(0.0..=1.0).contains(&x)
+                    || !(0.0..=1.0).contains(&y)
+                    || *w == 0
+                    || *h == 0
+                    || w.checked_mul(*h) != Some(data.len())
+                {
+                    0.0
+                } else {
+                    let px = (x * *w as f32 - 0.5).clamp(0.0, (*w - 1) as f32);
+                    let py = (y * *h as f32 - 0.5).clamp(0.0, (*h - 1) as f32);
+                    let x0 = px.floor() as usize;
+                    let y0 = py.floor() as usize;
+                    let x1 = (x0 + 1).min(*w - 1);
+                    let y1 = (y0 + 1).min(*h - 1);
+                    let tx = px - x0 as f32;
+                    let ty = py - y0 as f32;
+                    let top = data[y0 * *w + x0] * (1.0 - tx) + data[y0 * *w + x1] * tx;
+                    let bottom = data[y1 * *w + x0] * (1.0 - tx) + data[y1 * *w + x1] * tx;
+                    (top * (1.0 - ty) + bottom * ty).clamp(0.0, 1.0)
+                }
+            }
+        };
+        if self.has_strokes {
+            finish_coverage(&self.value, value, x, y, width, height, self.feather)
+        } else if self.invert {
+            1.0 - value
+        } else {
+            value
+        }
     }
 }
 
@@ -230,6 +417,14 @@ pub(crate) fn composite(base: &RgbaImage, edit: &RgbaImage, params: &Value) -> R
         .get("blendMode")
         .and_then(Value::as_str)
         .unwrap_or("normal");
+    let selection = params
+        .get("mask")
+        .filter(|v| v.is_object())
+        .map(PreparedMask::new);
+    let protection = params
+        .get("protectMask")
+        .filter(|v| v.is_object())
+        .map(PreparedMask::new);
     for y in 0..base.height {
         for x in 0..base.width {
             let nx = (x as f32 + 0.5) / base.width as f32;
@@ -239,11 +434,11 @@ pub(crate) fn composite(base: &RgbaImage, edit: &RgbaImage, params: &Value) -> R
             } else {
                 0.0
             };
-            if let Some(selection) = params.get("mask").filter(|v| v.is_object()) {
-                weight *= coverage(selection, nx, ny, base.width, base.height);
+            if let Some(selection) = &selection {
+                weight *= selection.coverage(nx, ny, base.width, base.height);
             }
-            if let Some(protection) = params.get("protectMask").filter(|v| v.is_object()) {
-                weight *= 1.0 - coverage(protection, nx, ny, base.width, base.height);
+            if let Some(protection) = &protection {
+                weight *= 1.0 - protection.coverage(nx, ny, base.width, base.height);
             }
             let index = (y as usize * base.width as usize + x as usize) * 4;
             if weight < 1e-8 {
@@ -275,6 +470,41 @@ pub(crate) fn composite(base: &RgbaImage, edit: &RgbaImage, params: &Value) -> R
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn prepared_masks_match_reference_for_concavity_feather_strokes_and_alpha() {
+        let masks = [
+            json!({"shape":"polygon","points":[{"x":0.1,"y":0.1},{"x":0.9,"y":0.1},{"x":0.6,"y":0.4},{"x":0.9,"y":0.9},{"x":0.1,"y":0.9}],"feather":7,"invert":true,"strokes":[{"x":0.03,"y":0.6,"radius":0.1,"strength":63},{"x":0.5,"y":0.4,"radius":0.2,"erase":true}]}),
+            json!({"shape":"raster","width":3,"height":2,"data":[255,0,128,53,190,0],"invert":true,"strokes":[{"x":0.3,"y":0.6,"radius":0.2,"strength":45}]}),
+            json!({"shape":"ellipse","region":{"x":0.1,"y":0.2,"width":0.7,"height":0.5},"feather":12}),
+        ];
+        for mask in masks {
+            let compiled = PreparedMask::new(&mask);
+            for y in 0..93 {
+                for x in 0..113 {
+                    let nx = (x as f32 - 6.0) / 101.0;
+                    let ny = (y as f32 - 5.0) / 83.0;
+                    assert_eq!(
+                        compiled.coverage(nx, ny, 101, 83),
+                        coverage(&mask, nx, ny, 101, 83),
+                        "mask={mask}, ({nx},{ny})"
+                    );
+                }
+            }
+        }
+        let compact = json!([{"x":0.1,"y":0.1},{"x":0.9,"y":0.1},{"x":0.5,"y":0.9}]);
+        let compiled = PreparedMask::new(&compact);
+        let normal = json!({"shape":"polygon","points":compact});
+        for y in 0..83 {
+            for x in 0..101 {
+                let nx = (x as f32 + 0.5) / 101.0;
+                let ny = (y as f32 + 0.5) / 83.0;
+                assert_eq!(
+                    compiled.coverage(nx, ny, 101, 83),
+                    coverage(&normal, nx, ny, 101, 83)
+                );
+            }
+        }
+    }
     #[test]
     fn raster_alpha_preserves_holes_and_interpolates_at_pixel_centers() {
         let mask = json!({"shape":"raster","width":3,"height":2,"data":[255,0,255,255,0,255]});

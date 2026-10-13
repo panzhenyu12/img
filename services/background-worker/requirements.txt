@@ -1,0 +1,9 @@
+torch==2.2.2
+numpy==1.26.4
+Pillow==11.1.0
+scipy==1.15.3
+fastapi==0.115.12
+uvicorn==0.34.2
+python-multipart==0.0.20
+pytest==8.3.5
+httpx==0.28.1

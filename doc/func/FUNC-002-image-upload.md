@@ -30,3 +30,7 @@ Go 测试覆盖上传、无效图像、超限、过期 session、删除竞态、
 ## 当前限制与变更
 
 无数据库和云存储；内存 session/提案/job 重启丢失。Web 只提供 JPG/PNG/WebP 入口，RAW/TIFF/HEIF 不属于本期。2026-10-12 将旧 Go Demo 像素实现替换为 Rust native；新增 job、取消与 EXIF 方向适配。
+
+## 2026-10-13 本地与服务端处理更新
+
+Web普通导入只解码到本地RGBA与EditGraph，不再自动创建session或上传图片。用户在AI助手点击“连接 AI 服务（上传图片）”时才创建session并上传原图；客户端模型填补由浏览器完成，服务端模型按钮明确发送该操作输入与蒙版。普通编辑、工程保存和图片导出保持本地可用。验证：client-inpaint.spec.ts普通导入API POST数量为0、editor AI提案测试通过显式连接继续走原提案流程。

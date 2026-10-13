@@ -198,7 +198,7 @@
         },
         "semanticMasks": {
           "type": "object",
-          "maxProperties": 28,
+          "maxProperties": 30,
           "properties": {
             "face": {
               "oneOf": [
@@ -595,6 +595,12 @@
             },
             "neck": {
               "$ref": "mask.schema.json"
+            },
+            "accessories": {
+              "$ref": "mask.schema.json"
+            },
+            "ears": {
+              "$ref": "mask.schema.json"
             }
           },
           "additionalProperties": false
@@ -602,6 +608,56 @@
         "subjectMask": {
           "$ref": "mask.schema.json",
           "description": "Person foreground alpha. Required for segmented body contour edits; face contour edits use it to exclude all person pixels from background donors."
+        },
+        "partMask": {
+          "$ref": "mask.schema.json",
+          "description": "Target body part alpha, separate from whole-person foreground."
+        },
+        "method": {
+          "enum": [
+            "exemplar",
+            "lama"
+          ],
+          "description": "repair.inpaint only; lama runs in browser ONNX or the server model worker; default exemplar."
+        },
+        "execution": {
+          "enum": ["client", "server"],
+          "description": "repair.inpaint method=lama only. Client performs local browser inference; server explicitly sends operation input and masks to the API. Default server for existing graphs."
+        },
+        "maxSide": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 2048,
+          "default": 1024,
+          "description": "LaMa model inference option."
+        },
+        "contextPadding": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 1024,
+          "default": 256,
+          "description": "LaMa model inference option."
+        },
+        "maskDilation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32,
+          "default": 4,
+          "description": "LaMa model inference option."
+        },
+        "seamBlend": {
+          "enum": [
+            "none",
+            "poisson"
+          ],
+          "default": "none"
+        },
+        "contextMode": {
+          "enum": [
+            "full",
+            "crop"
+          ],
+          "default": "full"
         }
       },
       "additionalProperties": true

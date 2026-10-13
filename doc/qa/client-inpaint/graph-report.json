@@ -1,0 +1,15 @@
+{
+  "firstMs": 36187.09000015259,
+  "cachedMs": 529.0100002288818,
+  "outside": 0,
+  "alpha": 0,
+  "changed": 5268,
+  "replayDifference": 0,
+  "zeroDifference": 0,
+  "isolated": true,
+  "requests": [],
+  "diagnostics": [
+    "client-inpaint {\"backend\":\"wasm\",\"threads\":4,\"isolated\":true,\"model\":\"1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6\",\"inferenceMs\":15155.25,\"totalMs\":35671.83500003815,\"input\":[768,576],\"modelSize\":[512,512],\"box\":[0,0,768,576]}"
+  ],
+  "quality": "Execution and composition verified; perceptual quality remains below full acceptance"
+}

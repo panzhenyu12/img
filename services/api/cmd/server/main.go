@@ -23,12 +23,13 @@ func main() {
 	maxUploadBytes := viper.GetInt64("server.max_upload_bytes")
 
 	server, err := api.NewServer(api.Config{
-		DataDir:           dataDir,
-		SessionTTL:        sessionTTL,
-		MaxUploadBytes:    maxUploadBytes,
-		RenderBinary:      viper.GetString("render.binary"),
-		RenderTimeout:     viper.GetDuration("render.timeout"),
-		RenderConcurrency: viper.GetInt("render.concurrency"),
+		DataDir:             dataDir,
+		SessionTTL:          sessionTTL,
+		MaxUploadBytes:      maxUploadBytes,
+		RenderBinary:        viper.GetString("render.binary"),
+		RenderTimeout:       viper.GetDuration("render.timeout"),
+		RenderConcurrency:   viper.GetInt("render.concurrency"),
+		BackgroundWorkerURL: viper.GetString("background.worker_url"),
 	})
 	if err != nil {
 		log.Fatalf("create api server: %v", err)
@@ -65,6 +66,8 @@ func configure() {
 	_ = viper.BindEnv("render.binary", "IMG_RENDER_BINARY")
 	_ = viper.BindEnv("render.timeout", "IMG_RENDER_TIMEOUT")
 	_ = viper.BindEnv("render.concurrency", "IMG_RENDER_CONCURRENCY")
+	_ = viper.BindEnv("background.worker_url", "IMG_BACKGROUND_WORKER_URL")
+	viper.SetDefault("background.worker_url", "http://127.0.0.1:8091")
 	viper.SetDefault("render.binary", "")
 	viper.SetDefault("render.timeout", 2*time.Minute)
 	viper.SetDefault("render.concurrency", 2)

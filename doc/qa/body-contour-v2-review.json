@@ -1,0 +1,320 @@
+{
+  "provenance": {
+    "date": "2026-10-13",
+    "nativeBinarySha256": "95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab",
+    "bodySourceSha256": "01059c82be84dfdae2b897cfed8ea4530ebe0a212ab61f332b76c7f1996147aa",
+    "landmarksSourceSha256": "cfc02c71b61c90dce274b3ea6d78fa7e0c464cd2d7d176879fe21b695b20180d",
+    "resolution": "max side 768px",
+    "amount": 60,
+    "modelDetection": "cached original Pose; not repeated",
+    "scoring": "manual subjective assessment; 35% effect, 35% naturalness, 20% protection, 10% engine efficiency",
+    "efficiencyLimit": "native process time includes image load/PNG output; no fresh model initialization, 1024px benchmark or peak memory evidence"
+  },
+  "summary": {
+    "samples": 5,
+    "outputs": 15,
+    "passed": 0
+  },
+  "checks": [
+    {
+      "id": "fashion-standing",
+      "part": "waist",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 6,
+        "targetProtection": 7,
+        "engineEfficiency": 7
+      },
+      "score": 7.0,
+      "status": "FAIL-under-8",
+      "notes": "真实衬衫外边收缩，中轴和手基本保持；衣袖贴腰处部位边界仍不精确，轮廓窄带有细色边。",
+      "metrics": {
+        "changedPixels": 17332,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 911,
+      "artifact": "body-contour-v2/fashion-standing-waist.png"
+    },
+    {
+      "id": "fashion-standing",
+      "part": "left-upper-arm",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 6,
+        "targetProtection": 8,
+        "engineEfficiency": 7
+      },
+      "score": 7.2,
+      "status": "FAIL-under-8",
+      "notes": "袖子外边确实内移，布纹保留；低分辨率软边与填补窄带有浅色重边，缺少真袖子/躯干像素分离。",
+      "metrics": {
+        "changedPixels": 2887,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 761,
+      "artifact": "body-contour-v2/fashion-standing-left-upper-arm.png"
+    },
+    {
+      "id": "fashion-standing",
+      "part": "left-thigh",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 5,
+        "targetProtection": 8,
+        "engineEfficiency": 7
+      },
+      "score": 6.85,
+      "status": "FAIL-under-8",
+      "notes": "裤腿真实收窄，手与骨轴保持；腿间背景窄带有残影，植物/格栅结构的延拓不可靠。",
+      "metrics": {
+        "changedPixels": 8827,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 971,
+      "artifact": "body-contour-v2/fashion-standing-left-thigh.png"
+    },
+    {
+      "id": "fashion-standing",
+      "part": "right-upper-arm",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 6,
+        "targetProtection": 8,
+        "engineEfficiency": 6
+      },
+      "score": 7.1,
+      "status": "FAIL-under-8",
+      "notes": "弯曲上臂外轮廓改变，袖口和前臂总体保持；轮廓转折和背景延拓处有细边，仍不够自然。",
+      "metrics": {
+        "changedPixels": 3742,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 1029,
+      "artifact": "body-contour-v2/fashion-standing-right-upper-arm.png"
+    },
+    {
+      "id": "fashion-standing",
+      "part": "right-thigh",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 5,
+        "targetProtection": 8,
+        "engineEfficiency": 7
+      },
+      "score": 6.85,
+      "status": "FAIL-under-8",
+      "notes": "裤腿外侧真实内移；腿间窄带与地面结构线有细条和接缝，不能以背景原像素不动证明自然。",
+      "metrics": {
+        "changedPixels": 6075,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 845,
+      "artifact": "body-contour-v2/fashion-standing-right-thigh.png"
+    },
+    {
+      "id": "fullbody-skirt",
+      "part": "waist",
+      "dimensions": {
+        "effect": 4,
+        "naturalness": 7,
+        "targetProtection": 7,
+        "engineEfficiency": 6
+      },
+      "score": 5.85,
+      "status": "FAIL-under-8",
+      "notes": "腰侧被衣袖连接/遮挡，主要改变裙子内部纹理，可见真实腰外边变化不足；不能把支持区内差分当成收腰成功。",
+      "metrics": {
+        "changedPixels": 2485,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 1053,
+      "artifact": "body-contour-v2/fullbody-skirt-waist.png"
+    },
+    {
+      "id": "fullbody-skirt",
+      "part": "left-upper-arm",
+      "dimensions": {
+        "effect": 7,
+        "naturalness": 6,
+        "targetProtection": 8,
+        "engineEfficiency": 7
+      },
+      "score": 6.85,
+      "status": "FAIL-under-8",
+      "notes": "可见衣袖外边略收窄，蕾丝细节大致保留；外边有暗边/小折线，隐藏内侧只能固定。",
+      "metrics": {
+        "changedPixels": 788,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 861,
+      "artifact": "body-contour-v2/fullbody-skirt-left-upper-arm.png"
+    },
+    {
+      "id": "fullbody-skirt",
+      "part": "right-upper-arm",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 6,
+        "targetProtection": 8,
+        "engineEfficiency": 7
+      },
+      "score": 7.2,
+      "status": "FAIL-under-8",
+      "notes": "衣袖真实外侧收窄；浅色袖边与背景有薄色缝，长袖下面的手臂轮廓并未被重建。",
+      "metrics": {
+        "changedPixels": 1197,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 856,
+      "artifact": "body-contour-v2/fullbody-skirt-right-upper-arm.png"
+    },
+    {
+      "id": "fullbody-side-fashion",
+      "part": "waist",
+      "dimensions": {
+        "effect": 5,
+        "naturalness": 3,
+        "targetProtection": 3,
+        "engineEfficiency": 7
+      },
+      "score": 4.1,
+      "status": "FAIL-under-8",
+      "notes": "垂挂大衣及包侧区域一起被缩，目标腰部隔离失败；外套软边残影显著，缺失区有拖影。",
+      "metrics": {
+        "changedPixels": 7032,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 746,
+      "artifact": "body-contour-v2/fullbody-side-fashion-waist.png"
+    },
+    {
+      "id": "fullbody-side-fashion",
+      "part": "right-upper-arm",
+      "dimensions": {
+        "effect": 6,
+        "naturalness": 3,
+        "targetProtection": 3,
+        "engineEfficiency": 7
+      },
+      "score": 4.45,
+      "status": "FAIL-under-8",
+      "notes": "上臂外边改变，但连在主体内的手/头发及大衣被误动，靠脸手部出现重影；必须判失败。",
+      "metrics": {
+        "changedPixels": 4814,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 640,
+      "artifact": "body-contour-v2/fullbody-side-fashion-right-upper-arm.png"
+    },
+    {
+      "id": "tilted-shirt",
+      "part": "waist",
+      "dimensions": {
+        "effect": 6,
+        "naturalness": 5,
+        "targetProtection": 4,
+        "engineEfficiency": 7
+      },
+      "score": 5.35,
+      "status": "FAIL-under-8",
+      "notes": "斜姿和宽袖的轮廓收缩明显；同时改变袖子/外套而非隔离真实腰，软边与窄带有残影。",
+      "metrics": {
+        "changedPixels": 22479,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 770,
+      "artifact": "body-contour-v2/tilted-shirt-waist.png"
+    },
+    {
+      "id": "tilted-shirt",
+      "part": "left-upper-arm",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 6,
+        "targetProtection": 8,
+        "engineEfficiency": 7
+      },
+      "score": 7.2,
+      "status": "FAIL-under-8",
+      "notes": "宽袖外轮廓真实内移，衣料纹理基本连续；袖边略有细重边，仍缺精确部位 alpha。",
+      "metrics": {
+        "changedPixels": 4743,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 647,
+      "artifact": "body-contour-v2/tilted-shirt-left-upper-arm.png"
+    },
+    {
+      "id": "action-suit",
+      "part": "waist",
+      "dimensions": {
+        "effect": 7,
+        "naturalness": 5,
+        "targetProtection": 4,
+        "engineEfficiency": 6
+      },
+      "score": 5.6,
+      "status": "FAIL-under-8",
+      "notes": "外套腰侧真实收缩，但电脑上缘附近出现差分和接缝；持物保护没有可靠语义隔离。",
+      "metrics": {
+        "changedPixels": 19234,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 1188,
+      "artifact": "body-contour-v2/action-suit-waist.png"
+    },
+    {
+      "id": "action-suit",
+      "part": "left-upper-arm",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 6,
+        "targetProtection": 7,
+        "engineEfficiency": 7
+      },
+      "score": 7.0,
+      "status": "FAIL-under-8",
+      "notes": "抬臂上下轮廓局部内移；肩接缝和弯曲袖边有折线，外侧背景填补色调略不连续。",
+      "metrics": {
+        "changedPixels": 1807,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 725,
+      "artifact": "body-contour-v2/action-suit-left-upper-arm.png"
+    },
+    {
+      "id": "action-suit",
+      "part": "right-upper-arm",
+      "dimensions": {
+        "effect": 8,
+        "naturalness": 6,
+        "targetProtection": 8,
+        "engineEfficiency": 7
+      },
+      "score": 7.2,
+      "status": "FAIL-under-8",
+      "notes": "上臂外轮廓真实改变，前臂保持；袖边和腋下仍有窄带接缝，不再因可渲染判通过。",
+      "metrics": {
+        "changedPixels": 2891,
+        "changedOriginalBackgroundPixels": 0,
+        "changedOutsideSupportPixels": 0
+      },
+      "elapsedMs": 746,
+      "artifact": "body-contour-v2/action-suit-right-upper-arm.png"
+    }
+  ]
+}

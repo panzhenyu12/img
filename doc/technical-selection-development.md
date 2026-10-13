@@ -1,6 +1,6 @@
 # 技术选型与开发文档（Web Demo）
 
-2026-10-13 算法整改更新：当前实现与验证以 [算法验证](qa/algorithm-validation.md) 和 [功能对账](func/FUNC-010-parameter-ledger.md) 为准。旧模板/RBF概述不能作为已完成语义重塑的证据。自动人脸增加本地BiSeNet ONNX解析，Rust分别使用完整head alpha和内脸skin/hair轮廓；身体非零调整必须提供部位、subjectMask与关键点，未验证结构参数拒绝。去人使用exemplar补全；真实照片的边缘色缝、遮挡和接缝仍未全部解决。
+2026-10-13 算法与双端更新：人脸已采用论文 rigid MLS、独立脸/头发/耳朵/配饰层与多尺度 F/B 估计；分类覆盖仍不是真实 matting。身体非零调整必须有真实 subjectMask，已删除无分割的背景拉伸路径；partMask 接口已通，自动 Pose 尚未解决衣物/手/头发部位归属。皮肤采用有蒙版的 Fast Guided Filter。去人保留传统 exemplar，并实现浏览器 ONNX LaMa 与 Go→本地 TorchScript Worker 双端推理，参数 execution 明确选择处理位置。实际效果仍有失败，逐功能 8 分目标尚未达到；当前状态见 [最新验证](qa/current-validation.md) 和 [质量目标](qa/quality-targets.md)。
 
 版本：v0.2 · 2026-10-12
 
@@ -93,11 +93,13 @@ DeepAgent（可选）
 
 ## 算法能力
 
-人脸轮廓在 `face.rs` 使用source→target轮廓控制和独立前景alpha：`faceContourMask/faceContour`是内脸与头发之间的边界，`face/faceOutline`是完整头部，`neck`表示收缩下颌后可能露出的脖子底层。Web本地BiSeNet ONNX提供类别解析；概率经保留.5边界的coverage转换，避免把低置信背景当作半透明头部。手工polygon可作为明确近似边界，裸矩形不猜人脸。
+人脸轮廓在 `face.rs` 使用source→target轮廓控制和独立前景alpha：`faceContourMask/faceContour`是脸部控制边界（排除头发、耳朵及配饰），`face/faceOutline`是完整头部，`neck`表示收缩下颌后可能露出的脖子底层。Web本地BiSeNet ONNX提供类别解析；概率经保留.5边界的coverage转换，避免把低置信背景当作半透明头部。手工polygon可作为明确近似边界，裸矩形不猜人脸。
 
 五官按实际semantic polygon在像素脸轴处理，避免非方照片的旋转剪切；鼻子矫正依据noseRoot→noseTip与脸轴的实际偏斜。身体粗细使用Pose部位轴、人体分割和近的自由侧跨度，独立形变人物RGB/alpha，背景不位移；窄带按clean donor补背景。没有分割、关键点或参数部位不匹配时拒绝执行。裙装/遮挡/贴合肢体采用保守能力判断，仍不能代替完整body parsing。未完成专用算法的身高、腿长、体态和结构参数拒绝非零调用。
 
-皮肤 mask 优先于 face，减去眼/眉/嘴/毛发与保护区域；磨皮使用有效皮肤 donor 的归一化 Gaussian 卷积、差值保边和高频残留，避免非皮肤颜色污染邻肤。美白与肤色分开调整亮度/色度，保护高光和深阴影。妆容只作用唇/眉/眼下等语义区域，同层先调色再几何采样以跟随特征变化；对称是可靠语义下的保守二维特征位置矫正。检测在当前层输入执行，旧上游几何/顺序变动后需重检测。牙齿在内嘴中独立筛选明亮低饱和像素。衣物平整使用低频与纹理混合。这些是确定性传统算法，尚非深度精修论文模型的完整复现。
+皮肤 mask 优先于 face，减去眼/眉/嘴/毛发与保护区域；磨皮使用有效皮肤 donor 的 Fast Guided Filter（有蒙版区域统计、共用亮度 guide、局部 RGB 线性系数与原始全分辨率 guide），连续混合高频纹理，避免非皮肤颜色污染邻肤。美白与肤色分开调整亮度/色度，保护高光和深阴影。妆容只作用唇/眉/眼下等语义区域，同层先调色再几何采样以跟随特征变化；对称是可靠语义下的保守二维特征位置矫正。检测在当前层输入执行，旧上游几何/顺序变动后需重检测。牙齿在内嘴中独立筛选明亮低饱和像素。衣物平整使用低频与纹理混合。这些是确定性传统算法，尚非深度精修论文模型的完整复现。
+
+LaMa 双端方式为浏览器 ORT-Web（固定512正方形输入，保留照片比例后对称补边，约208MB权重）与 Go 代理本地 Python/Torch Worker（默认 full/1024，支持 Poisson）。两端都由 Rust生成 canonical mask并合成一次；客户端没有静默远程回退。执行方式和参数进入同一Operation/MCP catalog。浏览器模型并不需要把图像算法改写成 Go；Go继续负责Gin/Viper、任务、缓存和协议，模型运行时用成熟ORT/Torch。运行方式、限制、候选库及已验证论文见 [FUNC-016](func/FUNC-016-local-model-inpaint.md)、[研究记录](research/lama-client-runtime.md)。
 
 修复笔刷可手动取样或自动选择邻近纹理；背景人物/杂物提供手工 polygon 圈选与主体冻结。内容填补使用confidence×isophote优先级和masked SSD匹配完整clean exemplar纹理块，保护和透明RGB排除在donor之外。狭窄背景自适应缩小匹配/复制窗；无合法patch明确报错。街景仍有块状接缝，不生成复杂缺失语义。功能与验收见 [FUNC-012](func/FUNC-012-body-semantic-masks.md)、[FUNC-014](func/FUNC-014-background-person-removal.md)、[FUNC-015](func/FUNC-015-skin-and-makeup-quality.md)。
 

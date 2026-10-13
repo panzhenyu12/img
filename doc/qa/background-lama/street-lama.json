@@ -1,0 +1,26 @@
+{
+  "model": "lama-big-torchscript",
+  "paper": "https://arxiv.org/abs/2109.07161",
+  "selected_pixels": 5422,
+  "device": "cpu",
+  "threads": 6,
+  "seam_blend": "none",
+  "inference_ms": 36868.09,
+  "total_ms": 52089.63,
+  "model_load_ms": 15001.04,
+  "peak_rss_mb": 1732.34,
+  "model_sha256": "344c77bbcb158f17dd143070d1e789f38a66c04202311ae3a258ef66667a9ea9",
+  "crop_box": [
+    0,
+    0,
+    768,
+    576
+  ],
+  "model_size": [
+    768,
+    576
+  ],
+  "scaled": false,
+  "mask_dilation": 4,
+  "seam": {}
+}

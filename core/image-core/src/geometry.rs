@@ -1,5 +1,5 @@
 use crate::engine::{as_native, byte, from_native, number, percent};
-use crate::mask::Region;
+use crate::mask::{PreparedMask, Region};
 use crate::{ImageError, RgbaImage};
 use serde_json::Value;
 
@@ -717,6 +717,33 @@ pub(crate) fn local_adjust_kind(
     let region = Region::read(p.get("region"));
     let values = p.get("adjustments").unwrap_or(p);
     let semantic_features = kind == "feature.adjust" && p.get("semanticMasks").is_some();
+    let stationary_masks: Vec<_> = if matches!(kind, "face.adjust" | "feature.adjust") {
+        ["hair", "ears", "accessories"]
+            .iter()
+            .filter_map(|name| p.get("semanticMasks").and_then(|m| m.get(name)))
+            .map(PreparedMask::new)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let stationary: Vec<bool> = if stationary_masks.is_empty() {
+        Vec::new()
+    } else {
+        (0..source.width as usize * source.height as usize)
+            .map(|i| {
+                let x = (i % source.width as usize) as f32 + 0.5;
+                let y = (i / source.width as usize) as f32 + 0.5;
+                stationary_masks.iter().any(|m| {
+                    m.coverage(
+                        x / source.width as f32,
+                        y / source.height as f32,
+                        source.width,
+                        source.height,
+                    ) >= 0.5
+                })
+            })
+            .collect()
+    };
     let mut symmetry_warps = if matches!(kind, "face.adjust" | "feature.adjust") {
         read_symmetry_warps(
             p,
@@ -1095,6 +1122,11 @@ pub(crate) fn local_adjust_kind(
     let mut facial_input = matches!(kind, "face.adjust" | "feature.adjust")
         .then(|| crate::color::local_color(source, p, false));
     if let Some(input) = &mut facial_input {
+        for (i, &frozen) in stationary.iter().enumerate() {
+            if frozen {
+                input.pixels[i * 4..i * 4 + 4].copy_from_slice(&source.pixels[i * 4..i * 4 + 4]);
+            }
+        }
         if selection_mask.is_some() || p.get("protectMask").is_some() {
             for y in 0..source.height {
                 for x in 0..source.width {
@@ -1122,6 +1154,10 @@ pub(crate) fn local_adjust_kind(
         source.height,
         true,
         |x, y| {
+            let destination = y as usize * source.width as usize + x as usize;
+            if stationary.get(destination).copied().unwrap_or(false) {
+                return (x, y);
+            }
             let nx = x / source.width as f32;
             let ny = y / source.height as f32;
             if !region.contains(nx, ny) {
@@ -1168,10 +1204,36 @@ pub(crate) fn local_adjust_kind(
                 ux += (sx - x) / (source.width as f32 * region.width) * weight;
                 uy += (sy - y) / (source.height as f32 * region.height) * weight;
             }
-            (
-                (region.x + ux * region.width) * source.width as f32,
-                (region.y + uy * region.height) * source.height as f32,
-            )
+            let sx = (region.x + ux * region.width) * source.width as f32;
+            let sy = (region.y + uy * region.height) * source.height as f32;
+            // A stationary obstruction must not be cloned into neighboring
+            // skin. Check all nonzero bilinear contributors, not only the
+            // nearest sampling pixel or the frozen output location.
+            if !stationary.is_empty() && ((sx - x).abs() + (sy - y).abs()) > 1e-5 {
+                let bx = sx.clamp(0.0, source.width as f32 - 1.0);
+                let by = sy.clamp(0.0, source.height as f32 - 1.0);
+                let (x0, y0) = (bx.floor() as usize, by.floor() as usize);
+                let (tx, ty) = (bx - bx.floor(), by - by.floor());
+                for (xx, yy, weight) in [
+                    (x0, y0, (1.0 - tx) * (1.0 - ty)),
+                    ((x0 + 1).min(source.width as usize - 1), y0, tx * (1.0 - ty)),
+                    (
+                        x0,
+                        (y0 + 1).min(source.height as usize - 1),
+                        (1.0 - tx) * ty,
+                    ),
+                    (
+                        (x0 + 1).min(source.width as usize - 1),
+                        (y0 + 1).min(source.height as usize - 1),
+                        tx * ty,
+                    ),
+                ] {
+                    if weight > 1e-6 && stationary[yy * source.width as usize + xx] {
+                        return (x, y);
+                    }
+                }
+            }
+            (sx, sy)
         },
     )?;
     // Clothing's frequency-based wrinkle/color pass retains its existing
@@ -1699,6 +1761,51 @@ mod tests {
         let (_, mut profile) = symmetry_fixture();
         profile["semanticMasks"]["rightEye"] = symmetry_polygon(176.0, 100.0, 6.0, 12.0);
         assert_eq!(local_adjust(&source, &profile).unwrap(), source);
+    }
+    #[test]
+    fn semantic_stationary_layers_neither_move_nor_get_sampled_into_neighboring_skin() {
+        let (mut source, mut params) = symmetry_fixture();
+        let mut frozen = vec![0_u8; source.width as usize * source.height as usize];
+        // An occluding accessory sits inside the moving feature's support,
+        // so output-only freezing would still duplicate it in nearby skin.
+        for y in 84..94 {
+            for x in 68..74 {
+                let i = y * source.width as usize + x;
+                frozen[i] = 255;
+                source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[0, 255, 0, 255]);
+            }
+        }
+        for key in ["accessories", "ears", "hair"] {
+            params["semanticMasks"][key] = serde_json::json!({"shape":"raster","width":source.width,"height":source.height,"data":frozen});
+            for adjustments in [
+                serde_json::json!({"symmetry":100}),
+                serde_json::json!({"eyeSize":100}),
+            ] {
+                params["adjustments"] = adjustments;
+                let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                assert_ne!(
+                    output.pixels, source.pixels,
+                    "feature must still move outside {key}"
+                );
+                for (i, &protected) in frozen.iter().enumerate() {
+                    if protected > 0 {
+                        assert_eq!(
+                            &output.pixels[i * 4..i * 4 + 4],
+                            &source.pixels[i * 4..i * 4 + 4],
+                            "frozen {key} {i}"
+                        );
+                    } else {
+                        assert!(
+                            !(output.pixels[i * 4] < 40
+                                && output.pixels[i * 4 + 1] > 240
+                                && output.pixels[i * 4 + 2] < 40),
+                            "{key} was copied into skin pixel {i}"
+                        );
+                    }
+                }
+            }
+            params["semanticMasks"].as_object_mut().unwrap().remove(key);
+        }
     }
 
     #[test]

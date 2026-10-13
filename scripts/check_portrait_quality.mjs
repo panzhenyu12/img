@@ -43,18 +43,20 @@ try {
       const nx=(x+.5)/source.width,ny=(y+.5)/source.height;
       let value=maskValue(person.semanticMasks.faceContourMask,nx,ny)>=.5?1:0;
       if(nx<region.x||nx>region.x+region.width||ny<region.y||ny>region.y+region.height)value|=4;
-      else {let maxAlpha=0;for(const [ox,oy]of[[0,0],[-2,0],[2,0],[0,-2],[0,2]])maxAlpha=Math.max(maxAlpha,maskValue(person.semanticMasks.face,(x+.5+ox)/source.width,(y+.5+oy)/source.height));if(maxAlpha<.01)value|=2;}
+      else {let maxAlpha=0,maxSubject=0;for(const [ox,oy]of[[0,0],[-2,0],[2,0],[0,-2],[0,2]]){maxAlpha=Math.max(maxAlpha,maskValue(person.semanticMasks.face,(x+.5+ox)/source.width,(y+.5+oy)/source.height));maxSubject=Math.max(maxSubject,maskValue(person.subjectMask,(x+.5+ox)/source.width,(y+.5+oy)/source.height));}if(maxAlpha<.01)value|=2;if(maxSubject<.01)value|=8;}
+      if(maskValue(person.semanticMasks.skin,nx,ny)===0)value|=16;
       sourceClasses[y*source.width+x]=value;
     }
     const crop = { x: Math.max(0, Math.floor(region.x * source.width)), y: Math.max(0, Math.floor(region.y * source.height)), w: Math.ceil(region.width * source.width), h: Math.ceil(region.height * source.height) };
     const checks = [];
+    const replayBaseParams = { region, mask:support, landmarks:person.points.map(({x,y})=>({x,y})), semanticMasks:person.semanticMasks };
     for (const item of cases) {
       const adjustment=item.tool==='skin'?{[item.key]:item.value,...(item.key==='texture'?{smooth:80}:{})}:{adjustments:{[item.key]:item.value}};
-      const graph = { version: '1.0', sourceAssetId: 'local', operations: [{ id: 'quality', type: item.tool==='skin'?'skin.retouch':item.tool==='feature'?'feature.adjust':'face.adjust', version: '1.0', enabled: true, params: { region, mask: support, landmarks: person.points.map(({ x, y }) => ({ x, y })), subjectMask: person.subjectMask, semanticMasks: person.semanticMasks,...adjustment }, controlPoints: [] }] };
+      const graph = { version: '1.0', sourceAssetId: 'local', operations: [{ id: 'quality', type: item.tool==='skin'?'skin.retouch':item.tool==='feature'?'feature.adjust':'face.adjust', version: '1.0', enabled: true, params: { region, mask: support, landmarks: person.points.map(({ x, y }) => ({ x, y })), ...(item.tool==='face'?{subjectMask:person.subjectMask}:{}), semanticMasks: person.semanticMasks,...adjustment }, controlPoints: [] }] };
       try {
       const output = await renderImage(source, graph, { kind: 'export' });
       const detected = featureBatch ? undefined : (await detectPeople(pixelsToCanvas(output), 'face'))[0];
-      const metrics = { changedFacePixels: 0, changedOutsideSupportPixels: 0, changedBackgroundBeyondOriginalFaceTwoPixels: 0, outsideSupportPixels: 0, backgroundBeyondOriginalFaceTwoPixels: 0, protectedFeatureCenters: {}, faceWidthAtCheek: { source: (person.points[8].x - person.points[28].x) * source.width, output: detected ? (detected.points[8].x - detected.points[28].x) * source.width : null } };
+      const metrics = { changedFacePixels: 0, changedOutsideSupportPixels: 0, changedBackgroundBeyondOriginalFaceTwoPixels: 0, changedKnownSceneBackgroundPixels: 0, changedOutsideOriginalSkinMaskPixels: 0, outsideSupportPixels: 0, backgroundBeyondOriginalFaceTwoPixels: 0, protectedFeatureCenters: {}, faceWidthAtCheek: { source: (person.points[8].x - person.points[28].x) * source.width, output: detected ? (detected.points[8].x - detected.points[28].x) * source.width : null } };
       const difference = { ...source, pixels: new Uint8Array(source.pixels.length) };
       for (let y = 0; y < source.height; y++) for (let x = 0; x < source.width; x++) {
         const index = (y * source.width + x) * 4; const nx = (x + .5) / source.width, ny = (y + .5) / source.height;
@@ -63,6 +65,8 @@ try {
         if ((category&1) && delta) metrics.changedFacePixels++;
         if (category&4) { metrics.outsideSupportPixels++; if (delta) metrics.changedOutsideSupportPixels++; }
         else if (category&2) { metrics.backgroundBeyondOriginalFaceTwoPixels++; if (delta) metrics.changedBackgroundBeyondOriginalFaceTwoPixels++; }
+        if((category&8)&&delta)metrics.changedKnownSceneBackgroundPixels++;
+        if(item.tool==='skin'&&(category&16)&&delta)metrics.changedOutsideOriginalSkinMaskPixels++;
         difference.pixels.set([Math.min(255, delta * 8), 0, 0, 255], index);
       }
       for (const name of ['leftEye', 'rightEye', 'nose', 'lips']) {
@@ -76,10 +80,10 @@ try {
       for (const [i, [image, label]] of [[source, 'Original'], [output, `${item.key}: ${item.value}`], [difference, 'Difference x8']].entries()) {
         ctx.fillText(label, crop.w * i * 2 + 10, 25); ctx.drawImage(pixelsToCanvas(image), crop.x, crop.y, crop.w, crop.h, crop.w * i * 2, 36, crop.w * 2, crop.h * 2);
       }
-      checks.push({ ...item, metrics, graph, png: canvas.toDataURL().split(',')[1], sourceContour: contour, headSourceContour:headContour, anatomicalSourceContour: person.points, detectedOutputContour: detected?.semanticMasks.faceContour.points });
-      } catch (error) { checks.push({...item,error:String(error),graph}); }
+      checks.push({ ...item, metrics, graph: featureBatch ? { ...graph, operations:graph.operations.map(op=>({...op,params:adjustment})) } : graph, png: canvas.toDataURL().split(',')[1], sourceContour: contour, headSourceContour:headContour, anatomicalSourceContour: person.points, detectedOutputContour: detected?.semanticMasks.faceContour.points });
+      } catch (error) { checks.push({...item,error:String(error),graph:featureBatch?{...graph,operations:graph.operations.map(op=>({...op,params:adjustment}))}:graph}); }
     }
-    return { source: { name, width: source.width, height: source.height }, date: new Date().toISOString(), checks };
+    return { source: { name, width: source.width, height: source.height }, date: new Date().toISOString(), ...(featureBatch?{replayBaseParams}:{}), checks };
   }, { encoded, name: path.basename(sample.input),allParameters:!batch || coreSamples.includes(sample.id),maxEdge:768,featureBatch });
   } catch(error) { result={source:{name:path.basename(sample.input)},date:new Date().toISOString(),error:String(error),checks:[]}; }
   const sampleDir=path.join(outDir,sample.id);
@@ -90,24 +94,26 @@ try {
     delete item.png;
   }
   await fs.writeFile(path.join(sampleDir, 'real-face-quality.json'), JSON.stringify(result, null, 2));
-  const failures = result.checks.filter(item => item.error || item.metrics.changedOutsideSupportPixels !== 0 || (featureBatch||item.key==='faceWidth')&&item.metrics.changedBackgroundBeyondOriginalFaceTwoPixels!==0 || !featureBatch&&(item.metrics.changedFacePixels===0||Object.values(item.metrics.protectedFeatureCenters).some(equal=>!equal)));
+  const failures = result.checks.filter(item => item.error || item.metrics.changedOutsideSupportPixels !== 0 || (item.tool==='skin'?(item.metrics.changedKnownSceneBackgroundPixels!==0||item.metrics.changedOutsideOriginalSkinMaskPixels!==0):(featureBatch||item.key==='faceWidth')&&item.metrics.changedBackgroundBeyondOriginalFaceTwoPixels!==0) || !featureBatch&&(item.metrics.changedFacePixels===0||Object.values(item.metrics.protectedFeatureCenters).some(equal=>!equal)));
   batchEvidence.push({id:sample.id,labels:sample.labels,source:result.source,error:result.error,checks:result.checks.map(({tool,key,value,metrics,error})=>({tool,key,value,metrics,error})),failures:failures.map(item=>item.key),artifactDirectory:sampleDir});
   console.log(JSON.stringify({id:sample.id,error:result.error,cases:result.checks.length,failures:failures.map(item=>({key:item.key,error:item.error,metrics:item.metrics}))}));
   }
   await fs.mkdir(outDir,{recursive:true});
   await fs.mkdir(path.join(root,'doc/qa'),{recursive:true});
   await fs.writeFile(path.join(root,'doc/qa',featureBatch?'feature-skin-multisample-review.json':'portrait-multisample-review.json'),JSON.stringify(batchEvidence,null,2));
-  const rows=batchEvidence.flatMap(sample=>sample.checks.map(item=>`| ${sample.id} | ${item.key}=${item.value} | ${sample.failures.includes(item.key)?'FAIL':'通过像素保护检查，待视觉复核'} | ${item.metrics?.faceWidthAtCheek.source.toFixed(2)??'未测得'} → ${item.metrics?.faceWidthAtCheek.output?.toFixed(2)??'未检出'} | ${item.metrics?.changedOutsideSupportPixels??'-'} | ${item.metrics?.changedBackgroundBeyondOriginalFaceTwoPixels??'-'} |`));
+  const rows=batchEvidence.flatMap(sample=>sample.checks.map(item=>`| ${sample.id} | ${item.key}=${item.value} | ${sample.failures.includes(item.key)?'FAIL':'通过像素保护检查，待视觉复核'} | ${item.metrics?.faceWidthAtCheek.source.toFixed(2)??'未测得'} → ${item.metrics?.faceWidthAtCheek.output?.toFixed(2)??'未检出'} | ${item.metrics?.changedOutsideSupportPixels??'-'} | ${item.metrics?.changedBackgroundBeyondOriginalFaceTwoPixels??'-'} | ${item.metrics?.changedKnownSceneBackgroundPixels??'-'} | ${item.tool==='skin'?item.metrics?.changedOutsideOriginalSkinMaskPixels??'-':'-'} |`));
   const errors=batchEvidence.filter(sample=>sample.error).map(sample=>`- ${sample.id}：${sample.error}`);
   await fs.writeFile(path.join(root,'doc/qa',featureBatch?'feature-skin-multisample-review.md':'portrait-multisample-review.md'),`# 多样本人脸算法效果记录
 
 日期：2026-10-13。最长边缩至768px。像素脸部控制轮廓与整头前景alpha分开；有序36点只作解剖定位。输出再检测的脸宽只作辅助测量，不能代替照片边缘视觉验收。
 
-| 照片 | 参数 | 像素检查 | 颧侧宽度px（重新检测） | 支持区外变化 | 原轮廓外2px背景变化 |
-|---|---|---|---|---|---|
+| 照片 | 参数 | 像素检查 | 颧侧宽度px（重新检测） | 支持区外变化 | 头部轮廓外2px变化（含颈部） | 真实场景背景变化 | 皮肤mask外变化 |
+|---|---|---|---|---|---|---|---|
 ${rows.join('\n')}
 
 ${errors.length?'检测失败记录：\n\n'+errors.join('\n'):''}
+
+皮肤包含明确的颈部语义层，因此头部轮廓外变化不等于场景背景变化。保留该原始指标，另以完整person alpha与原始skin mask核对真正背景和skin边界；未放宽阈值。
 
 逐参数原图、输出、差分与原/输出检测轮廓保存于 ${outDir}。像素检查通过不代表自然度已达标。五官与皮肤批测中零变化参数仅记录，需要判断照片是否存在目标（如牙齿）、当前参数是否有上下文（texture需smooth>0），不能当作自然效果通过。
 `);

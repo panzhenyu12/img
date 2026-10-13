@@ -7,7 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registry = await import(pathToFileURL(path.join(root, 'apps/web/src/core/registry.ts')).href);
 const engineVersion = fs.readFileSync(path.join(root, 'core/image-core/Cargo.toml'), 'utf8').match(/^version\s*=\s*"([^"]+)"/m)?.[1];
 const registered = structuredClone(registry.PARAMETER_REGISTRY);
-const semanticMaskNames = ['face', 'faceOutline', 'faceContour', 'faceContourMask', 'skin', 'neck', 'skinProtection', 'eyes', 'leftEye', 'rightEye', 'brows', 'leftBrow', 'rightBrow', 'underEyes', 'leftUnderEye', 'rightUnderEye', 'lips', 'lip', 'teeth', 'hair', 'nose', 'noseBridge', 'noseWings', 'noseTip', 'noseRoot', 'noseBase', 'leftNostril', 'rightNostril'];
+const semanticMaskNames = ['face', 'faceOutline', 'faceContour', 'faceContourMask', 'skin', 'neck', 'accessories', 'ears', 'skinProtection', 'eyes', 'leftEye', 'rightEye', 'brows', 'leftBrow', 'rightBrow', 'underEyes', 'leftUnderEye', 'rightUnderEye', 'lips', 'lip', 'teeth', 'hair', 'nose', 'noseBridge', 'noseWings', 'noseTip', 'noseRoot', 'noseBase', 'leftNostril', 'rightNostril'];
 const semanticMasks = {
   type: 'object', maxProperties: semanticMaskNames.length,
   properties: Object.fromEntries(semanticMaskNames.map(name => [name, { oneOf: [{ $ref: 'mask.schema.json' }, { type: 'array', minItems: 3, maxItems: 256, items: { $ref: 'mask.schema.json#/$defs/point' } }] }])),
@@ -35,6 +35,7 @@ for (const type of ['face.adjust', 'feature.adjust', 'body.adjust', 'clothing.ad
 for (const type of ['face.adjust', 'feature.adjust', 'skin.retouch']) registered[type].keys.semanticMasks = semanticMasks;
 registered['skin.retouch'].keys.landmarks = landmarks;
 registered['body.adjust'].keys.subjectMask = { $ref: 'mask.schema.json', description: 'Person segmentation alpha; raster row-major bytes, 1..512 dimensions, alpha moves with foreground. Required for body contour edits.' };
+registered['body.adjust'].keys.partMask = { $ref: 'mask.schema.json', description: 'Target body part alpha, separate from the whole-person foreground; neighboring body parts remain fixed.' };
 registered['face.adjust'].keys.subjectMask = { $ref: 'mask.schema.json', description: 'Full person alpha excluded from background donors during face reshaping' };
 registered['body.adjust'].keys.bodyPart = {
   enum: ['full-body', 'torso', 'waist', 'hips', 'left-upper-arm', 'right-upper-arm', 'left-forearm', 'right-forearm', 'left-thigh', 'right-thigh', 'left-calf', 'right-calf'],
@@ -60,7 +61,7 @@ const catalog = {
     'warp.liquify': { keys: { strokes: { type: 'array', maxItems: 4096, items: { ...stroke, toX: { min: -1, max: 2 }, toY: { min: -1, max: 2 }, mode: { enum: ['push', 'pinch', 'bloat', 'twirl', 'reconstruct'] }, direction: { enum: [-1, 1], default: 1 } } } }, description: 'Reconstruct restores this layer input; mirrored twirl strokes reverse direction' },
     'repair.clone': { keys: { strokes: { type: 'array', maxItems: 4096, items: { ...stroke, sourceX: { min: 0, max: 1 }, sourceY: { min: 0, max: 1 } }, required: ['x', 'y', 'radius', 'sourceX', 'sourceY'] } } },
     'repair.heal': { keys: { strokes: { type: 'array', maxItems: 4096, items: { ...stroke, sourceX: { min: 0, max: 1 }, sourceY: { min: 0, max: 1 } }, required: ['x', 'y', 'radius'] } } },
-    'repair.inpaint': { keys: { radius: { min: 0.00001, max: 1, default: 0.025 }, iterations: { min: 1, max: 64, default: 6, type: 'integer' } }, description: 'Exemplar patch inpainting with confidence/isophote priority; deterministic, no generative model' },
+    'repair.inpaint': { keys: { radius: { min: 0.00001, max: 1, default: 0.025 }, iterations: { min: 1, max: 64, default: 6, type: 'integer' }, method: { enum: ['exemplar', 'lama'], default: 'exemplar' }, execution: {enum:['client','server'],default:'server'}, maxSide: {min:256,max:2048,default:1024,type:'integer'}, contextPadding: {min:64,max:1024,default:256,type:'integer'}, maskDilation: {min:0,max:32,default:4,type:'integer'}, seamBlend: {enum:['none','poisson'],default:'none'}, contextMode: {enum:['full','crop'],default:'full'} }, description: 'Offline Rust exemplar fill, browser ONNX LaMa (execution=client; maxSide<=512; seamBlend=none), or server LaMa model; the shared Rust mask compositor preserves unselected pixels, protection and alpha. LaMa is independent of the AI agent.' },
     'paint.brush': { keys: { color: { type: 'array', length: 3, min: 0, max: 255 }, strokes: { type: 'array', maxItems: 4096, items: { ...stroke, erase: { type: 'boolean' } } } }, description: 'Paint color onto a reversible layer; erase restores this layer to the source' },
     'color.curves': { keys: { channel: { enum: ['rgb', 'red', 'green', 'blue'] }, points: { type: 'array', maxItems: 1024, minItems: 2, items: point } } },
     'color.hsl': { keys: { hue: { min: -100, max: 100 }, saturation: { min: -100, max: 100 }, lightness: { min: -100, max: 100 }, channels: { type: 'array', items: { hue: { min: 0, max: 360 }, range: { min: 1, max: 180 }, shift: { min: -100, max: 100 }, saturation: { min: -100, max: 100 }, lightness: { min: -100, max: 100 } } } } },

@@ -1,0 +1,162 @@
+{
+  "opsets": {
+    "": 17
+  },
+  "inputs": [
+    {
+      "name": "image",
+      "dtype": "FLOAT",
+      "shape": [
+        "batch",
+        3,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "mask",
+      "dtype": "FLOAT",
+      "shape": [
+        "batch",
+        1,
+        512,
+        512
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "FLOAT",
+      "shape": [
+        "batch",
+        3,
+        "Clipoutput_dim_2",
+        "Clipoutput_dim_3"
+      ]
+    }
+  ],
+  "operators": {
+    "Constant": 7054,
+    "Sub": 109,
+    "Mul": 292,
+    "Concat": 1360,
+    "ConstantOfShape": 98,
+    "Reshape": 1348,
+    "Slice": 1322,
+    "Transpose": 638,
+    "Cast": 782,
+    "Pad": 98,
+    "Conv": 222,
+    "Relu": 152,
+    "Add": 253,
+    "Shape": 1188,
+    "Gather": 396,
+    "Range": 180,
+    "Div": 432,
+    "Unsqueeze": 504,
+    "Cos": 144,
+    "Sin": 144,
+    "MatMul": 216,
+    "Sqrt": 144,
+    "Squeeze": 72,
+    "Einsum": 216,
+    "Neg": 36,
+    "BatchNormalization": 75,
+    "ConvTranspose": 3,
+    "Sigmoid": 1,
+    "Clip": 1
+  },
+  "last_nodes": [
+    {
+      "op": "Mul",
+      "name": "/Mul_1",
+      "inputs": [
+        "mask",
+        "/generator/model/model.35/Sigmoid_output_0"
+      ],
+      "outputs": [
+        "/Mul_1_output_0"
+      ]
+    },
+    {
+      "op": "Mul",
+      "name": "/Mul_2",
+      "inputs": [
+        "/Sub_output_0",
+        "image"
+      ],
+      "outputs": [
+        "/Mul_2_output_0"
+      ]
+    },
+    {
+      "op": "Add",
+      "name": "/Add",
+      "inputs": [
+        "/Mul_1_output_0",
+        "/Mul_2_output_0"
+      ],
+      "outputs": [
+        "/Add_output_0"
+      ]
+    },
+    {
+      "op": "Constant",
+      "name": "/Constant_2",
+      "inputs": [],
+      "outputs": [
+        "/Constant_2_output_0"
+      ]
+    },
+    {
+      "op": "Mul",
+      "name": "/Mul_3",
+      "inputs": [
+        "/Add_output_0",
+        "/Constant_2_output_0"
+      ],
+      "outputs": [
+        "/Mul_3_output_0"
+      ]
+    },
+    {
+      "op": "Constant",
+      "name": "/Constant_3",
+      "inputs": [],
+      "outputs": [
+        "/Constant_3_output_0"
+      ]
+    },
+    {
+      "op": "Constant",
+      "name": "/Constant_4",
+      "inputs": [],
+      "outputs": [
+        "/Constant_4_output_0"
+      ]
+    },
+    {
+      "op": "Clip",
+      "name": "/Clip",
+      "inputs": [
+        "/Mul_3_output_0",
+        "/Constant_3_output_0",
+        "/Constant_4_output_0"
+      ],
+      "outputs": [
+        "output"
+      ]
+    }
+  ],
+  "scalar_initializers": {},
+  "initializer_count": 606,
+  "tail_constants": {
+    "/generator/model/model.33/Constant_7": [
+      -1
+    ],
+    "/Constant_2": 255.0,
+    "/Constant_3": 0.0,
+    "/Constant_4": 255.0
+  }
+}

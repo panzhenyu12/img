@@ -1,0 +1,12 @@
+{
+  "official_generator_tensors": 989,
+  "export_generator_tensors": 989,
+  "missing": [],
+  "extra": [],
+  "matching": 989,
+  "different": [],
+  "generator_sha256": "b5daf9409a023ff32d9e84dd7c3a4d17964c92fcd174ad200d5dac42858e0252",
+  "checkpoint_sha256": "f1b358ca24093b93a106183b98a3dea6e8ed09f3b43ea7251eb2c81e7b4575f6",
+  "export_sha256": "344c77bbcb158f17dd143070d1e789f38a66c04202311ae3a258ef66667a9ea9",
+  "comparison": "exact torch.equal for every generator parameter and buffer after removing generator. prefixes"
+}

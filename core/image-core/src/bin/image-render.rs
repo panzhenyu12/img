@@ -2,7 +2,9 @@
 mod native {
     use clap::Parser;
     use image::{codecs::jpeg::JpegEncoder, DynamicImage, ImageDecoder, ImageFormat};
-    use image_core::{apply_graph_json, RgbaImage};
+    use image_core::{
+        apply_graph_json, composite_model_inpaint, prepare_model_inpaint, EditGraph, RgbaImage,
+    };
     use std::{
         fs,
         io::{BufWriter, Write},
@@ -25,11 +27,16 @@ mod native {
         format: String,
         #[arg(long, default_value_t = 92)]
         quality: u8,
+        /// Export canonical grayscale masks and oriented source into --output directory.
+        #[arg(long, conflicts_with = "candidate")]
+        inpaint_masks: bool,
+        /// Composite a model candidate with the single LaMa operation in --graph.
+        #[arg(long)]
+        candidate: Option<PathBuf>,
     }
 
-    pub fn run() -> Result<(), Box<dyn std::error::Error>> {
-        let args = Args::parse();
-        let mut reader = image::ImageReader::open(&args.input)?.with_guessed_format()?;
+    fn decode(path: &PathBuf) -> Result<RgbaImage, Box<dyn std::error::Error>> {
+        let mut reader = image::ImageReader::open(path)?.with_guessed_format()?;
         let mut limits = image::Limits::default();
         limits.max_alloc = Some(128_000_000);
         reader.limits(limits);
@@ -38,9 +45,51 @@ mod native {
         let mut decoded = DynamicImage::from_decoder(decoder)?;
         decoded.apply_orientation(orientation);
         let decoded = decoded.into_rgba8();
-        let source = RgbaImage::new(decoded.width(), decoded.height(), decoded.into_raw())?;
-        let graph = fs::read_to_string(args.graph)?;
-        let result = apply_graph_json(&source, &graph)?;
+        Ok(RgbaImage::new(
+            decoded.width(),
+            decoded.height(),
+            decoded.into_raw(),
+        )?)
+    }
+
+    pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+        let args = Args::parse();
+        let source = decode(&args.input)?;
+        let graph = fs::read_to_string(&args.graph)?;
+        let result = if args.inpaint_masks || args.candidate.is_some() {
+            let model_graph: EditGraph = serde_json::from_str(&graph)?;
+            if model_graph.operations.len() != 1 {
+                return Err("model mask/composite mode requires exactly one operation".into());
+            }
+            let operation = &model_graph.operations[0];
+            if args.inpaint_masks {
+                let masks = prepare_model_inpaint(&source, operation)?;
+                fs::create_dir_all(&args.output)?;
+                let target = image::GrayImage::from_raw(masks.width, masks.height, masks.target)
+                    .ok_or("invalid target mask")?;
+                let protection =
+                    image::GrayImage::from_raw(masks.width, masks.height, masks.protection)
+                        .ok_or("invalid protection mask")?;
+                target.save(args.output.join("target.png"))?;
+                protection.save(args.output.join("protection.png"))?;
+                image::RgbaImage::from_raw(source.width, source.height, source.pixels.clone())
+                    .ok_or("invalid oriented source")?
+                    .save(args.output.join("source.png"))?;
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "width":source.width,"height":source.height,"format":"masks",
+                        "selectedPixels":target.pixels().filter(|p|p[0]>0).count(),
+                        "output":args.output
+                    })
+                );
+                return Ok(());
+            }
+            let candidate = decode(args.candidate.as_ref().ok_or("candidate is required")?)?;
+            composite_model_inpaint(&source, &candidate, operation)?
+        } else {
+            apply_graph_json(&source, &graph)?
+        };
         let width = result.width;
         let height = result.height;
         let rendered = image::RgbaImage::from_raw(width, height, result.pixels)

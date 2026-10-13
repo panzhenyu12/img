@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -45,9 +46,10 @@ func findRenderBinary() string {
 }
 
 type renderMetadata struct {
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
-	Format string `json:"format"`
+	Width          int    `json:"width"`
+	Height         int    `json:"height"`
+	Format         string `json:"format"`
+	SelectedPixels int    `json:"selectedPixels"`
 }
 
 type renderOutput struct {
@@ -103,7 +105,7 @@ func prepareGraph(req renderRequest, sess *session) (EditGraph, error) {
 	if req.Operation != nil {
 		graph.Operations = append(graph.Operations, *req.Operation)
 	}
-	if len(graph.Operations) > 1024 {
+	if len(graph.Operations) > 256 {
 		return graph, errors.New("too many operations")
 	}
 	for i, op := range graph.Operations {
@@ -200,7 +202,6 @@ func (s *Server) runRender(ctx context.Context, sessionID string, req renderRequ
 	defer os.RemoveAll(dir)
 	inputPath := filepath.Join(dir, "input")
 	outputPath := filepath.Join(dir, "output."+format)
-	graphPath := filepath.Join(dir, "graph.json")
 	snapshot, err := os.Create(inputPath)
 	if err != nil {
 		return renderOutput{}, errors.New("render temporary storage is unavailable")
@@ -210,29 +211,9 @@ func (s *Server) runRender(ctx context.Context, sessionID string, req renderRequ
 	if copyErr != nil || closeErr != nil {
 		return renderOutput{}, errors.New("source snapshot failed")
 	}
-	data, err := json.Marshal(graph)
+	metadata, err := s.renderGraph(ctx, inputPath, outputPath, graph, format, quality, dir)
 	if err != nil {
-		return renderOutput{}, errWorkerRejected
-	}
-	if err := os.WriteFile(graphPath, data, 0o600); err != nil {
-		return renderOutput{}, errors.New("render graph storage failed")
-	}
-	cmd := exec.CommandContext(ctx, s.renderBinary, "--input", inputPath, "--output", outputPath, "--graph", graphPath, "--format", format, "--quality", fmt.Sprint(quality))
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() != nil {
-			return renderOutput{}, ctx.Err()
-		}
-		if _, ok := err.(*exec.ExitError); ok {
-			return renderOutput{}, fmt.Errorf("%w: %s", errWorkerRejected, safeWorkerMessage(stderr.String(), dir, sess.Image.Path))
-		}
-		return renderOutput{}, errWorkerUnavailable
-	}
-	metadata := renderMetadata{}
-	if json.Unmarshal(stdout.Bytes(), &metadata) != nil || metadata.Width <= 0 || metadata.Height <= 0 || metadata.Format != format {
-		return renderOutput{}, errors.New("invalid render worker response")
+		return renderOutput{}, err
 	}
 	if progress != nil {
 		progress(0.9, "encoding")
@@ -296,6 +277,8 @@ func writeRenderError(w http.ResponseWriter, err error) {
 		writeError(w, 422, "invalid_operation", err.Error())
 	case errors.Is(err, errWorkerUnavailable):
 		writeError(w, 503, "render_worker_unavailable", err.Error())
+	case errors.Is(err, errBackgroundUnavailable):
+		writeError(w, 503, "background_worker_unavailable", err.Error())
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(w, 504, "render_timeout", "render exceeded the configured time limit")
 	case errors.Is(err, context.Canceled):
@@ -303,4 +286,114 @@ func writeRenderError(w http.ResponseWriter, err error) {
 	default:
 		writeError(w, 500, "render_failed", "render could not be completed")
 	}
+}
+
+func (s *Server) runNativeGraph(ctx context.Context, inputPath, outputPath string, graph EditGraph, format string, quality int, dir string, extra ...string) (renderMetadata, error) {
+	graphPath := filepath.Join(dir, "graph.json")
+	data, err := json.Marshal(graph)
+	if err != nil {
+		return renderMetadata{}, errWorkerRejected
+	}
+	if err := os.WriteFile(graphPath, data, 0o600); err != nil {
+		return renderMetadata{}, errors.New("render graph storage failed")
+	}
+	args := []string{"--input", inputPath, "--output", outputPath, "--graph", graphPath, "--format", format, "--quality", fmt.Sprint(quality)}
+	args = append(args, extra...)
+	cmd := exec.CommandContext(ctx, s.renderBinary, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return renderMetadata{}, ctx.Err()
+		}
+		if _, ok := err.(*exec.ExitError); ok {
+			return renderMetadata{}, fmt.Errorf("%w: %s", errWorkerRejected, safeWorkerMessage(stderr.String(), dir, inputPath))
+		}
+		return renderMetadata{}, errWorkerUnavailable
+	}
+	metadata := renderMetadata{}
+	expected := format
+	for _, arg := range extra {
+		if arg == "--inpaint-masks" {
+			expected = "masks"
+		}
+	}
+	if json.Unmarshal(stdout.Bytes(), &metadata) != nil || metadata.Width <= 0 || metadata.Height <= 0 || metadata.Format != expected {
+		return renderMetadata{}, errors.New("invalid render worker response")
+	}
+	return metadata, nil
+}
+
+// Split only at LaMa nodes. Every prefix/suffix still runs in the shared Rust
+// core; model candidates pass through its canonical common compositor once.
+func (s *Server) renderGraph(ctx context.Context, inputPath, outputPath string, graph EditGraph, format string, quality int, dir string) (renderMetadata, error) {
+	current := inputPath
+	start := 0
+	for index, op := range graph.Operations {
+		if op.Type != "repair.inpaint" || op.Params["method"] != "lama" {
+			continue
+		}
+		if index > start {
+			segment := graph
+			segment.Operations = graph.Operations[start:index]
+			path := filepath.Join(dir, fmt.Sprintf("prefix-%d.png", index))
+			if _, err := s.runNativeGraph(ctx, current, path, segment, "png", quality, dir); err != nil {
+				return renderMetadata{}, err
+			}
+			current = path
+		}
+		single := graph
+		single.Operations = []Operation{op}
+		masksDir := filepath.Join(dir, fmt.Sprintf("masks-%d", index))
+		metadata, err := s.runNativeGraph(ctx, current, masksDir, single, "png", quality, dir, "--inpaint-masks")
+		if err != nil {
+			return renderMetadata{}, err
+		}
+		// Client mode is a concrete execution choice. Never upload its pixels
+		// to the model service implicitly when replaying a saved graph.
+		if op.Enabled && op.Params["execution"] == "client" {
+			opacity := 100.0
+			if value, ok := op.Params["opacity"]; ok {
+				opacity, _ = strconv.ParseFloat(fmt.Sprint(value), 64)
+			}
+			if opacity > 0 {
+				return renderMetadata{}, fmt.Errorf("%w: client LaMa must be exported in the browser; explicitly choose execution=server to use backend export", errWorkerRejected)
+			}
+		}
+		oriented := filepath.Join(masksDir, "source.png")
+		if metadata.SelectedPixels > 0 {
+			imageData, err := os.ReadFile(oriented)
+			if err != nil {
+				return renderMetadata{}, err
+			}
+			mask, err := os.ReadFile(filepath.Join(masksDir, "target.png"))
+			if err != nil {
+				return renderMetadata{}, err
+			}
+			protection, err := os.ReadFile(filepath.Join(masksDir, "protection.png"))
+			if err != nil {
+				return renderMetadata{}, err
+			}
+			result, err := s.callBackgroundWorker(ctx, imageData, mask, protection, operationModelOptions(op))
+			if err != nil {
+				return renderMetadata{}, err
+			}
+			candidate := filepath.Join(dir, fmt.Sprintf("candidate-%d.png", index))
+			if err := os.WriteFile(candidate, result.data, 0o600); err != nil {
+				return renderMetadata{}, err
+			}
+			composite := filepath.Join(dir, fmt.Sprintf("composite-%d.png", index))
+			if _, err := s.runNativeGraph(ctx, oriented, composite, single, "png", quality, dir, "--candidate", candidate); err != nil {
+				return renderMetadata{}, err
+			}
+			current = composite
+		} else {
+			current = oriented
+		}
+		start = index + 1
+	}
+	segment := graph
+	segment.Operations = graph.Operations[start:]
+	return s.runNativeGraph(ctx, current, outputPath, segment, format, quality, dir)
 }

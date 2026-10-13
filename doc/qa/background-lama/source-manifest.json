@@ -1,0 +1,23 @@
+[
+  {
+    "file": "street-source.png",
+    "source": "OpenCV samples/data/vtest.avi, frame50",
+    "width": 768,
+    "height": 576,
+    "sha256": "b99e83dd92123d85ba227938a4accc70ccdba07b9ba70d7c9e9d6b4be0965a8e"
+  },
+  {
+    "file": "crowd-source.png",
+    "source": "test/images/street-crowd.jpg, Pexels842339",
+    "width": 1280,
+    "height": 854,
+    "sha256": "b33437df529d9cfdf900320d1cbebe7315ba2b2fecea8ec7a856906d63c88c02"
+  },
+  {
+    "file": "architecture-clean.png",
+    "source": "test/images/cityscape.jpg, Pexels373893",
+    "width": 1280,
+    "height": 853,
+    "sha256": "93377772a00d448444b2bf1866f41445ff12aaa586a9229f1a6412ad22d962e8"
+  }
+]

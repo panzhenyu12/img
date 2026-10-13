@@ -14,12 +14,12 @@
 |---|---|---|
 | 裁剪/缩放/旋转/翻转/透视 | 坐标、维度、identity、透明边角；public graph黑盒 | 8-bit RGBA，不含RAW/ICC |
 | 网格与液化 | 像素距离；所有mode方向、有限支持、归零、冻结；连续stroke在取样前参与保护 | 手工二维编辑，不是三维语义重建 |
-| 九个人脸轮廓参数 | face.rs source→target控制，完整头部前景alpha与内脸skin/hair边界分离；双向轮廓位移、滚转、五官/第二张脸/ROI/alpha保护 | 长发、耳饰、下颌底层与复杂背景仍需逐样片检查 |
+| 九个人脸轮廓参数 | Schaefer rigid MLS、多尺度F/B颜色估计、内脸/头发/耳朵/饰物独立层；双向真实轮廓、滚转、五官/第二张脸/ROI/alpha保护 | 外扩细色线、发际线受冻结限制、下巴暗点与颈部阴影仍未通过 |
 | 五官与对称 | 像素脸轴和实际semantic polygon；逐参数正负方向与目标面积；鼻子矫正依据真实偏斜；对称保留各侧纹理 | 侧脸/遮挡/缺少可靠语义不可冒充可编辑 |
-| 腰/肩/胯/上臂/前臂/腿 | Pose轴与subject alpha独立重塑，近的自由侧半径，背景不位移、露出窄带填补；九类宽度黑盒测试 | 宽松衣服、裙装遮腿、贴合肢体、无合法底层donor会拒绝或未验证 |
-| 皮肤与妆容 | skin、feature、冻结与区域控制取样；磨皮不引入外部RGB；肤色亮度/色度与阴影高光保护；唇/牙/眉独立边界 | 经典算法，不含学习式瑕疵/妆容重建 |
+| 腰/肩/胯/上臂/前臂/腿 | 必需真实subjectMask、65截面双侧轮廓、单调逆映射、F/B分层与完整soft fringe、partMask接口；缺mask旧背景warp已删除 | 真实15项全部未达8；自动Pose无真partMask，手/发/包/持物隔离及窄带仍有失败 |
+| 皮肤与妆容 | 有蒙版Fast Guided Filter、512px分析、共享亮度guide、连续高频残留；skin、feature、冻结控制取样；肤色明度/色度与阴影高光保护；唇/牙/眉独立边界 | 真实48项皮肤及123项五官/肤色批测保护检查完成，自然度仍需逐项复核；不含学习式瑕疵/妆容重建 |
 | 衣物 | 褶皱细纹弱化、纹理/色相/饱和度/亮度；强度连续，取样隔离 | 严重折痕、服装版型重建未实现；[衣物多图](clothing-multisample-review.md) |
-| 去除杂物/人物 | confidence×isophote优先级、masked SSD完整exemplar donor；棋盘与条纹原频率/phase、冻结/透明与无donor | 街景选中人物移除，放大仍有块状接缝，专业自然重建未通过 |
+| 去除杂物/人物 | 保留传统exemplar；浏览器ONNX和服务端TorchScript LaMa真实推理、共用Rust target/composite、面积预处理、冻结/alpha、图层顺序与有界缓存 | 简单街景改善，复杂轨道和建筑结构仍失败；浏览器首次效率未达标 |
 | 仿制/修复/绘色 | 明确source坐标、均匀背景瑕疵修复、alpha与冻结 | 传统手工工具 |
 | 调色/曲线/HSL/LUT/胶片 | 线性光EV、渐进黑白、不同空间尺度、保边降噪、DCP去雾；LUT三线性与channel顺序，滤镜强度0完全原图 | 胶片为效果模拟，没有富士官方配方一致性证据 |
 
@@ -27,9 +27,9 @@
 
 ## 当前工程检查
 
-最终Rust release全量检查：119项库测试+10项public graph黑盒测试通过；1项真实街景ignored测试另以实际fixture手动运行，不能计入默认通过数量。`clippy --all-targets -- -D warnings`、全部Go test/vet、TypeScript/Vite生产构建通过；模型安装脚本验证本地face parser SHA256。
+最终Rust release全量检查：141项库测试+10项public graph黑盒测试通过；2项ignored分别为真实街景手动检查和native人脸性能基准，不能计入默认通过数量。`clippy --all-targets -- -D warnings`、全部Go test/vet、TypeScript/Vite生产构建通过；Python模型包装11项通过。模型安装脚本校验face parser与LaMa权重。
 
-去雾曾在native/WASM产生1字节差异，现统一软件libm并使用weighted f64 box guided filter；正负强度与分析缩放/冻结三场景严格RGBA 0差异，不放宽容差。具体证据见颜色审计。完整Playwright 24/24通过（约4.6分钟），所有公开滑杆native/WASM逐字节差异0。真实人像检测案例约32–55秒，不是实时性能；见 [最终检查](current-validation.md)。
+去雾曾在native/WASM产生1字节差异，现统一软件libm并使用weighted f64 box guided filter；正负强度与分析缩放/冻结三场景严格RGBA 0差异，不放宽容差。具体证据见颜色审计。最新完整Playwright数量、真实检测与模型性能见 [最终检查](current-validation.md)。浏览器真实LaMa完整图层回放无API请求，与独立Rust合成严格一致；不能将模型执行成功当作画质验收。
 
 ## 多张真实照片
 
@@ -37,7 +37,7 @@
 
 `make quality-face` / `make quality-body` 在本地模型和Rust WASM中生成原图、输出、放大差分、操作图与摘要。原始操作含大raster，保存到忽略的`test/results/`；`doc/qa/`保留精简指标和代表对比图。报告保留FAIL、UNVERIFIED、检测缺失和不可用部位，不把重检测噪声当作真实轮廓测量，不把任何像素变化当成功。
 
-结果见 [人像批量](portrait-multisample-review.md)、[身形批量](body-multisample-review.md)、[人脸目视](face-contour-visual-review.md)。真实照片效果与工程单测分开记录。
+当前版本见 [人脸目视](face-contour-visual-review.md)、[身体V2](body-contour-v2-review.md)、[五官与皮肤](feature-skin-multisample-review.md)、[LaMa双端](algorithm-audit-lama.md)、[浏览器LaMa](client-inpaint/browser-client-review.md)。旧 [人像批量](portrait-multisample-review.md)、[身形批量](body-multisample-review.md) 保留历史版本失败，不能混为当前算法的逐项验证。真实照片效果与工程单测分开记录。
 
 ## 可复现检查
 

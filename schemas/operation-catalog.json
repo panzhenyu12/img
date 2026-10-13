@@ -179,7 +179,7 @@
         },
         "semanticMasks": {
           "type": "object",
-          "maxProperties": 28,
+          "maxProperties": 30,
           "properties": {
             "face": {
               "oneOf": [
@@ -257,6 +257,36 @@
               ]
             },
             "neck": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "accessories": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "ears": {
               "oneOf": [
                 {
                   "$ref": "mask.schema.json"
@@ -879,7 +909,7 @@
         },
         "semanticMasks": {
           "type": "object",
-          "maxProperties": 28,
+          "maxProperties": 30,
           "properties": {
             "face": {
               "oneOf": [
@@ -957,6 +987,36 @@
               ]
             },
             "neck": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "accessories": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "ears": {
               "oneOf": [
                 {
                   "$ref": "mask.schema.json"
@@ -1343,7 +1403,7 @@
         },
         "semanticMasks": {
           "type": "object",
-          "maxProperties": 28,
+          "maxProperties": 30,
           "properties": {
             "face": {
               "oneOf": [
@@ -1421,6 +1481,36 @@
               ]
             },
             "neck": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "accessories": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "ears": {
               "oneOf": [
                 {
                   "$ref": "mask.schema.json"
@@ -1907,6 +1997,10 @@
         "subjectMask": {
           "$ref": "mask.schema.json",
           "description": "Person segmentation alpha; raster row-major bytes, 1..512 dimensions, alpha moves with foreground. Required for body contour edits."
+        },
+        "partMask": {
+          "$ref": "mask.schema.json",
+          "description": "Target body part alpha, separate from the whole-person foreground; neighboring body parts remain fixed."
         },
         "bodyPart": {
           "enum": [
@@ -2429,9 +2523,55 @@
           "max": 64,
           "default": 6,
           "type": "integer"
+        },
+        "method": {
+          "enum": [
+            "exemplar",
+            "lama"
+          ],
+          "default": "exemplar"
+        },
+        "execution": {
+          "enum": [
+            "client",
+            "server"
+          ],
+          "default": "server"
+        },
+        "maxSide": {
+          "min": 256,
+          "max": 2048,
+          "default": 1024,
+          "type": "integer"
+        },
+        "contextPadding": {
+          "min": 64,
+          "max": 1024,
+          "default": 256,
+          "type": "integer"
+        },
+        "maskDilation": {
+          "min": 0,
+          "max": 32,
+          "default": 4,
+          "type": "integer"
+        },
+        "seamBlend": {
+          "enum": [
+            "none",
+            "poisson"
+          ],
+          "default": "none"
+        },
+        "contextMode": {
+          "enum": [
+            "full",
+            "crop"
+          ],
+          "default": "full"
         }
       },
-      "description": "Exemplar patch inpainting with confidence/isophote priority; deterministic, no generative model"
+      "description": "Offline Rust exemplar fill, browser ONNX LaMa (execution=client; maxSide<=512; seamBlend=none), or server LaMa model; the shared Rust mask compositor preserves unselected pixels, protection and alpha. LaMa is independent of the AI agent."
     },
     "paint.brush": {
       "keys": {

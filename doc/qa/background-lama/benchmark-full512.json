@@ -1,0 +1,110 @@
+[
+  {
+    "model": "lama-big-torchscript",
+    "paper": "https://arxiv.org/abs/2109.07161",
+    "selected_pixels": 5422,
+    "device": "cpu",
+    "threads": 6,
+    "seam_blend": "none",
+    "context_mode": "full",
+    "inference_ms": 27365.73,
+    "total_ms": 27555.66,
+    "model_load_ms": 4726.59,
+    "peak_rss_mb": 1046.04,
+    "model_sha256": "344c77bbcb158f17dd143070d1e789f38a66c04202311ae3a258ef66667a9ea9",
+    "crop_box": [
+      0,
+      0,
+      768,
+      576
+    ],
+    "model_size": [
+      512,
+      384
+    ],
+    "scaled": true,
+    "mask_dilation": 4,
+    "seam": {}
+  },
+  {
+    "model": "lama-big-torchscript",
+    "paper": "https://arxiv.org/abs/2109.07161",
+    "selected_pixels": 5422,
+    "device": "cpu",
+    "threads": 4,
+    "seam_blend": "none",
+    "context_mode": "full",
+    "inference_ms": 23676.9,
+    "total_ms": 24034.35,
+    "model_load_ms": 4726.59,
+    "peak_rss_mb": 1104.54,
+    "model_sha256": "344c77bbcb158f17dd143070d1e789f38a66c04202311ae3a258ef66667a9ea9",
+    "crop_box": [
+      0,
+      0,
+      768,
+      576
+    ],
+    "model_size": [
+      512,
+      384
+    ],
+    "scaled": true,
+    "mask_dilation": 4,
+    "seam": {}
+  },
+  {
+    "model": "lama-big-torchscript",
+    "paper": "https://arxiv.org/abs/2109.07161",
+    "selected_pixels": 5422,
+    "device": "cpu",
+    "threads": 2,
+    "seam_blend": "none",
+    "context_mode": "full",
+    "inference_ms": 12804.32,
+    "total_ms": 12960.96,
+    "model_load_ms": 4726.59,
+    "peak_rss_mb": 1133.41,
+    "model_sha256": "344c77bbcb158f17dd143070d1e789f38a66c04202311ae3a258ef66667a9ea9",
+    "crop_box": [
+      0,
+      0,
+      768,
+      576
+    ],
+    "model_size": [
+      512,
+      384
+    ],
+    "scaled": true,
+    "mask_dilation": 4,
+    "seam": {}
+  },
+  {
+    "model": "lama-big-torchscript",
+    "paper": "https://arxiv.org/abs/2109.07161",
+    "selected_pixels": 5422,
+    "device": "cpu",
+    "threads": 6,
+    "seam_blend": "none",
+    "context_mode": "full",
+    "inference_ms": 12859.33,
+    "total_ms": 13105.47,
+    "model_load_ms": 4726.59,
+    "peak_rss_mb": 1154.92,
+    "model_sha256": "344c77bbcb158f17dd143070d1e789f38a66c04202311ae3a258ef66667a9ea9",
+    "crop_box": [
+      0,
+      0,
+      768,
+      576
+    ],
+    "model_size": [
+      512,
+      384
+    ],
+    "scaled": true,
+    "mask_dilation": 4,
+    "seam": {}
+  }
+]

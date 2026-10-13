@@ -37,13 +37,14 @@ const (
 
 // Config controls the temporary API server.
 type Config struct {
-	DataDir           string
-	SessionTTL        time.Duration
-	MaxUploadBytes    int64
-	Now               func() time.Time
-	RenderBinary      string
-	RenderTimeout     time.Duration
-	RenderConcurrency int
+	DataDir             string
+	SessionTTL          time.Duration
+	MaxUploadBytes      int64
+	Now                 func() time.Time
+	RenderBinary        string
+	RenderTimeout       time.Duration
+	RenderConcurrency   int
+	BackgroundWorkerURL string
 }
 
 // Server is the in-memory session API. A Server is safe for concurrent use.
@@ -53,15 +54,18 @@ type Server struct {
 	maxUploadBytes int64
 	now            func() time.Time
 
-	mu            sync.RWMutex
-	sessions      map[string]*session
-	renderBinary  string
-	renderTimeout time.Duration
-	renderSlots   chan struct{}
-	jobs          map[string]*renderJob
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
+	mu                  sync.RWMutex
+	sessions            map[string]*session
+	renderBinary        string
+	renderTimeout       time.Duration
+	renderSlots         chan struct{}
+	jobs                map[string]*renderJob
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	wg                  sync.WaitGroup
+	backgroundWorkerURL string
+	backgroundClient    *http.Client
+	backgroundCache     *modelCache
 }
 
 type session struct {
@@ -143,6 +147,9 @@ func NewServer(cfg Config) (*Server, error) {
 		now:            cfg.Now,
 		sessions:       make(map[string]*session),
 		renderBinary:   cfg.RenderBinary, renderTimeout: cfg.RenderTimeout, renderSlots: make(chan struct{}, cfg.RenderConcurrency), jobs: make(map[string]*renderJob), ctx: ctx, cancel: cancel,
+		backgroundWorkerURL: strings.TrimRight(cfg.BackgroundWorkerURL, "/"),
+		backgroundClient:    &http.Client{Timeout: cfg.RenderTimeout},
+		backgroundCache:     newModelCache(64 << 20),
 	}, nil
 }
 
@@ -168,6 +175,7 @@ func (s *Server) Handler() http.Handler {
 	engine := gin.New()
 	engine.Use(gin.Recovery(), ginCORSMiddleware())
 	engine.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
+	engine.POST("/api/inpaint/model", func(c *gin.Context) { s.modelInpaintHTTP(c.Writer, c.Request) })
 	engine.POST("/api/v1/sessions", func(c *gin.Context) { s.createSession(c.Writer) })
 	engine.GET("/api/v1/sessions/:id", func(c *gin.Context) { s.session(c.Writer, c.Request, c.Param("id")) })
 	engine.DELETE("/api/v1/sessions/:id", func(c *gin.Context) { s.session(c.Writer, c.Request, c.Param("id")) })

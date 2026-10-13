@@ -1,0 +1,202 @@
+[
+  {
+    "id": "fashion-standing",
+    "source": {
+      "width": 540,
+      "height": 768
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 17332,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 911
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 2887,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 761
+      },
+      {
+        "part": "left-thigh",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 8827,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 971
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 3742,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 1029
+      },
+      {
+        "part": "right-thigh",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 6075,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 845
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-contour-v2/fashion-standing"
+  },
+  {
+    "id": "fullbody-skirt",
+    "source": {
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 2485,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 1053
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 788,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 861
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 1197,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 856
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-contour-v2/fullbody-skirt"
+  },
+  {
+    "id": "fullbody-side-fashion",
+    "source": {
+      "width": 768,
+      "height": 512
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 7032,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 746
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 4814,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 640
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-contour-v2/fullbody-side-fashion"
+  },
+  {
+    "id": "tilted-shirt",
+    "source": {
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 22479,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 770
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 4743,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 647
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-contour-v2/tilted-shirt"
+  },
+  {
+    "id": "action-suit",
+    "source": {
+      "width": 768,
+      "height": 608
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 19234,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 1188
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 1807,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 725
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "metrics": {
+          "changedPixels": 2891,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "elapsedMs": 746
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-contour-v2/action-suit"
+  }
+]

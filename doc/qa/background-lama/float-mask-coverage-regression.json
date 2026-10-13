@@ -1,0 +1,64 @@
+{
+  "preprocess": "area-mask-v3",
+  "earlier_real_QA_mask_equivalence": [
+    {
+      "case": "street",
+      "max_side": 512,
+      "model_size": [
+        512,
+        384
+      ],
+      "changed_model_mask_pixels": 0
+    },
+    {
+      "case": "street",
+      "max_side": 1024,
+      "model_size": [
+        768,
+        576
+      ],
+      "changed_model_mask_pixels": 0
+    },
+    {
+      "case": "crowd",
+      "max_side": 1024,
+      "model_size": [
+        1024,
+        683
+      ],
+      "changed_model_mask_pixels": 0
+    },
+    {
+      "case": "architecture",
+      "max_side": 1024,
+      "model_size": [
+        1024,
+        682
+      ],
+      "changed_model_mask_pixels": 0
+    },
+    {
+      "case": "canonical-street",
+      "max_side": 1024,
+      "model_size": [
+        768,
+        576
+      ],
+      "changed_model_mask_pixels": 0
+    }
+  ],
+  "regression": {
+    "source_size": [
+      8192,
+      1024
+    ],
+    "model_size": [
+      256,
+      32
+    ],
+    "unknown_source_pixels": 3,
+    "old_unknown_model_pixels": 0,
+    "new_unknown_model_pixels": 3,
+    "minimum_nonzero_float_coverage": 0.0009765625
+  }
+}

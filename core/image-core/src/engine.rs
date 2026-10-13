@@ -78,7 +78,12 @@ pub fn apply_graph(source: &RgbaImage, graph: &EditGraph) -> Result<RgbaImage, I
             "skin.retouch" => color::skin(&current, &op.params),
             "repair.clone" => geometry::repair(&current, &op.params, false)?,
             "repair.heal" => geometry::repair(&current, &op.params, true)?,
-            "repair.inpaint" => crate::inpaint::inpaint(&current, &op.params)?,
+            "repair.inpaint" => {
+                if op.params.get("method").and_then(Value::as_str) == Some("lama") {
+                    return Err(ImageError::InvalidOperation("LaMa requires the local model worker; use the Web/Go renderer or method=exemplar".into()));
+                }
+                crate::inpaint::inpaint(&current, &op.params)?
+            }
             "paint.brush" => crate::paint::render(&current, &op.params)?,
             "color.basic" => color::basic(&current, &op.params),
             "color.curves" => color::curves(&current, &op.params)?,
@@ -94,8 +99,11 @@ pub fn apply_graph(source: &RgbaImage, graph: &EditGraph) -> Result<RgbaImage, I
         // Global geometry changes dimensions and has no original pixel at the
         // new coordinates to blend against. Pixel effects and local warps share
         // one selection/protection/opacity/blending boundary.
-        current = if op.kind == "face.adjust" {
-            // The face compositor separates foreground membership from the
+        current = if op.kind == "face.adjust"
+            || (op.kind == "body.adjust"
+                && op.params.get("subjectMask").is_some_and(Value::is_object))
+        {
+            // The portrait compositor separates foreground membership from the
             // user support mask and handles ROI/protection/blending itself.
             // Reapplying the original contour would restore the old edge.
             processed
@@ -261,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn semantic_body_operation_uses_axis_warp_route() {
+    fn semantic_body_operation_moves_the_contour_and_keeps_the_background() {
         let mut pixels = [20, 20, 80, 255].repeat(32 * 32);
         for y in 0..32 {
             for x in 10..22 {
@@ -270,15 +278,33 @@ mod tests {
             }
         }
         let source = RgbaImage::new(32, 32, pixels).unwrap();
+        let matte: Vec<u8> = (0..32 * 32)
+            .map(|i| if (10..22).contains(&(i % 32)) { 255 } else { 0 })
+            .collect();
         let graph = serde_json::json!({"operations":[{"type":"body.adjust","params":{
             "region":{"x":0.25,"y":0.15,"width":0.5,"height":0.7},
             "bodyPart":"waist","adjustments":{"waist":70},
-            "subjectMask":{"shape":"rect","region":{"x":0.3125,"y":0,"width":0.375,"height":1}},
+            "subjectMask":{"shape":"raster","width":32,"height":32,"data":matte},
             "landmarks":[{"x":0.5,"y":0.15},{"x":0.5,"y":0.5},{"x":0.5,"y":0.85}]
         }}]});
         let output = apply_graph_json(&source, &graph.to_string()).unwrap();
         assert_eq!(&output.pixels[..4 * 4], &source.pixels[..4 * 4]);
         assert_ne!(output.pixels, source.pixels);
+        let subject_count =
+            |image: &RgbaImage| image.pixels.chunks_exact(4).filter(|p| p[0] > 150).count();
+        assert!(
+            subject_count(&output) < subject_count(&source),
+            "the visible subject must actually get narrower"
+        );
+        for (i, &coverage) in matte.iter().enumerate() {
+            if coverage == 0 {
+                assert_eq!(
+                    &output.pixels[i * 4..i * 4 + 4],
+                    &source.pixels[i * 4..i * 4 + 4],
+                    "background changed at {i}"
+                );
+            }
+        }
     }
 
     #[test]
