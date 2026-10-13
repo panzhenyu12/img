@@ -1,0 +1,2565 @@
+{
+  "version": "1.0",
+  "engineVersion": "image-core-0.2.0",
+  "coordinates": "region/mask/controlPoints/strokes: normalized 0..1; crop/resize: pixels",
+  "sliderUnit": "percent",
+  "operations": {
+    "identity": {
+      "keys": {}
+    },
+    "crop": {
+      "keys": {
+        "x": {
+          "unit": "px"
+        },
+        "y": {
+          "unit": "px"
+        },
+        "width": {
+          "min": 1,
+          "unit": "px"
+        },
+        "height": {
+          "min": 1,
+          "unit": "px"
+        }
+      }
+    },
+    "rotate": {
+      "keys": {
+        "degrees": {
+          "min": -360,
+          "max": 360
+        },
+        "expand": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "flip": {
+      "keys": {
+        "axis": {
+          "enum": [
+            "horizontal",
+            "vertical"
+          ]
+        }
+      }
+    },
+    "resize": {
+      "keys": {
+        "width": {
+          "min": 1,
+          "max": 16384
+        },
+        "height": {
+          "min": 1,
+          "max": 16384
+        }
+      }
+    },
+    "perspective": {
+      "keys": {
+        "corners": {
+          "type": "array",
+          "length": 4,
+          "order": [
+            "TL",
+            "TR",
+            "BR",
+            "BL"
+          ]
+        }
+      }
+    },
+    "face.adjust": {
+      "operation": "face.adjust",
+      "region": "face",
+      "keys": {
+        "adjustments": {
+          "type": "object",
+          "properties": {
+            "forehead": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "额头高度"
+            },
+            "foreheadWidth": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "额头宽度"
+            },
+            "temples": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "太阳穴"
+            },
+            "cheekbones": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "颧骨"
+            },
+            "jaw": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "下颌"
+            },
+            "chin": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "下巴长度"
+            },
+            "chinWidth": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "下巴宽度"
+            },
+            "chinPoint": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "下巴尖度"
+            },
+            "faceWidth": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "脸宽 / 瘦脸"
+            },
+            "symmetry": {
+              "min": 0,
+              "max": 100,
+              "default": 0,
+              "label": "五官对称校正"
+            }
+          }
+        },
+        "landmarks": {
+          "type": "array",
+          "maxItems": 128,
+          "description": "Canonical normalized anatomical landmarks (face:36; body:segment endpoints). Contours are separate semantic masks.",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "min": 0,
+                "max": 1
+              },
+              "y": {
+                "min": 0,
+                "max": 1
+              },
+              "toX": {
+                "min": 0,
+                "max": 1
+              },
+              "toY": {
+                "min": 0,
+                "max": 1
+              },
+              "weight": {
+                "min": 0.01,
+                "max": 10,
+                "default": 1
+              }
+            }
+          }
+        },
+        "semanticMasks": {
+          "type": "object",
+          "maxProperties": 28,
+          "properties": {
+            "face": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceOutline": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContour": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContourMask": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skin": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "neck": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skinProtection": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "eyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "brows": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "underEyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lips": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "teeth": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "hair": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "nose": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBridge": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseWings": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseTip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseRoot": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBase": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "Named face feature masks; skin excludes eyes/brows/mouth, makeup uses its feature. Coordinates are normalized. Optional and independent of AI."
+        },
+        "subjectMask": {
+          "$ref": "mask.schema.json",
+          "description": "Full person alpha excluded from background donors during face reshaping"
+        }
+      }
+    },
+    "feature.adjust": {
+      "operation": "feature.adjust",
+      "region": "face",
+      "keys": {
+        "adjustments": {
+          "type": "object",
+          "properties": {
+            "eyeSize": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眼睛大小"
+            },
+            "eyeWidth": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眼睛宽度"
+            },
+            "eyeHeight": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眼睛高度"
+            },
+            "eyeSpacing": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眼间距"
+            },
+            "eyeTilt": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眼睛倾斜"
+            },
+            "eyeCorner": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眼角"
+            },
+            "eyelid": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眼睑"
+            },
+            "eyeInnerCorner": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "内眼角"
+            },
+            "eyeOuterCorner": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "外眼角"
+            },
+            "darkCircle": {
+              "min": 0,
+              "max": 100,
+              "default": 0,
+              "label": "黑眼圈"
+            },
+            "browLength": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眉长"
+            },
+            "browWidth": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眉宽"
+            },
+            "browThickness": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眉毛粗细"
+            },
+            "browPeak": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眉峰"
+            },
+            "browTail": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眉尾"
+            },
+            "browColor": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眉毛深浅"
+            },
+            "browSpacing": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "眉间距"
+            },
+            "noseBridge": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "鼻梁宽度"
+            },
+            "noseWings": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "鼻翼"
+            },
+            "noseLength": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "鼻长"
+            },
+            "noseTip": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "鼻尖"
+            },
+            "noseStraight": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "鼻子矫正"
+            },
+            "nostril": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "鼻孔"
+            },
+            "noseRoot": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "山根"
+            },
+            "noseBase": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "鼻基底"
+            },
+            "mouthWidth": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "嘴宽"
+            },
+            "mouthHeight": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "嘴高"
+            },
+            "upperLip": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "上唇厚度"
+            },
+            "lowerLip": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "下唇厚度"
+            },
+            "lipColor": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "唇色"
+            },
+            "philtrum": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "人中"
+            },
+            "teethWhiten": {
+              "min": 0,
+              "max": 100,
+              "default": 0,
+              "label": "牙齿美白"
+            },
+            "lipPeak": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "唇峰"
+            },
+            "lipCorner": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "嘴角"
+            },
+            "lipBrightness": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "唇部明亮"
+            },
+            "lipSaturation": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "唇部饱和"
+            },
+            "symmetry": {
+              "min": 0,
+              "max": 100,
+              "default": 0,
+              "label": "五官对称校正"
+            }
+          }
+        },
+        "landmarks": {
+          "type": "array",
+          "maxItems": 128,
+          "description": "Canonical normalized anatomical landmarks (face:36; body:segment endpoints). Contours are separate semantic masks.",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "min": 0,
+                "max": 1
+              },
+              "y": {
+                "min": 0,
+                "max": 1
+              },
+              "toX": {
+                "min": 0,
+                "max": 1
+              },
+              "toY": {
+                "min": 0,
+                "max": 1
+              },
+              "weight": {
+                "min": 0.01,
+                "max": 10,
+                "default": 1
+              }
+            }
+          }
+        },
+        "semanticMasks": {
+          "type": "object",
+          "maxProperties": 28,
+          "properties": {
+            "face": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceOutline": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContour": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContourMask": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skin": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "neck": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skinProtection": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "eyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "brows": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "underEyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lips": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "teeth": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "hair": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "nose": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBridge": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseWings": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseTip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseRoot": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBase": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "Named face feature masks; skin excludes eyes/brows/mouth, makeup uses its feature. Coordinates are normalized. Optional and independent of AI."
+        }
+      }
+    },
+    "skin.retouch": {
+      "operation": "skin.retouch",
+      "region": "face",
+      "keys": {
+        "smooth": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "磨皮"
+        },
+        "texture": {
+          "min": 0,
+          "max": 100,
+          "default": 50,
+          "label": "纹理保留"
+        },
+        "whiten": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "美白"
+        },
+        "warmth": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "肤色冷暖"
+        },
+        "redness": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "红润 / 去红"
+        },
+        "semanticMasks": {
+          "type": "object",
+          "maxProperties": 28,
+          "properties": {
+            "face": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceOutline": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContour": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContourMask": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skin": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "neck": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skinProtection": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "eyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "brows": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "underEyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lips": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "teeth": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "hair": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "nose": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBridge": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseWings": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseTip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseRoot": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBase": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "Named face feature masks; skin excludes eyes/brows/mouth, makeup uses its feature. Coordinates are normalized. Optional and independent of AI."
+        },
+        "landmarks": {
+          "type": "array",
+          "maxItems": 128,
+          "description": "Canonical normalized anatomical landmarks (face:36; body:segment endpoints). Contours are separate semantic masks.",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "min": 0,
+                "max": 1
+              },
+              "y": {
+                "min": 0,
+                "max": 1
+              },
+              "toX": {
+                "min": 0,
+                "max": 1
+              },
+              "toY": {
+                "min": 0,
+                "max": 1
+              },
+              "weight": {
+                "min": 0.01,
+                "max": 10,
+                "default": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "body.adjust": {
+      "operation": "body.adjust",
+      "region": "body",
+      "keys": {
+        "adjustments": {
+          "type": "object",
+          "properties": {
+            "shoulder": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "肩宽"
+            },
+            "waist": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "腰围"
+            },
+            "belly": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "腹部"
+            },
+            "arms": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "手臂"
+            },
+            "forearms": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "前臂"
+            },
+            "legs": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "腿部粗细"
+            },
+            "hips": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "胯宽"
+            },
+            "thighs": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "大腿"
+            },
+            "calves": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "小腿"
+            }
+          }
+        },
+        "landmarks": {
+          "type": "array",
+          "maxItems": 128,
+          "description": "Canonical normalized anatomical landmarks (face:36; body:segment endpoints). Contours are separate semantic masks.",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "min": 0,
+                "max": 1
+              },
+              "y": {
+                "min": 0,
+                "max": 1
+              },
+              "toX": {
+                "min": 0,
+                "max": 1
+              },
+              "toY": {
+                "min": 0,
+                "max": 1
+              },
+              "weight": {
+                "min": 0.01,
+                "max": 10,
+                "default": 1
+              }
+            }
+          }
+        },
+        "subjectMask": {
+          "$ref": "mask.schema.json",
+          "description": "Person segmentation alpha; raster row-major bytes, 1..512 dimensions, alpha moves with foreground. Required for body contour edits."
+        },
+        "bodyPart": {
+          "enum": [
+            "full-body",
+            "torso",
+            "waist",
+            "hips",
+            "left-upper-arm",
+            "right-upper-arm",
+            "left-forearm",
+            "right-forearm",
+            "left-thigh",
+            "right-thigh",
+            "left-calf",
+            "right-calf"
+          ],
+          "description": "Semantic Pose mask selected by the browser detector"
+        }
+      }
+    },
+    "clothing.adjust": {
+      "operation": "clothing.adjust",
+      "region": "clothing",
+      "keys": {
+        "adjustments": {
+          "type": "object",
+          "properties": {
+            "smooth": {
+              "min": 0,
+              "max": 100,
+              "default": 0,
+              "label": "褶皱平整"
+            },
+            "texture": {
+              "min": 0,
+              "max": 100,
+              "default": 70,
+              "label": "纹理保护"
+            },
+            "hue": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "颜色色相"
+            },
+            "saturation": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "颜色饱和"
+            },
+            "brightness": {
+              "min": -100,
+              "max": 100,
+              "default": 0,
+              "label": "衣物亮度"
+            }
+          }
+        },
+        "landmarks": {
+          "type": "array",
+          "maxItems": 128,
+          "description": "Canonical normalized anatomical landmarks (face:36; body:segment endpoints). Contours are separate semantic masks.",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "min": 0,
+                "max": 1
+              },
+              "y": {
+                "min": 0,
+                "max": 1
+              },
+              "toX": {
+                "min": 0,
+                "max": 1
+              },
+              "toY": {
+                "min": 0,
+                "max": 1
+              },
+              "weight": {
+                "min": 0.01,
+                "max": 10,
+                "default": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "warp.liquify": {
+      "keys": {
+        "strokes": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "x": {
+              "min": 0,
+              "max": 1
+            },
+            "y": {
+              "min": 0,
+              "max": 1
+            },
+            "radius": {
+              "min": 0.00001,
+              "max": 1
+            },
+            "strength": {
+              "min": 0,
+              "max": 100
+            },
+            "toX": {
+              "min": -1,
+              "max": 2
+            },
+            "toY": {
+              "min": -1,
+              "max": 2
+            },
+            "mode": {
+              "enum": [
+                "push",
+                "pinch",
+                "bloat",
+                "twirl",
+                "reconstruct"
+              ]
+            },
+            "direction": {
+              "enum": [
+                -1,
+                1
+              ],
+              "default": 1
+            }
+          }
+        }
+      },
+      "description": "Reconstruct restores this layer input; mirrored twirl strokes reverse direction"
+    },
+    "warp.grid": {
+      "keys": {
+        "points": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "inX": "normalized source x",
+            "inY": "normalized source y",
+            "outX": "normalized destination x",
+            "outY": "normalized destination y"
+          }
+        }
+      },
+      "operationControlPoints": {
+        "type": "array",
+        "maxItems": 1024,
+        "items": {
+          "inX": "normalized source x",
+          "inY": "normalized source y",
+          "outX": "normalized destination x",
+          "outY": "normalized destination y"
+        }
+      }
+    },
+    "repair.heal": {
+      "keys": {
+        "strokes": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "x": {
+              "min": 0,
+              "max": 1
+            },
+            "y": {
+              "min": 0,
+              "max": 1
+            },
+            "radius": {
+              "min": 0.00001,
+              "max": 1
+            },
+            "strength": {
+              "min": 0,
+              "max": 100
+            },
+            "sourceX": {
+              "min": 0,
+              "max": 1
+            },
+            "sourceY": {
+              "min": 0,
+              "max": 1
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "radius"
+          ]
+        }
+      }
+    },
+    "color.basic": {
+      "operation": "color.basic",
+      "keys": {
+        "exposure": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "曝光"
+        },
+        "brightness": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "亮度"
+        },
+        "contrast": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "对比度"
+        },
+        "highlights": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "高光"
+        },
+        "shadows": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "阴影"
+        },
+        "whites": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "白色色阶"
+        },
+        "blacks": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "黑色色阶"
+        },
+        "temperature": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "色温"
+        },
+        "tint": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "色调"
+        },
+        "saturation": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "饱和度"
+        },
+        "vibrance": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "自然饱和度"
+        },
+        "clarity": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "清晰度"
+        },
+        "sharpness": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "锐化"
+        },
+        "texture": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "纹理"
+        },
+        "dehaze": {
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "label": "去雾"
+        },
+        "noise": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "降噪"
+        },
+        "blackWhite": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "黑白"
+        },
+        "blackPoint": {
+          "min": 0,
+          "max": 99.9,
+          "default": 0,
+          "label": "黑色色阶端点"
+        },
+        "whitePoint": {
+          "min": 0.1,
+          "max": 100,
+          "default": 100,
+          "label": "白色色阶端点"
+        },
+        "gamma": {
+          "min": 0.1,
+          "max": 5,
+          "default": 1,
+          "label": "中间调 Gamma"
+        }
+      }
+    },
+    "color.curves": {
+      "keys": {
+        "channel": {
+          "enum": [
+            "rgb",
+            "red",
+            "green",
+            "blue"
+          ]
+        },
+        "points": {
+          "type": "array",
+          "maxItems": 1024,
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "min": 0,
+                "max": 1
+              },
+              "y": {
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          }
+        }
+      }
+    },
+    "color.hsl": {
+      "keys": {
+        "hue": {
+          "min": -100,
+          "max": 100
+        },
+        "saturation": {
+          "min": -100,
+          "max": 100
+        },
+        "lightness": {
+          "min": -100,
+          "max": 100
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "hue": {
+              "min": 0,
+              "max": 360
+            },
+            "range": {
+              "min": 1,
+              "max": 180
+            },
+            "shift": {
+              "min": -100,
+              "max": 100
+            },
+            "saturation": {
+              "min": -100,
+              "max": 100
+            },
+            "lightness": {
+              "min": -100,
+              "max": 100
+            }
+          }
+        }
+      }
+    },
+    "filter.film": {
+      "operation": "filter.film",
+      "keys": {
+        "intensity": {
+          "min": 0,
+          "max": 100,
+          "default": 70,
+          "label": "滤镜强度"
+        },
+        "grain": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "颗粒"
+        },
+        "vignette": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "暗角"
+        },
+        "glow": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "辉光"
+        },
+        "halation": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "光晕"
+        },
+        "fade": {
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "label": "黑位褪色"
+        },
+        "preset": {
+          "enum": [
+            "neutral",
+            "warm",
+            "cool",
+            "classic",
+            "fade",
+            "vivid",
+            "mono",
+            "cinema"
+          ]
+        },
+        "seed": {
+          "min": 0,
+          "max": 4294967295,
+          "type": "integer",
+          "default": 42
+        }
+      }
+    },
+    "repair.clone": {
+      "keys": {
+        "strokes": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "x": {
+              "min": 0,
+              "max": 1
+            },
+            "y": {
+              "min": 0,
+              "max": 1
+            },
+            "radius": {
+              "min": 0.00001,
+              "max": 1
+            },
+            "strength": {
+              "min": 0,
+              "max": 100
+            },
+            "sourceX": {
+              "min": 0,
+              "max": 1
+            },
+            "sourceY": {
+              "min": 0,
+              "max": 1
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "radius",
+            "sourceX",
+            "sourceY"
+          ]
+        }
+      }
+    },
+    "repair.inpaint": {
+      "keys": {
+        "radius": {
+          "min": 0.00001,
+          "max": 1,
+          "default": 0.025
+        },
+        "iterations": {
+          "min": 1,
+          "max": 64,
+          "default": 6,
+          "type": "integer"
+        }
+      },
+      "description": "Exemplar patch inpainting with confidence/isophote priority; deterministic, no generative model"
+    },
+    "paint.brush": {
+      "keys": {
+        "color": {
+          "type": "array",
+          "length": 3,
+          "min": 0,
+          "max": 255
+        },
+        "strokes": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "x": {
+              "min": 0,
+              "max": 1
+            },
+            "y": {
+              "min": 0,
+              "max": 1
+            },
+            "radius": {
+              "min": 0.00001,
+              "max": 1
+            },
+            "strength": {
+              "min": 0,
+              "max": 100
+            },
+            "erase": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "description": "Paint color onto a reversible layer; erase restores this layer to the source"
+    },
+    "filter.lut": {
+      "keys": {
+        "size": {
+          "min": 2,
+          "max": 65,
+          "type": "integer"
+        },
+        "data": {
+          "type": "array",
+          "length": "size^3",
+          "order": "red axis fastest",
+          "items": "RGB tuple [r,g,b] with values 0..1"
+        },
+        "domainMin": {
+          "type": "array",
+          "length": 3
+        },
+        "domainMax": {
+          "type": "array",
+          "length": 3
+        },
+        "amount": {
+          "min": 0,
+          "max": 100
+        }
+      }
+    }
+  },
+  "filmPresets": [
+    {
+      "id": "neutral",
+      "name": "原片",
+      "category": "自然",
+      "description": "保留原有色彩"
+    },
+    {
+      "id": "warm",
+      "name": "暖光人像",
+      "category": "人像",
+      "description": "温暖、柔和肤色"
+    },
+    {
+      "id": "cool",
+      "name": "冷调影院",
+      "category": "电影",
+      "description": "冷静蓝调与柔和反差"
+    },
+    {
+      "id": "classic",
+      "name": "经典纪实",
+      "category": "纪实",
+      "description": "温暖低饱和纪实风格"
+    },
+    {
+      "id": "fade",
+      "name": "复古褪色",
+      "category": "复古",
+      "description": "提升黑位、轻柔反差"
+    },
+    {
+      "id": "vivid",
+      "name": "鲜艳风景",
+      "category": "风景",
+      "description": "鲜艳通透色彩"
+    },
+    {
+      "id": "mono",
+      "name": "银盐黑白",
+      "category": "黑白",
+      "description": "黑白高反差"
+    },
+    {
+      "id": "cinema",
+      "name": "青橙电影",
+      "category": "电影",
+      "description": "阴影青调、高光暖调"
+    }
+  ],
+  "commonParams": {
+    "region": "normalized rectangle {x,y,width,height}",
+    "mask": "inline {shape: rect|ellipse|polygon|brush|linear|radial|raster,width,height,data,region,points,strokes,from,to,invert,feather}",
+    "protectMask": "inline mask; selected area stays unmodified",
+    "opacity": "0..100",
+    "blendMode": [
+      "normal",
+      "multiply",
+      "screen",
+      "overlay",
+      "soft-light",
+      "darken",
+      "lighten"
+    ]
+  }
+}

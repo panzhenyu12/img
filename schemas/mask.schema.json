@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://img.local/schemas/mask.schema.json",
+  "title": "Inline selection and protection mask",
+  "type": "object",
+  "required": [
+    "shape"
+  ],
+  "properties": {
+    "shape": {
+      "enum": [
+        "rect",
+        "ellipse",
+        "polygon",
+        "brush",
+        "linear",
+        "radial",
+        "raster"
+      ]
+    },
+    "region": {
+      "$ref": "#/$defs/region"
+    },
+    "points": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/point"
+      }
+    },
+    "from": {
+      "$ref": "#/$defs/point"
+    },
+    "to": {
+      "$ref": "#/$defs/point"
+    },
+    "strokes": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "radius"
+        ],
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "strength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "erase": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "invert": {
+      "type": "boolean"
+    },
+    "feather": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 512
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 512
+    },
+    "data": {
+      "type": "array",
+      "maxItems": 262144,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "description": "Row-major alpha bytes; length must equal width * height. Full-image coordinates."
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "object",
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "shape": {
+            "const": "raster"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "width",
+          "height",
+          "data"
+        ]
+      }
+    }
+  ]
+}

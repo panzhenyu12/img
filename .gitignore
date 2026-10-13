@@ -1,0 +1,16 @@
+.DS_Store
+node_modules/
+dist/
+*.wasm
+services/api/tmp/
+core/image-core/target/
+.run/
+apps/web/public/wasm/
+apps/web/public/vision/
+apps/web/public/ort/
+apps/web/public/models/
+apps/web/test-results/
+apps/web/playwright-report/
+services/agent/.venv/
+services/agent/__pycache__/
+test/results/

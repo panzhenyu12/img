@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://img.local/schemas/edit-proposal.schema.json",
+  "title": "AI edit proposal",
+  "description": "AI suggestions are proposals first. Applying them appends operations to an edit graph and never overwrites the source asset.",
+  "type": "object",
+  "required": ["id", "baseRevision", "operations", "status", "createdBy"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "baseRevision": { "type": "string", "minLength": 1 },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "operation.schema.json" }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "rejected", "applied", "expired"]
+    },
+    "createdBy": {
+      "type": "object",
+      "required": ["actorType"],
+      "properties": {
+        "actorType": { "type": "string", "enum": ["ai", "user", "system"] },
+        "actorId": { "type": "string" },
+        "model": { "type": "string" },
+        "toolCallId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "approvalMode": {
+      "type": "string",
+      "enum": ["auto", "confirm", "disabled"]
+    },
+    "summary": { "type": "string" },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

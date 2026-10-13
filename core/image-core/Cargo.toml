@@ -1,0 +1,26 @@
+[package]
+name = "image-core"
+version = "0.2.0"
+edition = "2021"
+description = "Deterministic, non-destructive image operations shared by WebAssembly and native workers."
+license = "UNLICENSED"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+wasm = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+libm = { version = "0.2.16", default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clap = { version = "4", features = ["derive"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"

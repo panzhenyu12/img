@@ -1,0 +1,11 @@
+{
+  "id": "op-identity-001",
+  "type": "identity",
+  "version": "1.0",
+  "enabled": true,
+  "maskId": null,
+  "targetId": null,
+  "params": {},
+  "controlPoints": [],
+  "engineVersion": "image-core-0.1"
+}

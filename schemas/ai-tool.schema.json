@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://img.local/schemas/ai-tool.schema.json",
+  "title": "AI image editing MCP bridge message",
+  "description": "Tool calls and results exchanged by the optional AI layer. AI may propose edit operations, but applying them is a separate approval step.",
+  "oneOf": [
+    { "$ref": "#/$defs/toolCall" },
+    { "$ref": "#/$defs/toolResult" }
+  ],
+  "$defs": {
+    "approvalMode": {
+      "type": "string",
+      "enum": ["auto", "confirm", "disabled"]
+    },
+    "toolName": {
+      "type": "string",
+      "enum": [
+        "inspect_asset",
+        "detect_landmarks",
+        "detect_regions",
+        "propose_operations",
+        "apply_operations",
+        "render_preview",
+        "export_image",
+        "undo_operations"
+      ]
+    },
+    "toolCall": {
+      "type": "object",
+      "required": ["name", "arguments"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "$ref": "#/$defs/toolName" },
+        "arguments": { "type": "object", "additionalProperties": true },
+        "approvalMode": { "$ref": "#/$defs/approvalMode" },
+        "proposalId": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "requestId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "toolError": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "retryable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "toolResult": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "error", "pending_approval", "rejected"]
+        },
+        "name": { "$ref": "#/$defs/toolName" },
+        "result": { "type": "object", "additionalProperties": true },
+        "proposal": { "$ref": "edit-proposal.schema.json" },
+        "error": { "$ref": "#/$defs/toolError" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

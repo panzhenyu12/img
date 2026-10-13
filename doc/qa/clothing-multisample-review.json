@@ -1,0 +1,368 @@
+[
+  {
+    "id": "clothing-texture",
+    "width": 1024,
+    "height": 683,
+    "region": {
+      "x": 0.48,
+      "y": 0.56,
+      "width": 0.14,
+      "height": 0.3
+    },
+    "sourceMetrics": {
+      "count": 25283,
+      "meanLuminance": 210.08305517543272,
+      "meanChroma": 7.162876240952419,
+      "gradientEnergy": 4.0801059921686385
+    },
+    "checks": [
+      {
+        "key": "smooth",
+        "adjustments": {
+          "smooth": 60,
+          "texture": 70
+        },
+        "changedInside": 19338,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 25283,
+          "meanLuminance": 210.12160659734303,
+          "meanChroma": 7.159949373096547,
+          "gradientEnergy": 3.041123482181677
+        }
+      },
+      {
+        "key": "texture-low",
+        "adjustments": {
+          "smooth": 80,
+          "texture": 0
+        },
+        "changedInside": 26084,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 25283,
+          "meanLuminance": 210.1866542815675,
+          "meanChroma": 7.155361309971127,
+          "gradientEnergy": 1.6457612071352277
+        }
+      },
+      {
+        "key": "texture-high",
+        "adjustments": {
+          "smooth": 80,
+          "texture": 100
+        },
+        "changedInside": 19883,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 25283,
+          "meanLuminance": 210.12592393310288,
+          "meanChroma": 7.160582209389709,
+          "gradientEnergy": 3.103453878099897
+        }
+      },
+      {
+        "key": "hue",
+        "adjustments": {
+          "hue": 60
+        },
+        "changedInside": 29315,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 25283,
+          "meanLuminance": 210.05984984370176,
+          "meanChroma": 7.162876240952419,
+          "gradientEnergy": 4.080582557449692
+        }
+      },
+      {
+        "key": "saturation",
+        "adjustments": {
+          "saturation": 60
+        },
+        "changedInside": 29315,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 25283,
+          "meanLuminance": 209.08524825379024,
+          "meanChroma": 11.541826523751137,
+          "gradientEnergy": 4.0892746430407385
+        }
+      },
+      {
+        "key": "brightness",
+        "adjustments": {
+          "brightness": 30
+        },
+        "changedInside": 29315,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 25283,
+          "meanLuminance": 232.56459175734398,
+          "meanChroma": 6.374322667404976,
+          "gradientEnergy": 3.7392115413519
+        }
+      },
+      {
+        "key": "texture-without-smooth",
+        "adjustments": {
+          "smooth": 0,
+          "texture": 100
+        },
+        "changedInside": 0,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 25283,
+          "meanLuminance": 210.08305517543272,
+          "meanChroma": 7.162876240952419,
+          "gradientEnergy": 4.0801059921686385
+        }
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/clothing-algorithms/clothing-texture"
+  },
+  {
+    "id": "tilted-shirt",
+    "width": 683,
+    "height": 1024,
+    "region": {
+      "x": 0.49,
+      "y": 0.46,
+      "width": 0.1,
+      "height": 0.16
+    },
+    "sourceMetrics": {
+      "count": 8456,
+      "meanLuminance": 48.64623826868663,
+      "meanChroma": 39.41508987701041,
+      "gradientEnergy": 7.1579862346262555
+    },
+    "checks": [
+      {
+        "key": "smooth",
+        "adjustments": {
+          "smooth": 60,
+          "texture": 70
+        },
+        "changedInside": 8824,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 8456,
+          "meanLuminance": 48.57480290917853,
+          "meanChroma": 39.44429990539262,
+          "gradientEnergy": 5.215783396404872
+        }
+      },
+      {
+        "key": "texture-low",
+        "adjustments": {
+          "smooth": 80,
+          "texture": 0
+        },
+        "changedInside": 10799,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 8456,
+          "meanLuminance": 48.48923564333312,
+          "meanChroma": 39.51052507095554,
+          "gradientEnergy": 2.6819123935666958
+        }
+      },
+      {
+        "key": "texture-high",
+        "adjustments": {
+          "smooth": 80,
+          "texture": 100
+        },
+        "changedInside": 8946,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 8456,
+          "meanLuminance": 48.579661329235286,
+          "meanChroma": 39.458727530747396,
+          "gradientEnergy": 5.335277341532614
+        }
+      },
+      {
+        "key": "hue",
+        "adjustments": {
+          "hue": 60
+        },
+        "changedInside": 11152,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 8456,
+          "meanLuminance": 58.61361894512587,
+          "meanChroma": 39.41508987701041,
+          "gradientEnergy": 7.245014877010349
+        }
+      },
+      {
+        "key": "saturation",
+        "adjustments": {
+          "saturation": 60
+        },
+        "changedInside": 11152,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 8456,
+          "meanLuminance": 48.07300813623218,
+          "meanChroma": 62.69914853358562,
+          "gradientEnergy": 7.184431244086942
+        }
+      },
+      {
+        "key": "brightness",
+        "adjustments": {
+          "brightness": 30
+        },
+        "changedInside": 11152,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 8456,
+          "meanLuminance": 71.6389072847708,
+          "meanChroma": 39.42478713339641,
+          "gradientEnergy": 7.162681835383124
+        }
+      },
+      {
+        "key": "texture-without-smooth",
+        "adjustments": {
+          "smooth": 0,
+          "texture": 100
+        },
+        "changedInside": 0,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 8456,
+          "meanLuminance": 48.64623826868663,
+          "meanChroma": 39.41508987701041,
+          "gradientEnergy": 7.1579862346262555
+        }
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/clothing-algorithms/tilted-shirt"
+  },
+  {
+    "id": "fashion-standing",
+    "width": 720,
+    "height": 1024,
+    "region": {
+      "x": 0.34,
+      "y": 0.58,
+      "width": 0.25,
+      "height": 0.08
+    },
+    "sourceMetrics": {
+      "count": 11760,
+      "meanLuminance": 199.6802326360462,
+      "meanChroma": 26.216241496598638,
+      "gradientEnergy": 7.720186989795919
+    },
+    "checks": [
+      {
+        "key": "smooth",
+        "adjustments": {
+          "smooth": 60,
+          "texture": 70
+        },
+        "changedInside": 13580,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 11760,
+          "meanLuminance": 199.6820921938735,
+          "meanChroma": 26.195663265306123,
+          "gradientEnergy": 5.531236564625847
+        }
+      },
+      {
+        "key": "texture-low",
+        "adjustments": {
+          "smooth": 80,
+          "texture": 0
+        },
+        "changedInside": 14645,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 11760,
+          "meanLuminance": 199.67857372448935,
+          "meanChroma": 26.154336734693878,
+          "gradientEnergy": 2.6435939285714456
+        }
+      },
+      {
+        "key": "texture-high",
+        "adjustments": {
+          "smooth": 80,
+          "texture": 100
+        },
+        "changedInside": 13737,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 11760,
+          "meanLuminance": 199.6806217346909,
+          "meanChroma": 26.199149659863945,
+          "gradientEnergy": 5.67550462585034
+        }
+      },
+      {
+        "key": "hue",
+        "adjustments": {
+          "hue": 60
+        },
+        "changedInside": 14760,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 11760,
+          "meanLuminance": 194.21925693878032,
+          "meanChroma": 26.216241496598638,
+          "gradientEnergy": 7.836777380952358
+        }
+      },
+      {
+        "key": "saturation",
+        "adjustments": {
+          "saturation": 60
+        },
+        "changedInside": 14759,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 11760,
+          "meanLuminance": 199.3451918027297,
+          "meanChroma": 41.974659863945575,
+          "gradientEnergy": 7.851113656462569
+        }
+      },
+      {
+        "key": "brightness",
+        "adjustments": {
+          "brightness": 30
+        },
+        "changedInside": 14760,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 11760,
+          "meanLuminance": 222.66668428570517,
+          "meanChroma": 26.206462585034014,
+          "gradientEnergy": 7.719202602040825
+        }
+      },
+      {
+        "key": "texture-without-smooth",
+        "adjustments": {
+          "smooth": 0,
+          "texture": 100
+        },
+        "changedInside": 0,
+        "changedOutside": 0,
+        "metrics": {
+          "count": 11760,
+          "meanLuminance": 199.6802326360462,
+          "meanChroma": 26.216241496598638,
+          "gradientEnergy": 7.720186989795919
+        }
+      }
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/clothing-algorithms/fashion-standing"
+  }
+]

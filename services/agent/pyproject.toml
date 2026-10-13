@@ -1,0 +1,12 @@
+[project]
+name = "retouch-deepagent"
+version = "0.1.0"
+description = "Optional DeepAgent that proposes operations through the Go MCP gateway"
+requires-python = ">=3.11"
+dependencies = [
+  "deepagents>=0.4,<1",
+  "langchain-mcp-adapters>=0.2,<1",
+  "langchain-openai>=1,<2",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+]

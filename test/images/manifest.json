@@ -1,0 +1,279 @@
+[
+  {
+    "id": "portrait-man",
+    "path": "portrait-man.jpg",
+    "source": "https://www.pexels.com/photo/220453/",
+    "downloadUrl": "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 210414,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "frontal",
+      "glasses",
+      "beard"
+    ],
+    "width": 1280,
+    "height": 1920,
+    "sha256": "f6d7aee5b27f4748ba7a59b25957e1e77c701fee29ebbb9ddf9351d8dcdb1506"
+  },
+  {
+    "id": "portrait-woman",
+    "path": "portrait-woman.jpg",
+    "source": "https://www.pexels.com/photo/774909/",
+    "downloadUrl": "https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 264386,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "smile",
+      "light-skin",
+      "hair",
+      "dress"
+    ],
+    "width": 1280,
+    "height": 1920,
+    "sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e"
+  },
+  {
+    "id": "portrait-glasses-street",
+    "path": "portrait-glasses-street.jpg",
+    "source": "https://www.pexels.com/photo/1239291/",
+    "downloadUrl": "https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 131842,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "glasses",
+      "frontal",
+      "street"
+    ],
+    "width": 1280,
+    "height": 853,
+    "sha256": "d141a5d208912b1998d03d7e86f808369078df2917526625d6510bb51b2fea2b"
+  },
+  {
+    "id": "portrait-makeup",
+    "path": "portrait-makeup.jpg",
+    "source": "https://www.pexels.com/photo/415829/",
+    "downloadUrl": "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 98960,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "frontal",
+      "makeup",
+      "plain-background"
+    ],
+    "width": 1280,
+    "height": 1128,
+    "sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70"
+  },
+  {
+    "id": "portrait-dark",
+    "path": "portrait-dark.jpg",
+    "source": "https://www.pexels.com/photo/1681010/",
+    "downloadUrl": "https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 284865,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "dark-skin",
+      "frontal",
+      "jacket"
+    ],
+    "width": 1280,
+    "height": 1920,
+    "sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271"
+  },
+  {
+    "id": "fashion-standing",
+    "path": "fashion-standing.jpg",
+    "source": "https://www.pexels.com/photo/1043474/",
+    "downloadUrl": "https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 244490,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "standing",
+      "hands-on-waist",
+      "shirt",
+      "glasses"
+    ],
+    "width": 1280,
+    "height": 1820,
+    "sha256": "32831ca9c43206337dd26b27ff0543f7b6c80b7f96f376020f1301b8921bbadf"
+  },
+  {
+    "id": "clothes-on-rail",
+    "path": "clothes-on-rail.jpg",
+    "source": "https://www.pexels.com/photo/994517/",
+    "downloadUrl": "https://images.pexels.com/photos/994517/pexels-photo-994517.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 86585,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "clothing",
+      "texture",
+      "no-person"
+    ],
+    "width": 1280,
+    "height": 853,
+    "sha256": "44b5eca31e51c6d52e4d1f8f3d09f5cfcad83b026c341f4e9348492197218b50"
+  },
+  {
+    "id": "clothing-texture",
+    "path": "clothing-texture.jpg",
+    "source": "https://www.pexels.com/photo/428340/",
+    "downloadUrl": "https://images.pexels.com/photos/428340/pexels-photo-428340.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 64557,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "tshirt",
+      "profile",
+      "torso",
+      "plain-background"
+    ],
+    "width": 1280,
+    "height": 854,
+    "sha256": "f3dd2152e71f2ee9469b75b970e75be6428990478d6ad0712538948f6184eb9a"
+  },
+  {
+    "id": "street-crowd",
+    "path": "street-crowd.jpg",
+    "source": "https://www.pexels.com/photo/842339/",
+    "downloadUrl": "https://images.pexels.com/photos/842339/pexels-photo-842339.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 140280,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "multiple-people",
+      "street",
+      "overhead",
+      "diagonal-lines"
+    ],
+    "width": 1280,
+    "height": 854,
+    "sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a"
+  },
+  {
+    "id": "cityscape",
+    "path": "cityscape.jpg",
+    "source": "https://www.pexels.com/photo/373893/",
+    "downloadUrl": "https://images.pexels.com/photos/373893/pexels-photo-373893.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 246724,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "architecture",
+      "low-light",
+      "no-person"
+    ],
+    "width": 1280,
+    "height": 853,
+    "sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb"
+  },
+  {
+    "id": "fullbody-skirt",
+    "path": "fullbody-skirt.jpg",
+    "source": "https://www.pexels.com/photo/1007018/",
+    "downloadUrl": "https://images.pexels.com/photos/1007018/pexels-photo-1007018.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 197073,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "full-body",
+      "skirt",
+      "crossed-legs",
+      "diagonal-background"
+    ],
+    "width": 1280,
+    "height": 1920,
+    "sha256": "95473c736519d32507521f672616ad7628ab5bcd15efa8e175bf9dc2a9efc144"
+  },
+  {
+    "id": "fullbody-side-fashion",
+    "path": "fullbody-side-fashion.jpg",
+    "source": "https://www.pexels.com/photo/1126993/",
+    "downloadUrl": "https://images.pexels.com/photos/1126993/pexels-photo-1126993.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 62795,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "side-body",
+      "dress",
+      "plain-background"
+    ],
+    "width": 1280,
+    "height": 853,
+    "sha256": "1082f17c1c0b572b604f80d403858128bfd4687548568de911cbf9c4932af999"
+  },
+  {
+    "id": "tilted-shirt",
+    "path": "tilted-shirt.jpg",
+    "source": "https://www.pexels.com/photo/1926769/",
+    "downloadUrl": "https://images.pexels.com/photos/1926769/pexels-photo-1926769.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 162633,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "tilted-face",
+      "glasses",
+      "shirt",
+      "wrinkles"
+    ],
+    "width": 1280,
+    "height": 1920,
+    "sha256": "c2c553a14f208b8ba7e92c4eb201c43668aaddef1919ae493e554bdfef4cb1dc"
+  },
+  {
+    "id": "profile-hoodie",
+    "path": "profile-hoodie.jpg",
+    "source": "https://www.pexels.com/photo/1183266/",
+    "downloadUrl": "https://images.pexels.com/photos/1183266/pexels-photo-1183266.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 242511,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "profile",
+      "hoodie",
+      "structured-background"
+    ],
+    "width": 1280,
+    "height": 1920,
+    "sha256": "f20a749fd646fa2501ed5e0e65de7d3329412f0f437543b969b8d5711f4ab655"
+  },
+  {
+    "id": "portrait-hair",
+    "path": "portrait-hair.jpg",
+    "source": "https://www.pexels.com/photo/3760854/",
+    "downloadUrl": "https://images.pexels.com/photos/3760854/pexels-photo-3760854.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 152113,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "frontal",
+      "hair-overlap",
+      "smile"
+    ],
+    "width": 1280,
+    "height": 1671,
+    "sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b"
+  },
+  {
+    "id": "action-suit",
+    "path": "action-suit.jpg",
+    "source": "https://www.pexels.com/photo/3772512/",
+    "downloadUrl": "https://images.pexels.com/photos/3772512/pexels-photo-3772512.jpeg?auto=compress&cs=tinysrgb&w=1280&q=90",
+    "bytes": 92395,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "pose",
+      "arms",
+      "suit",
+      "street"
+    ],
+    "width": 1280,
+    "height": 1013,
+    "sha256": "70bfac21aa227629e24ae91ebc6b65e47177b84e0f000d5a14415cc467d8ff94"
+  },
+  {
+    "id": "portrait-roll",
+    "path": "portrait-roll.jpg",
+    "labels": [
+      "derived",
+      "roll-18deg",
+      "makeup"
+    ],
+    "derivedFrom": "portrait-makeup",
+    "transform": "clockwise rotation 18 degrees, bicubic, expanded",
+    "width": 1566,
+    "height": 1470,
+    "sha256": "9bce7c4c500b343ee92660be345ccdd2680997e2e41e500018eb2e44df11400e"
+  }
+]

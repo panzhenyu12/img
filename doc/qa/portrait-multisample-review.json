@@ -1,0 +1,1103 @@
+[
+  {
+    "id": "portrait-man",
+    "labels": [
+      "frontal",
+      "glasses",
+      "beard"
+    ],
+    "source": {
+      "name": "portrait-man.jpg",
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 15897,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 198998,
+          "backgroundBeyondOriginalFaceTwoPixels": 113171,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 204.849853515625,
+            "output": 196.5313262939453
+          }
+        }
+      }
+    ],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/portrait-man"
+  },
+  {
+    "id": "portrait-woman",
+    "labels": [
+      "smile",
+      "light-skin",
+      "hair",
+      "dress"
+    ],
+    "source": {
+      "name": "portrait-woman.jpg",
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "key": "forehead",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 6118,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 171.54949951171875
+          }
+        }
+      },
+      {
+        "key": "foreheadWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2074,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 172.76449584960938
+          }
+        }
+      },
+      {
+        "key": "temples",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2951,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 170.33126831054688
+          }
+        }
+      },
+      {
+        "key": "cheekbones",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4584,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 169.6051025390625
+          }
+        }
+      },
+      {
+        "key": "jaw",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2498,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 26,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 172.13833618164062
+          }
+        }
+      },
+      {
+        "key": "chin",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2425,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 603,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 172.16506958007812
+          }
+        }
+      },
+      {
+        "key": "chinWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2144,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 42,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 172.25941467285156
+          }
+        }
+      },
+      {
+        "key": "chinPoint",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2342,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 62,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 172.36813354492188
+          }
+        }
+      },
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 7471,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 76,
+          "outsideSupportPixels": 90008,
+          "backgroundBeyondOriginalFaceTwoPixels": 181578,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.35089111328125,
+            "output": 167.46307373046875
+          }
+        }
+      }
+    ],
+    "failures": [
+      "faceWidth"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/portrait-woman"
+  },
+  {
+    "id": "portrait-glasses-street",
+    "labels": [
+      "glasses",
+      "frontal",
+      "street"
+    ],
+    "source": {
+      "name": "portrait-glasses-street.jpg",
+      "width": 768,
+      "height": 512
+    },
+    "checks": [
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3564,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 2,
+          "outsideSupportPixels": 188061,
+          "backgroundBeyondOriginalFaceTwoPixels": 144348,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 114.13874816894531,
+            "output": 109.14131927490234
+          }
+        }
+      }
+    ],
+    "failures": [
+      "faceWidth"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/portrait-glasses-street"
+  },
+  {
+    "id": "portrait-makeup",
+    "labels": [
+      "frontal",
+      "makeup",
+      "plain-background"
+    ],
+    "source": {
+      "name": "portrait-makeup.jpg",
+      "width": 768,
+      "height": 677
+    },
+    "checks": [
+      {
+        "key": "forehead",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 7656,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 3,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 231.46488189697266
+          }
+        }
+      },
+      {
+        "key": "foreheadWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3473,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 59,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 232.09412384033203
+          }
+        }
+      },
+      {
+        "key": "temples",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3427,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 3,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 228.57039642333984
+          }
+        }
+      },
+      {
+        "key": "cheekbones",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 8301,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 15,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 225.9529037475586
+          }
+        }
+      },
+      {
+        "key": "jaw",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 7731,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 175,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 231.17559814453125
+          }
+        }
+      },
+      {
+        "key": "chin",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4106,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 1247,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 231.3134307861328
+          }
+        }
+      },
+      {
+        "key": "chinWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4203,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 147,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 231.73265075683594
+          }
+        }
+      },
+      {
+        "key": "chinPoint",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4085,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 187,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 231.99449157714844
+          }
+        }
+      },
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 13766,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 471,
+          "outsideSupportPixels": 246346,
+          "backgroundBeyondOriginalFaceTwoPixels": 156900,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 231.6591339111328,
+            "output": 222.64917755126953
+          }
+        }
+      }
+    ],
+    "failures": [
+      "faceWidth"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/portrait-makeup"
+  },
+  {
+    "id": "portrait-dark",
+    "labels": [
+      "dark-skin",
+      "frontal",
+      "jacket"
+    ],
+    "source": {
+      "name": "portrait-dark.jpg",
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "key": "forehead",
+        "value": 60,
+        "error": "Error: face contour requires clean, unprotected background beside the revealed edge"
+      },
+      {
+        "key": "foreheadWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1754,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 172.47909545898438
+          }
+        }
+      },
+      {
+        "key": "temples",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2923,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 167.23385620117188
+          }
+        }
+      },
+      {
+        "key": "cheekbones",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5435,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 166.56082153320312
+          }
+        }
+      },
+      {
+        "key": "jaw",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5149,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 169.37144470214844
+          }
+        }
+      },
+      {
+        "key": "chin",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3666,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 631,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 170.0380859375
+          }
+        }
+      },
+      {
+        "key": "chinWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3177,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 119,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 170.42864990234375
+          }
+        }
+      },
+      {
+        "key": "chinPoint",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3216,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 170.31483459472656
+          }
+        }
+      },
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 9708,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 202932,
+          "backgroundBeyondOriginalFaceTwoPixels": 120786,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 170.2515106201172,
+            "output": 162.5977020263672
+          }
+        }
+      }
+    ],
+    "failures": [
+      "forehead"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/portrait-dark"
+  },
+  {
+    "id": "fashion-standing",
+    "labels": [
+      "standing",
+      "hands-on-waist",
+      "shirt",
+      "glasses"
+    ],
+    "source": {
+      "name": "fashion-standing.jpg",
+      "width": 540,
+      "height": 768
+    },
+    "checks": [
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 3120,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 371726,
+          "backgroundBeyondOriginalFaceTwoPixels": 25314,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 84.5163631439209,
+            "output": 84.13410007953644
+          }
+        }
+      }
+    ],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/fashion-standing"
+  },
+  {
+    "id": "clothing-texture",
+    "labels": [
+      "tshirt",
+      "profile",
+      "torso",
+      "plain-background"
+    ],
+    "source": {
+      "name": "clothing-texture.jpg",
+      "width": 768,
+      "height": 512
+    },
+    "error": "No face detected at evaluation resolution",
+    "checks": [],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/clothing-texture"
+  },
+  {
+    "id": "fullbody-skirt",
+    "labels": [
+      "full-body",
+      "skirt",
+      "crossed-legs",
+      "diagonal-background"
+    ],
+    "source": {
+      "name": "fullbody-skirt.jpg",
+      "width": 512,
+      "height": 768
+    },
+    "error": "No face detected at evaluation resolution",
+    "checks": [],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/fullbody-skirt"
+  },
+  {
+    "id": "fullbody-side-fashion",
+    "labels": [
+      "side-body",
+      "dress",
+      "plain-background"
+    ],
+    "source": {
+      "name": "fullbody-side-fashion.jpg",
+      "width": 768,
+      "height": 512
+    },
+    "error": "No face detected at evaluation resolution",
+    "checks": [],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/fullbody-side-fashion"
+  },
+  {
+    "id": "tilted-shirt",
+    "labels": [
+      "tilted-face",
+      "glasses",
+      "shirt",
+      "wrinkles"
+    ],
+    "source": {
+      "name": "tilted-shirt.jpg",
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2598,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 326619,
+          "backgroundBeyondOriginalFaceTwoPixels": 43418,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 79.66860961914062,
+            "output": 77.90744018554688
+          }
+        }
+      }
+    ],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/tilted-shirt"
+  },
+  {
+    "id": "profile-hoodie",
+    "labels": [
+      "profile",
+      "hoodie",
+      "structured-background"
+    ],
+    "source": {
+      "name": "profile-hoodie.jpg",
+      "width": 512,
+      "height": 768
+    },
+    "error": "No face detected at evaluation resolution",
+    "checks": [],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/profile-hoodie"
+  },
+  {
+    "id": "portrait-hair",
+    "labels": [
+      "frontal",
+      "hair-overlap",
+      "smile"
+    ],
+    "source": {
+      "name": "portrait-hair.jpg",
+      "width": 588,
+      "height": 768
+    },
+    "checks": [
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5734,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 16,
+          "outsideSupportPixels": 203082,
+          "backgroundBeyondOriginalFaceTwoPixels": 148061,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 172.82621026039124,
+            "output": 168.82805800437927
+          }
+        }
+      }
+    ],
+    "failures": [
+      "faceWidth"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/portrait-hair"
+  },
+  {
+    "id": "action-suit",
+    "labels": [
+      "pose",
+      "arms",
+      "suit",
+      "street"
+    ],
+    "source": {
+      "name": "action-suit.jpg",
+      "width": 768,
+      "height": 608
+    },
+    "error": "No face detected at evaluation resolution",
+    "checks": [],
+    "failures": [],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/action-suit"
+  },
+  {
+    "id": "portrait-roll",
+    "labels": [
+      "derived",
+      "roll-18deg",
+      "makeup"
+    ],
+    "source": {
+      "name": "portrait-roll.jpg",
+      "width": 768,
+      "height": 721
+    },
+    "checks": [
+      {
+        "key": "forehead",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5409,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 177.8536605834961
+          }
+        }
+      },
+      {
+        "key": "foreheadWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 1709,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 47,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 178.67713165283203
+          }
+        }
+      },
+      {
+        "key": "temples",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2254,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 0,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 176.97203063964844
+          }
+        }
+      },
+      {
+        "key": "cheekbones",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 5461,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 5,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 173.62442779541016
+          }
+        }
+      },
+      {
+        "key": "jaw",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 4830,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 95,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 177.89957427978516
+          }
+        }
+      },
+      {
+        "key": "chin",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2777,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 757,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 177.6697540283203
+          }
+        }
+      },
+      {
+        "key": "chinWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2509,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 86,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 177.39745330810547
+          }
+        }
+      },
+      {
+        "key": "chinPoint",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 2610,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 101,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 178.51856231689453
+          }
+        }
+      },
+      {
+        "key": "faceWidth",
+        "value": 60,
+        "metrics": {
+          "changedFacePixels": 9162,
+          "changedOutsideSupportPixels": 0,
+          "changedBackgroundBeyondOriginalFaceTwoPixels": 279,
+          "outsideSupportPixels": 345873,
+          "backgroundBeyondOriginalFaceTwoPixels": 130267,
+          "protectedFeatureCenters": {
+            "leftEye": true,
+            "rightEye": true,
+            "nose": true,
+            "lips": true
+          },
+          "faceWidthAtCheek": {
+            "source": 177.75354766845703,
+            "output": 171.1032257080078
+          }
+        }
+      }
+    ],
+    "failures": [
+      "faceWidth"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/portrait-algorithms/portrait-roll"
+  }
+]

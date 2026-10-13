@@ -1,0 +1,466 @@
+[
+  {
+    "key": "face.adjust.forehead",
+    "changed": 4351
+  },
+  {
+    "key": "face.adjust.foreheadWidth",
+    "changed": 4784
+  },
+  {
+    "key": "face.adjust.temples",
+    "changed": 5211
+  },
+  {
+    "key": "face.adjust.cheekbones",
+    "changed": 5213
+  },
+  {
+    "key": "face.adjust.jaw",
+    "changed": 5219
+  },
+  {
+    "key": "face.adjust.chin",
+    "changed": 2632
+  },
+  {
+    "key": "face.adjust.chinWidth",
+    "changed": 3411
+  },
+  {
+    "key": "face.adjust.chinPoint",
+    "changed": 2001
+  },
+  {
+    "key": "face.adjust.faceWidth",
+    "changed": 8008
+  },
+  {
+    "key": "face.adjust.faceHeight",
+    "changed": 14063
+  },
+  {
+    "key": "face.adjust.midface",
+    "changed": 4186
+  },
+  {
+    "key": "face.adjust.doubleChin",
+    "changed": 2317
+  },
+  {
+    "key": "face.adjust.symmetry",
+    "changed": 4065
+  },
+  {
+    "key": "feature.adjust.eyeSize",
+    "changed": 2238
+  },
+  {
+    "key": "feature.adjust.eyeWidth",
+    "changed": 2193
+  },
+  {
+    "key": "feature.adjust.eyeHeight",
+    "changed": 1885
+  },
+  {
+    "key": "feature.adjust.eyeSpacing",
+    "changed": 2534
+  },
+  {
+    "key": "feature.adjust.eyeTilt",
+    "changed": 2218
+  },
+  {
+    "key": "feature.adjust.eyeCorner",
+    "changed": 1085
+  },
+  {
+    "key": "feature.adjust.eyelid",
+    "changed": 1136
+  },
+  {
+    "key": "feature.adjust.eyeInnerCorner",
+    "changed": 833
+  },
+  {
+    "key": "feature.adjust.eyeOuterCorner",
+    "changed": 828
+  },
+  {
+    "key": "feature.adjust.eyeBag",
+    "changed": 1325
+  },
+  {
+    "key": "feature.adjust.darkCircle",
+    "changed": 1512
+  },
+  {
+    "key": "feature.adjust.tearTrough",
+    "changed": 1283
+  },
+  {
+    "key": "feature.adjust.browLength",
+    "changed": 1730
+  },
+  {
+    "key": "feature.adjust.browWidth",
+    "changed": 1578
+  },
+  {
+    "key": "feature.adjust.browThickness",
+    "changed": 1186
+  },
+  {
+    "key": "feature.adjust.browPeak",
+    "changed": 1042
+  },
+  {
+    "key": "feature.adjust.browTail",
+    "changed": 828
+  },
+  {
+    "key": "feature.adjust.browColor",
+    "changed": 1384
+  },
+  {
+    "key": "feature.adjust.browSpacing",
+    "changed": 1825
+  },
+  {
+    "key": "feature.adjust.noseBridge",
+    "changed": 1194
+  },
+  {
+    "key": "feature.adjust.noseWings",
+    "changed": 879
+  },
+  {
+    "key": "feature.adjust.noseLength",
+    "changed": 1625
+  },
+  {
+    "key": "feature.adjust.noseTip",
+    "changed": 582
+  },
+  {
+    "key": "feature.adjust.noseHeight",
+    "changed": 1276
+  },
+  {
+    "key": "feature.adjust.noseStraight",
+    "changed": 1949
+  },
+  {
+    "key": "feature.adjust.nostril",
+    "changed": 289
+  },
+  {
+    "key": "feature.adjust.noseRoot",
+    "changed": 573
+  },
+  {
+    "key": "feature.adjust.noseBase",
+    "changed": 632
+  },
+  {
+    "key": "feature.adjust.noseLipAngle",
+    "changed": 1071
+  },
+  {
+    "key": "feature.adjust.mouthWidth",
+    "changed": 1824
+  },
+  {
+    "key": "feature.adjust.mouthHeight",
+    "changed": 1484
+  },
+  {
+    "key": "feature.adjust.upperLip",
+    "changed": 525
+  },
+  {
+    "key": "feature.adjust.lowerLip",
+    "changed": 514
+  },
+  {
+    "key": "feature.adjust.lipColor",
+    "changed": 1142
+  },
+  {
+    "key": "feature.adjust.philtrum",
+    "changed": 631
+  },
+  {
+    "key": "feature.adjust.teethWhiten",
+    "changed": 189
+  },
+  {
+    "key": "feature.adjust.lipPeak",
+    "changed": 399
+  },
+  {
+    "key": "feature.adjust.lipCorner",
+    "changed": 805
+  },
+  {
+    "key": "feature.adjust.lipBrightness",
+    "changed": 1217
+  },
+  {
+    "key": "feature.adjust.lipSaturation",
+    "changed": 1205
+  },
+  {
+    "key": "feature.adjust.symmetry",
+    "changed": 4065
+  },
+  {
+    "key": "skin.retouch.smooth",
+    "changed": 8682
+  },
+  {
+    "key": "skin.retouch.texture",
+    "changed": 5023
+  },
+  {
+    "key": "skin.retouch.whiten",
+    "changed": 17087
+  },
+  {
+    "key": "skin.retouch.warmth",
+    "changed": 16620
+  },
+  {
+    "key": "skin.retouch.redness",
+    "changed": 16661
+  },
+  {
+    "key": "body.adjust.neck",
+    "changed": 1142
+  },
+  {
+    "key": "body.adjust.shoulder",
+    "changed": 4514
+  },
+  {
+    "key": "body.adjust.waist",
+    "changed": 3879
+  },
+  {
+    "key": "body.adjust.belly",
+    "changed": 3658
+  },
+  {
+    "key": "body.adjust.arms",
+    "changed": 4535
+  },
+  {
+    "key": "body.adjust.neckLength",
+    "changed": 1336
+  },
+  {
+    "key": "body.adjust.trapezius",
+    "changed": 2237
+  },
+  {
+    "key": "body.adjust.shoulderLevel",
+    "changed": 4274
+  },
+  {
+    "key": "body.adjust.collarbone",
+    "changed": 1376
+  },
+  {
+    "key": "body.adjust.forearms",
+    "changed": 2784
+  },
+  {
+    "key": "body.adjust.legs",
+    "changed": 5065
+  },
+  {
+    "key": "body.adjust.hips",
+    "changed": 3900
+  },
+  {
+    "key": "body.adjust.height",
+    "changed": 13189
+  },
+  {
+    "key": "body.adjust.legLength",
+    "changed": 6876
+  },
+  {
+    "key": "body.adjust.thighs",
+    "changed": 3305
+  },
+  {
+    "key": "body.adjust.calves",
+    "changed": 2542
+  },
+  {
+    "key": "body.adjust.ankles",
+    "changed": 823
+  },
+  {
+    "key": "body.adjust.posture",
+    "changed": 13669
+  },
+  {
+    "key": "body.adjust.headRatio",
+    "changed": 1479
+  },
+  {
+    "key": "clothing.adjust.smooth",
+    "changed": 15442
+  },
+  {
+    "key": "clothing.adjust.texture",
+    "changed": 15108
+  },
+  {
+    "key": "clothing.adjust.hue",
+    "changed": 17281
+  },
+  {
+    "key": "clothing.adjust.saturation",
+    "changed": 17206
+  },
+  {
+    "key": "clothing.adjust.brightness",
+    "changed": 17328
+  },
+  {
+    "key": "clothing.adjust.fit",
+    "changed": 13955
+  },
+  {
+    "key": "clothing.adjust.edges",
+    "changed": 12887
+  },
+  {
+    "key": "clothing.adjust.sleeves",
+    "changed": 4019
+  },
+  {
+    "key": "clothing.adjust.skirt",
+    "changed": 6071
+  },
+  {
+    "key": "clothing.adjust.collar",
+    "changed": 2107
+  },
+  {
+    "key": "clothing.adjust.cuffs",
+    "changed": 1891
+  },
+  {
+    "key": "clothing.adjust.sleeveLength",
+    "changed": 5268
+  },
+  {
+    "key": "color.basic.exposure",
+    "changed": 27435
+  },
+  {
+    "key": "color.basic.brightness",
+    "changed": 27542
+  },
+  {
+    "key": "color.basic.contrast",
+    "changed": 27324
+  },
+  {
+    "key": "color.basic.highlights",
+    "changed": 27272
+  },
+  {
+    "key": "color.basic.shadows",
+    "changed": 27114
+  },
+  {
+    "key": "color.basic.whites",
+    "changed": 21257
+  },
+  {
+    "key": "color.basic.blacks",
+    "changed": 21199
+  },
+  {
+    "key": "color.basic.temperature",
+    "changed": 18361
+  },
+  {
+    "key": "color.basic.tint",
+    "changed": 27542
+  },
+  {
+    "key": "color.basic.saturation",
+    "changed": 27234
+  },
+  {
+    "key": "color.basic.vibrance",
+    "changed": 26968
+  },
+  {
+    "key": "color.basic.clarity",
+    "changed": 9057
+  },
+  {
+    "key": "color.basic.sharpness",
+    "changed": 9057
+  },
+  {
+    "key": "color.basic.texture",
+    "changed": 9057
+  },
+  {
+    "key": "color.basic.dehaze",
+    "changed": 27109
+  },
+  {
+    "key": "color.basic.noise",
+    "changed": 20100
+  },
+  {
+    "key": "color.basic.blackWhite",
+    "changed": 27508
+  },
+  {
+    "key": "color.basic.blackPoint",
+    "changed": 27435
+  },
+  {
+    "key": "color.basic.whitePoint",
+    "changed": 27435
+  },
+  {
+    "key": "color.basic.gamma",
+    "changed": 27330
+  },
+  {
+    "key": "filter.film.intensity",
+    "changed": 25517
+  },
+  {
+    "key": "filter.film.grain",
+    "changed": 26922
+  },
+  {
+    "key": "filter.film.vignette",
+    "changed": 27058
+  },
+  {
+    "key": "filter.film.glow",
+    "changed": 12974
+  },
+  {
+    "key": "filter.film.halation",
+    "changed": 7801
+  },
+  {
+    "key": "filter.film.fade",
+    "changed": 26971
+  }
+]

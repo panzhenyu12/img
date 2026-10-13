@@ -1,0 +1,10 @@
+server:
+  addr: ":8080"
+  data_dir: "/tmp/image-editor-api"
+  session_ttl: "24h"
+  max_upload_bytes: 104857600
+render:
+  # Empty auto-discovers core/image-core/target/release/image-render.
+  binary: ""
+  timeout: "2m"
+  concurrency: 2

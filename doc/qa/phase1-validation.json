@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-13",
+  "scope": "Algorithm-first Web demo: semantic portrait retouching and segmented body reshape",
+  "checks": {
+    "makeTest": "passed",
+    "rustTests": 72,
+    "goTest": "passed",
+    "goVet": "passed",
+    "webBuild": "passed",
+    "playwrightTests": 19,
+    "playwrightPassed": 19,
+    "registeredSliders": 116,
+    "slidersWithPixelChanges": 116,
+    "wasmNativePNGPixelMismatches": 0,
+    "exif6Dimensions": [
+      1024,
+      820
+    ],
+    "aiWithoutKeyStatus": 503,
+    "realAIModelValidated": false,
+    "playwrightStatus": "passed",
+    "clippy": "passed",
+    "makeE2E": "passed",
+    "playwrightDurationReported": "1.9m",
+    "segmentedBodyForegroundAndAlpha": "passed",
+    "crossedArmHandProtection": "passed",
+    "layerInputDetectionAfterCrop": "passed"
+  },
+  "limitations": [
+    "CPU WASM/native; no GPU or large-image performance acceptance",
+    "Pose person alpha is model segmentation, not precise matting or body-part parsing",
+    "Face contour still uses full-photo inverse sampling; independent foreground reshape not implemented for faces",
+    "No automatic skin/hair/clothing parsing; 2D feature symmetry is conservative",
+    "No generative object/person removal or complex background reconstruction",
+    "Changing upstream geometry/order requires renewed detection",
+    "Project JSON requires original image",
+    "Notion not synchronized: connector unavailable"
+  ],
+  "visualEvidence": [
+    "portrait-skin-comparison.png",
+    "portrait-face-comparison.png",
+    "portrait-body-comparison.png"
+  ],
+  "visualQualityAcceptance": "Single front-facing/crossed-arm portrait inspected; multi-pose, multi-skin-tone and full-body quality not yet accepted",
+  "status": "historical-superseded",
+  "supersededBy": "algorithm-validation.md",
+  "warning": "Old pixel-change-only results do not establish retouching quality. See current per-algorithm contracts and real-photo failures."
+}

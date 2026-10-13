@@ -1,0 +1,634 @@
+[
+  {
+    "id": "fashion-standing",
+    "source": {
+      "width": 540,
+      "height": 768
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "key": "waist",
+        "status": "UNVERIFIED-no-measured-shrink",
+        "metrics": {
+          "changedPixels": 16161,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": 182
+            },
+            {
+              "t": 0.5,
+              "width": 178
+            },
+            {
+              "t": 0.6,
+              "width": 178
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": 182
+            },
+            {
+              "t": 0.5,
+              "width": 180
+            },
+            {
+              "t": 0.6,
+              "width": 178
+            }
+          ]
+        },
+        "medianWidthDelta": 0
+      },
+      {
+        "part": "left-upper-arm",
+        "key": "arms",
+        "status": "UNVERIFIED-no-contour-measurement",
+        "metrics": {
+          "changedPixels": 6161,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ]
+        },
+        "medianWidthDelta": null
+      },
+      {
+        "part": "left-thigh",
+        "key": "thighs",
+        "status": "UNVERIFIED-no-contour-measurement",
+        "metrics": {
+          "changedPixels": 14565,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ]
+        },
+        "medianWidthDelta": null
+      },
+      {
+        "part": "right-upper-arm",
+        "key": "arms",
+        "status": "UNVERIFIED-no-contour-measurement",
+        "metrics": {
+          "changedPixels": 9888,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ]
+        },
+        "medianWidthDelta": null
+      },
+      {
+        "part": "right-thigh",
+        "key": "thighs",
+        "status": "UNVERIFIED-no-contour-measurement",
+        "metrics": {
+          "changedPixels": 12796,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ]
+        },
+        "medianWidthDelta": null
+      }
+    ],
+    "missing": [
+      "left-calf",
+      "right-calf"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-algorithms/fashion-standing"
+  },
+  {
+    "id": "fullbody-skirt",
+    "source": {
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "key": "waist",
+        "status": "UNVERIFIED-no-measured-shrink",
+        "metrics": {
+          "changedPixels": 2687,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": 147
+            },
+            {
+              "t": 0.5,
+              "width": 145
+            },
+            {
+              "t": 0.6,
+              "width": 145
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": 145
+            },
+            {
+              "t": 0.5,
+              "width": 146
+            },
+            {
+              "t": 0.6,
+              "width": 145
+            }
+          ]
+        },
+        "medianWidthDelta": 0
+      },
+      {
+        "part": "left-upper-arm",
+        "key": "arms",
+        "status": "UNVERIFIED-no-measured-shrink",
+        "metrics": {
+          "changedPixels": 1804,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": 133
+            },
+            {
+              "t": 0.5,
+              "width": 139
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": 133
+            },
+            {
+              "t": 0.5,
+              "width": 136
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ]
+        },
+        "medianWidthDelta": 0
+      },
+      {
+        "part": "right-upper-arm",
+        "key": "arms",
+        "status": "contour-resegmentation-shrank",
+        "metrics": {
+          "changedPixels": 2832,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": 134
+            },
+            {
+              "t": 0.5,
+              "width": 134
+            },
+            {
+              "t": 0.6,
+              "width": 139
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": 128
+            },
+            {
+              "t": 0.5,
+              "width": 131
+            },
+            {
+              "t": 0.6,
+              "width": 134
+            }
+          ]
+        },
+        "medianWidthDelta": -5
+      }
+    ],
+    "missing": [
+      "left-thigh",
+      "right-thigh",
+      "left-calf",
+      "right-calf"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-algorithms/fullbody-skirt"
+  },
+  {
+    "id": "fullbody-side-fashion",
+    "source": {
+      "width": 768,
+      "height": 512
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "key": "waist",
+        "status": "UNVERIFIED-no-measured-shrink",
+        "metrics": {
+          "changedPixels": 1823,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": 120
+            },
+            {
+              "t": 0.5,
+              "width": 123
+            },
+            {
+              "t": 0.6,
+              "width": 121
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": 121
+            },
+            {
+              "t": 0.5,
+              "width": 123
+            },
+            {
+              "t": 0.6,
+              "width": 118
+            }
+          ]
+        },
+        "medianWidthDelta": 0
+      },
+      {
+        "part": "right-upper-arm",
+        "key": "arms",
+        "status": "contour-resegmentation-shrank",
+        "metrics": {
+          "changedPixels": 5518,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": 110
+            },
+            {
+              "t": 0.5,
+              "width": 116
+            },
+            {
+              "t": 0.6,
+              "width": 119
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": 103
+            },
+            {
+              "t": 0.5,
+              "width": 107
+            },
+            {
+              "t": 0.6,
+              "width": 109
+            }
+          ]
+        },
+        "medianWidthDelta": -9
+      }
+    ],
+    "missing": [
+      "left-upper-arm",
+      "left-thigh",
+      "right-thigh",
+      "left-calf",
+      "right-calf"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-algorithms/fullbody-side-fashion"
+  },
+  {
+    "id": "tilted-shirt",
+    "source": {
+      "width": 512,
+      "height": 768
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "key": "waist",
+        "status": "contour-resegmentation-shrank",
+        "metrics": {
+          "changedPixels": 6943,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": 251
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": 247
+            }
+          ]
+        },
+        "medianWidthDelta": -4
+      },
+      {
+        "part": "left-upper-arm",
+        "key": "arms",
+        "status": "UNVERIFIED-no-contour-measurement",
+        "metrics": {
+          "changedPixels": 14270,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ]
+        },
+        "medianWidthDelta": null
+      }
+    ],
+    "missing": [
+      "right-upper-arm",
+      "left-thigh",
+      "right-thigh",
+      "left-calf",
+      "right-calf"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-algorithms/tilted-shirt"
+  },
+  {
+    "id": "action-suit",
+    "source": {
+      "width": 768,
+      "height": 608
+    },
+    "checks": [
+      {
+        "part": "waist",
+        "key": "waist",
+        "status": "UNVERIFIED-no-measured-shrink",
+        "metrics": {
+          "changedPixels": 7100,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": 254
+            },
+            {
+              "t": 0.5,
+              "width": 261
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": 257
+            },
+            {
+              "t": 0.5,
+              "width": 269
+            },
+            {
+              "t": 0.6,
+              "width": null
+            }
+          ]
+        },
+        "medianWidthDelta": 8
+      },
+      {
+        "part": "left-upper-arm",
+        "key": "arms",
+        "status": "contour-resegmentation-shrank",
+        "metrics": {
+          "changedPixels": 1796,
+          "changedOriginalBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0,
+          "originalWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": 58
+            }
+          ],
+          "outputWidths": [
+            {
+              "t": 0.4,
+              "width": null
+            },
+            {
+              "t": 0.5,
+              "width": null
+            },
+            {
+              "t": 0.6,
+              "width": 55
+            }
+          ]
+        },
+        "medianWidthDelta": -3
+      },
+      {
+        "part": "right-upper-arm",
+        "key": "arms",
+        "status": "FAIL-render",
+        "error": "Error: body contour reconstruction requires unprotected background next to the revealed silhouette"
+      }
+    ],
+    "missing": [
+      "left-thigh",
+      "right-thigh",
+      "left-calf",
+      "right-calf"
+    ],
+    "artifactDirectory": "/Users/modao/work/img/test/results/body-algorithms/action-suit"
+  }
+]

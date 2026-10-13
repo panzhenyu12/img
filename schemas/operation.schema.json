@@ -1,0 +1,645 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://img.local/schemas/operation.schema.json",
+  "title": "Image editing operation",
+  "description": "Non-destructive operation shared by Web, Go API and render workers.",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "version",
+    "enabled",
+    "params"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "identity",
+        "crop",
+        "rotate",
+        "flip",
+        "perspective",
+        "warp.grid",
+        "warp.liquify",
+        "face.adjust",
+        "feature.adjust",
+        "skin.retouch",
+        "body.adjust",
+        "clothing.adjust",
+        "repair.clone",
+        "repair.heal",
+        "repair.inpaint",
+        "paint.brush",
+        "color.basic",
+        "color.curves",
+        "color.hsl",
+        "filter.film",
+        "filter.lut",
+        "resize"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "origin": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "ai",
+        "imported"
+      ]
+    },
+    "label": {
+      "type": "string"
+    },
+    "explanation": {
+      "type": "string"
+    },
+    "provenance": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "user",
+            "ai",
+            "system"
+          ]
+        },
+        "actorId": {
+          "type": "string"
+        },
+        "toolName": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "maskId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "targetId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "region": {
+          "$ref": "mask.schema.json#/$defs/region"
+        },
+        "mask": {
+          "$ref": "mask.schema.json"
+        },
+        "protectMask": {
+          "$ref": "mask.schema.json"
+        },
+        "landmarks": {
+          "type": "array",
+          "maxItems": 128,
+          "description": "Optional normalized source/destination landmark pairs for local RBF warps",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "toX": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "toY": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "weight": {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 10,
+                "default": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "bodyPart": {
+          "type": "string",
+          "enum": [
+            "full-body",
+            "torso",
+            "waist",
+            "hips",
+            "left-upper-arm",
+            "right-upper-arm",
+            "left-forearm",
+            "right-forearm",
+            "left-thigh",
+            "right-thigh",
+            "left-calf",
+            "right-calf"
+          ]
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "blendMode": {
+          "enum": [
+            "normal",
+            "multiply",
+            "screen",
+            "overlay",
+            "soft-light",
+            "darken",
+            "lighten"
+          ]
+        },
+        "semanticMasks": {
+          "type": "object",
+          "maxProperties": 28,
+          "properties": {
+            "face": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceOutline": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skin": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "skinProtection": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "eyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "brows": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightBrow": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "underEyes": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightUnderEye": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lips": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "lip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "teeth": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "hair": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "nose": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBridge": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseWings": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseTip": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseRoot": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "noseBase": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "leftNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "rightNostril": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContour": {
+              "oneOf": [
+                {
+                  "$ref": "mask.schema.json"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "mask.schema.json#/$defs/point"
+                  }
+                }
+              ]
+            },
+            "faceContourMask": {
+              "$ref": "mask.schema.json"
+            },
+            "neck": {
+              "$ref": "mask.schema.json"
+            }
+          },
+          "additionalProperties": false
+        },
+        "subjectMask": {
+          "$ref": "mask.schema.json",
+          "description": "Person foreground alpha. Required for segmented body contour edits; face contour edits use it to exclude all person pixels from background donors."
+        }
+      },
+      "additionalProperties": true
+    },
+    "controlPoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "inX": {
+            "type": "number"
+          },
+          "inY": {
+            "type": "number"
+          },
+          "outX": {
+            "type": "number"
+          },
+          "outY": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "engineVersion": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

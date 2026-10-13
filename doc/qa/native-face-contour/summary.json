@@ -1,0 +1,104 @@
+[
+  {
+    "id": "fixture-portrait",
+    "width": 820,
+    "height": 1024,
+    "contourPoints": 180,
+    "headPoints": 204,
+    "changed": 14920,
+    "crop": {
+      "x": 230.36650562286377,
+      "y": 25.529076099395752,
+      "w": 345.05131316185,
+      "h": 398.90360164642334
+    },
+    "visualReview": "真实脸颊/下颌内收，中央五官稳定；耳缘有局部位移和细边缘不平滑，未通过综合自然度验收。",
+    "acceptance": "contour-change-observed-naturalness-not-accepted"
+  },
+  {
+    "id": "portrait-woman",
+    "width": 683,
+    "height": 1024,
+    "contourPoints": 78,
+    "headPoints": 189,
+    "changed": 41039,
+    "crop": {
+      "x": 108.24379441738128,
+      "y": 221.56264386177062,
+      "w": 416.98392598628993,
+      "h": 463.6208365440368
+    },
+    "visualReview": "长发内侧皮肤脸缘确实内收，原无clean donors错误已修复；脸旁发丝和耳朵局部跟随，未通过综合自然度验收。",
+    "acceptance": "contour-change-observed-naturalness-not-accepted"
+  },
+  {
+    "id": "portrait-makeup",
+    "width": 1024,
+    "height": 902,
+    "contourPoints": 63,
+    "headPoints": 151,
+    "changed": 58100,
+    "crop": {
+      "x": 211.83597412109373,
+      "y": 62.86097967028617,
+      "w": 561.3817016601563,
+      "h": 619.4722359001637
+    },
+    "visualReview": "双侧皮肤脸缘内收，旧黄色下颌边带已消除；耳饰和鬓发跟随，尚需配饰独立保护。",
+    "acceptance": "contour-change-observed-naturalness-not-accepted"
+  },
+  {
+    "id": "portrait-dark",
+    "width": 683,
+    "height": 1024,
+    "contourPoints": 86,
+    "headPoints": 110,
+    "changed": 21705,
+    "crop": {
+      "x": 150.12661296129227,
+      "y": 267.7720373868942,
+      "w": 412.7611375451088,
+      "h": 460.7392199039459
+    },
+    "visualReview": "深肤色脸颊/下颌内收，旧白色背景脖子边带已消除；真实颈部颜色参与补偿，细缝和纹理自然度继续保留未验收。",
+    "acceptance": "contour-change-observed-naturalness-not-accepted"
+  },
+  {
+    "id": "portrait-roll",
+    "width": 1024,
+    "height": 961,
+    "contourPoints": 107,
+    "headPoints": 230,
+    "changed": 35941,
+    "crop": {
+      "x": 286.2651062011719,
+      "y": 150.0590989291668,
+      "w": 480.1588439941406,
+      "h": 514.3027780354023
+    },
+    "visualReview": "滚转18度的皮肤脸缘沿面部坐标系内收，旧黄色下颌边带已消除；发丝/耳饰也跟随。",
+    "acceptance": "contour-change-observed-naturalness-not-accepted"
+  },
+  {
+    "id": "profile-hoodie",
+    "error": "Error: page.evaluate: Error: No face detected\n    at eval (eval at evaluate (:370:30), <anonymous>:6:22)\n    at async <anonymous>:396:30",
+    "visualReview": "MediaPipe在此1024px侧脸样本未检出；无输出，检测失败。",
+    "acceptance": "detection-failed"
+  },
+  {
+    "id": "portrait-hair",
+    "width": 784,
+    "height": 1024,
+    "contourPoints": 83,
+    "headPoints": 109,
+    "changed": 26117,
+    "crop": {
+      "x": 185.27477321624755,
+      "y": 169.36599311828613,
+      "w": 417.4597509384155,
+      "h": 479.75037460327144
+    },
+    "visualReview": "发丝交叠下皮肤脸缘内收，外侧发型大部分目视稳定；靠脸发丝仍采样变形，局部下颌边界较硬。",
+    "acceptance": "contour-change-observed-naturalness-not-accepted"
+  }
+]
