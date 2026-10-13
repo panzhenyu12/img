@@ -42,3 +42,5 @@
 | 光影、曲线、HSL、LUT、胶片各项 | 已有独立算子、真实色彩方向和确定性测试 | 未逐功能达到 8 分；胶片尚无相机/胶片响应标定 |
 
 统一测试报告与真实样片报告是证据来源；本表保留“未达 8 分”直到逐功能获得足够对照。最新验证数量及限制记录在 [current-validation](current-validation.md)。
+
+当前主观评分见 [current-self-assessment](current-self-assessment.md)。视觉暂评、Demo正确性暂评与完整四维验收分别标记；代表项不能替代全部子参数，也不改变本页未达标状态。

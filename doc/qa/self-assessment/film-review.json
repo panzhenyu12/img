@@ -1,0 +1,82 @@
+[
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "neutral",
+    "nativeTotalMs": 148.87
+  },
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "warm",
+    "nativeTotalMs": 218.65
+  },
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "cool",
+    "nativeTotalMs": 119.0
+  },
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "classic",
+    "nativeTotalMs": 93.87
+  },
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "fade",
+    "nativeTotalMs": 122.08
+  },
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "vivid",
+    "nativeTotalMs": 90.04
+  },
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "mono",
+    "nativeTotalMs": 82.0
+  },
+  {
+    "source": "doc/qa/background-lama/street-source.png",
+    "preset": "cinema",
+    "nativeTotalMs": 76.48
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "neutral",
+    "nativeTotalMs": 252.47
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "warm",
+    "nativeTotalMs": 171.51
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "cool",
+    "nativeTotalMs": 164.12
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "classic",
+    "nativeTotalMs": 153.29
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "fade",
+    "nativeTotalMs": 176.05
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "vivid",
+    "nativeTotalMs": 181.59
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "mono",
+    "nativeTotalMs": 209.24
+  },
+  {
+    "source": "test/images/cityscape.jpg",
+    "preset": "cinema",
+    "nativeTotalMs": 190.28
+  }
+]
