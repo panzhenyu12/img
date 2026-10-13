@@ -4,11 +4,12 @@ API_DIR := services/api
 WEB_DIR := apps/web
 API_ADDR ?= http://127.0.0.1:8080
 WEB_ADDR ?= http://127.0.0.1:5173
+QUALITY_PYTHON ?= services/background-worker/.venv/bin/python
 
 .PHONY: help setup dev api web agent web-install native wasm api-build build test check fmt \
 	rust-test api-test web-build e2e health stop clean models quality quality-face quality-body quality-clothing lint
 
-.PHONY: background-setup background-models background background-test client-models quality-skin
+.PHONY: background-setup background-models background background-test client-models quality-skin quality-film body-setup body-models
 
 help:
 	@echo "make dev          启动 Go API 和 Vite Web 开发服务器"
@@ -18,9 +19,11 @@ help:
 	@echo "make test         运行 Rust、Go 和 Web 检查"
 	@echo "make e2e          验证 WASM 预览、画笔、历史和 native 导出"
 	@echo "make quality      在真实人像/身形/衣物照片上生成对比和失败报告"
+	@echo "make quality-film 在六张照片上回放胶片响应，保留哈希和首次/热运行时间"
 	@echo "make background   启动可选 LaMa 本地去人模型 (8091)"
 	@echo "make background-models 安装可选模型环境并下载校验权重"
 	@echo "make client-models 下载校验浏览器去人 ONNX 模型"
+	@echo "make body-models  导出并校验可选人体像素分区模型"
 	@echo "make agent        启动可选 DeepAgent (8090)"
 	@echo "make check        运行测试、vet 和生产构建"
 	@echo "make health       检查本地 Go API"
@@ -55,6 +58,13 @@ background-models: background-setup
 client-models:
 	python3 scripts/setup_client_inpaint.py
 
+body-setup:
+	@test -x .models/body-parser/.venv/bin/python || uv venv --python 3.11 .models/body-parser/.venv
+	uv pip install --python .models/body-parser/.venv/bin/python -r scripts/body_parser_requirements.txt
+
+body-models: body-setup
+	.models/body-parser/.venv/bin/python scripts/export_body_parser.py
+
 background:
 	cd services/background-worker && .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8091
 
@@ -63,6 +73,11 @@ background-test:
 
 quality-skin:
 	node scripts/check_portrait_quality.mjs --features
+
+# Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
+quality-film: native
+	cargo build --release --manifest-path core/image-core/Cargo.toml --example graph_quality_bench
+	$(QUALITY_PYTHON) scripts/review_film_response.py --out test/results/film-response-current
 
 native:
 	cargo build --release --manifest-path core/image-core/Cargo.toml --bin image-render

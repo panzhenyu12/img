@@ -195,7 +195,15 @@ enum PreparedShape {
         height: usize,
         data: Vec<f32>,
     },
-    Other,
+    Inline(InlineShape, Region),
+}
+
+enum InlineShape {
+    Rect,
+    Ellipse,
+    Brush,
+    Radial,
+    Linear { ax: f32, ay: f32, bx: f32, by: f32 },
 }
 
 /// Compile JSON geometry once per pass. Polygon bounds avoid walking facial
@@ -267,7 +275,30 @@ impl<'a> PreparedMask<'a> {
                     data,
                 }
             }
-            _ => PreparedShape::Other,
+            shape => {
+                let region = Region::read(value.get("region").or(Some(&value)));
+                let inline = match shape {
+                    Some("ellipse") => InlineShape::Ellipse,
+                    Some("brush") => InlineShape::Brush,
+                    Some("radial") => InlineShape::Radial,
+                    Some("linear") => {
+                        let from = value.get("from");
+                        let to = value.get("to");
+                        InlineShape::Linear {
+                            ax: from.map(|p| number(p, "x", region.x)).unwrap_or(region.x),
+                            ay: from.map(|p| number(p, "y", region.y)).unwrap_or(region.y),
+                            bx: to
+                                .map(|p| number(p, "x", region.x + region.width))
+                                .unwrap_or(region.x + region.width),
+                            by: to
+                                .map(|p| number(p, "y", region.y + region.height))
+                                .unwrap_or(region.y + region.height),
+                        }
+                    }
+                    _ => InlineShape::Rect,
+                };
+                PreparedShape::Inline(inline, region)
+            }
         };
         let invert = value
             .get("invert")
@@ -287,7 +318,48 @@ impl<'a> PreparedMask<'a> {
     }
     pub fn coverage(&self, x: f32, y: f32, width: u32, height: u32) -> f32 {
         let value = match &self.shape {
-            PreparedShape::Other => return coverage(&self.value, x, y, width, height),
+            PreparedShape::Inline(shape, region) => match shape {
+                InlineShape::Brush => 0.0,
+                InlineShape::Linear { ax, ay, bx, by } => {
+                    let dx = bx - ax;
+                    let dy = by - ay;
+                    smooth_step(
+                        0.0,
+                        1.0,
+                        ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy).max(1e-8),
+                    )
+                }
+                InlineShape::Radial | InlineShape::Ellipse => {
+                    let nx = (x - region.x - region.width * 0.5) / (region.width * 0.5);
+                    let ny = (y - region.y - region.height * 0.5) / (region.height * 0.5);
+                    let distance = (nx * nx + ny * ny).sqrt();
+                    if matches!(shape, InlineShape::Radial) {
+                        1.0 - smooth_step(0.0, 1.0, distance)
+                    } else {
+                        let signed = (1.0 - distance) * region.width.min(region.height) * 0.5;
+                        if self.feather > 0.0 {
+                            smooth_step(-self.feather * 0.5, self.feather * 0.5, signed)
+                        } else if signed >= 0.0 {
+                            1.0
+                        } else {
+                            0.0
+                        }
+                    }
+                }
+                InlineShape::Rect => {
+                    let signed = (x - region.x)
+                        .min(region.x + region.width - x)
+                        .min(y - region.y)
+                        .min(region.y + region.height - y);
+                    if self.feather > 0.0 {
+                        smooth_step(-self.feather * 0.5, self.feather * 0.5, signed)
+                    } else if signed >= 0.0 {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+            },
             PreparedShape::Polygon { points, bounds } => {
                 if points.len() < 3
                     || x < bounds.0 - self.feather * 0.5
@@ -427,8 +499,19 @@ pub(crate) fn composite(base: &RgbaImage, edit: &RgbaImage, params: &Value) -> R
         .map(PreparedMask::new);
     for y in 0..base.height {
         for x in 0..base.width {
+            let index = (y as usize * base.width as usize + x as usize) * 4;
+            // Local edits leave most pixels unchanged. Normal blending of
+            // identical bytes is exact for any selection, opacity and alpha;
+            // other blend modes still need their own color calculation.
+            if mode == "normal" && base.pixels[index..index + 4] == edit.pixels[index..index + 4] {
+                continue;
+            }
             let nx = (x as f32 + 0.5) / base.width as f32;
             let ny = (y as f32 + 0.5) / base.height as f32;
+            if !region.contains(nx, ny) || opacity < 1e-8 {
+                output.pixels[index..index + 4].copy_from_slice(&base.pixels[index..index + 4]);
+                continue;
+            }
             let mut weight = if region.contains(nx, ny) {
                 opacity
             } else {
@@ -440,7 +523,6 @@ pub(crate) fn composite(base: &RgbaImage, edit: &RgbaImage, params: &Value) -> R
             if let Some(protection) = &protection {
                 weight *= 1.0 - protection.coverage(nx, ny, base.width, base.height);
             }
-            let index = (y as usize * base.width as usize + x as usize) * 4;
             if weight < 1e-8 {
                 output.pixels[index..index + 4].copy_from_slice(&base.pixels[index..index + 4]);
                 continue;
@@ -476,6 +558,13 @@ mod tests {
             json!({"shape":"polygon","points":[{"x":0.1,"y":0.1},{"x":0.9,"y":0.1},{"x":0.6,"y":0.4},{"x":0.9,"y":0.9},{"x":0.1,"y":0.9}],"feather":7,"invert":true,"strokes":[{"x":0.03,"y":0.6,"radius":0.1,"strength":63},{"x":0.5,"y":0.4,"radius":0.2,"erase":true}]}),
             json!({"shape":"raster","width":3,"height":2,"data":[255,0,128,53,190,0],"invert":true,"strokes":[{"x":0.3,"y":0.6,"radius":0.2,"strength":45}]}),
             json!({"shape":"ellipse","region":{"x":0.1,"y":0.2,"width":0.7,"height":0.5},"feather":12}),
+            json!({"region":{"x":0.1,"y":0.2,"width":0.7,"height":0.5},"invert":true,"feather":23}),
+            json!({"kind":"rect","x":0.1,"y":0.2,"width":0.0,"height":0.0}),
+            json!({"shape":"radial","region":{"x":0.1,"y":0.2,"width":0.7,"height":0.5},"strokes":[{"x":0.5,"y":0.5,"radius":0.2,"erase":true}]}),
+            json!({"shape":"linear","from":{"x":0.2,"y":0.3},"to":{"x":0.8,"y":0.7},"invert":true}),
+            json!({"shape":"linear","region":{"x":0.1,"y":0.2,"width":0.7,"height":0.5},"from":{"x":0.4},"to":{"x":0.4,"y":0.2}}),
+            json!({"shape":"brush","feather":10,"strokes":[{"x":0.5,"y":0.5,"radius":0.2,"strength":60}]}),
+            json!({"shape":"unknown-defaults-to-rect","feather":15}),
         ];
         for mask in masks {
             let compiled = PreparedMask::new(&mask);
@@ -504,6 +593,39 @@ mod tests {
                 );
             }
         }
+    }
+    #[test]
+    fn unchanged_pixels_remain_exact_only_for_normal_blending() {
+        let source = RgbaImage::new(
+            4,
+            1,
+            vec![
+                17, 64, 170, 0, 99, 123, 210, 73, 35, 90, 201, 255, 255, 128, 0, 255,
+            ],
+        )
+        .unwrap();
+        for opacity in [0, 17, 100] {
+            let p = json!({"opacity":opacity,"mask":{"shape":"linear","from":{"x":0.1,"y":0},"to":{"x":0.9,"y":1}}});
+            assert_eq!(composite(&source, &source, &p), source);
+        }
+        let output = composite(
+            &source,
+            &source,
+            &json!({"blendMode":"multiply","opacity":100}),
+        );
+        assert_eq!(output.pixels[7], 73);
+        assert_eq!(output.pixels[8], byte(35.0 * 35.0 / 255.0));
+        assert_ne!(output, source);
+        let changed = RgbaImage::new(4, 1, [220, 50, 40, 255].repeat(4)).unwrap();
+        assert_eq!(composite(&source, &changed, &json!({"opacity":0})), source);
+        assert_eq!(
+            composite(
+                &source,
+                &changed,
+                &json!({"region":{"x":0,"y":0.6,"width":1,"height":0.4}})
+            ),
+            source
+        );
     }
     #[test]
     fn raster_alpha_preserves_holes_and_interpolates_at_pixel_centers() {

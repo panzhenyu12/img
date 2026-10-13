@@ -7,6 +7,7 @@ export interface RenderOptions { signal?: AbortSignal; kind?: RenderKind }
 interface RenderTask {
   id: number; kind: RenderKind; source: ImagePixels; graphJson: string;
   modelGraph: boolean;
+  bodySliderKey?: string;
   resolve: (image: ImagePixels) => void; reject: (error: Error) => void;
   signal?: AbortSignal; onAbort?: () => void; settled: boolean;
 }
@@ -98,11 +99,13 @@ function cancel(task: RenderTask, sourceChanged = false) {
   if (task === active) {
     if (task.kind === 'preview') {
       if (!wasSettled) cancelledPreviews++;
+      const nextBodySlider = latestPreview?.bodySliderKey;
+      const reuseBodyLayers = !sourceChanged && task.bodySliderKey !== undefined && (latestPreview === null || task.bodySliderKey === nextBodySlider);
       // Model sessions and successful candidates live inside this Worker.
       // Keep the current model render running while sliders replace its
       // caller, then dispatch the latest preview with the reusable candidate.
       // A new photograph must not wait behind the old model calculation.
-      if (!task.modelGraph || sourceChanged) {
+      if ((!task.modelGraph && !reuseBodyLayers) || sourceChanged) {
         // Synchronous Rust work can only be interrupted by termination.
         terminateWorker(); active = null; pump();
       }
@@ -126,7 +129,15 @@ export function renderImage(source: ImagePixels, graph: EditGraph, options: Rend
   catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); }
   return new Promise((resolve, reject) => {
     const modelGraph = graph.operations.some(op => op.type === 'repair.inpaint' && op.params.method === 'lama' && op.enabled !== false && Number(op.params.opacity ?? 100) > 0);
-    const task: RenderTask = { id: ++requestId, kind: options.kind ?? 'preview', source, graphJson, modelGraph, resolve, reject, signal: options.signal, settled: false };
+    // Consecutive values on the final body slider share the exact upstream
+    // image and segmentation. Let an already running frame populate Rust's
+    // bounded F/B cache; its rejected caller cannot display a stale result.
+    // Different images, masks or upstream edits still terminate old CPU work.
+    const last = graph.operations.at(-1);
+    const bodySliderKey = !modelGraph && last?.type === 'body.adjust' && last.enabled !== false
+      ? JSON.stringify({...graph,source:undefined,operations:[...graph.operations.slice(0,-1),{...last,params:{...last.params,adjustments:undefined}}]})
+      : undefined;
+    const task: RenderTask = { id: ++requestId, kind: options.kind ?? 'preview', source, graphJson, modelGraph, bodySliderKey, resolve, reject, signal: options.signal, settled: false };
     if (task.signal) { task.onAbort = () => cancel(task); task.signal.addEventListener('abort', task.onAbort, { once: true }); }
     if (task.kind === 'preview') {
       if (latestPreview) rejectTask(latestPreview, abortError('预览已被更新参数替代'));

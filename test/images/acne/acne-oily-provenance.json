@@ -1,0 +1,94 @@
+{
+  "title": "File:Acne vulgaris on a very oily skin.jpg",
+  "commons_page": "https://commons.wikimedia.org/wiki/File:Acne_vulgaris_on_a_very_oily_skin.jpg",
+  "original_url": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Acne_vulgaris_on_a_very_oily_skin.jpg",
+  "sha256": "6190c4f206a01862544816feef23d284ad87fbd4802d3a1042c79e686a02c3fb",
+  "original_size": [
+    2576,
+    1932
+  ],
+  "test_size": [
+    1024,
+    768
+  ],
+  "metadata": {
+    "DateTime": {
+      "value": "2016-03-29 03:24:13",
+      "source": "mediawiki-metadata",
+      "hidden": ""
+    },
+    "ObjectName": {
+      "value": "Acne vulgaris on a very oily skin",
+      "source": "mediawiki-metadata"
+    },
+    "CommonsMetadataExtension": {
+      "value": 1.2,
+      "source": "extension",
+      "hidden": ""
+    },
+    "Categories": {
+      "value": "Teenagers|Foreheads|Self-published work|Photographs by Roshu Bangal|Acne vulgaris|Males with acne",
+      "source": "commons-categories",
+      "hidden": ""
+    },
+    "Assessments": {
+      "value": "",
+      "source": "commons-categories",
+      "hidden": ""
+    },
+    "ImageDescription": {
+      "value": "Image of an 18 year old male with moderate acne vulgaris (white heads). His face appears to be very oily as well.",
+      "source": "commons-desc-page"
+    },
+    "DateTimeOriginal": {
+      "value": "2015-05-30 20:49:59",
+      "source": "commons-desc-page"
+    },
+    "Credit": {
+      "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+      "source": "commons-desc-page"
+    },
+    "Artist": {
+      "value": "<a href=\"//commons.wikimedia.org/wiki/User:Roshu_Bangal\" title=\"User:Roshu Bangal\">Roshu Bangal</a>",
+      "source": "commons-desc-page"
+    },
+    "Permission": {
+      "value": "<table style=\"margin: 1.5em auto; width:100%; background-color:lightblue; border:4px solid #000000; padding:1px;\" cellspacing=\"10\">\n\n<tbody><tr>\n<td align=\"center\"><span typeof=\"mw:File\"><a href=\"//commons.wikimedia.org/wiki/File:Start_hand.svg\" class=\"mw-file-description\"><img src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4e/Start_hand.svg/40px-Start_hand.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"35\" height=\"35\" class=\"mw-file-element\" srcset=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4e/Start_hand.svg/120px-Start_hand.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail 2x\" data-file-width=\"64\" data-file-height=\"64\"></a></span>\n</td>\n<td><a href=\"https://upload.wikimedia.org/wikipedia/commons/f/f0/Acne_vulgaris_on_a_very_oily_skin.jpg?utm_source=commons.wikimedia.org&amp;utm_campaign=index&amp;utm_content=original\" class=\"internal\" title=\"Acne vulgaris on a very oily skin.jpg\"><b>This work</b></a> was made by <b><a href=\"//commons.wikimedia.org/wiki/User:Roshu_Bangal\" title=\"User:Roshu Bangal\">Roshu Bangal</a></b> and released under the license(s) stated below. Please feel free to use it for any purpose as long as you credit <b>Roshu Bangal</b> as author and follow the terms of the chosen license. If you use this work <b>outside</b> of the Wikimedia projects, I would very much like to get <b><a class=\"external text\" href=\"https://commons.wikimedia.org/w/index.php?title=User_talk:Roshu_Bangal&amp;action=edit&amp;section=new\">a note</a></b> from you. Thanks!\n</td></tr></tbody></table>",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "LicenseShortName": {
+      "value": "CC BY-SA 4.0",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "UsageTerms": {
+      "value": "Creative Commons Attribution-Share Alike 4.0",
+      "source": "commons-desc-page"
+    },
+    "AttributionRequired": {
+      "value": "true",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "LicenseUrl": {
+      "value": "https://creativecommons.org/licenses/by-sa/4.0",
+      "source": "commons-desc-page"
+    },
+    "Copyrighted": {
+      "value": "True",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "Restrictions": {
+      "value": "",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "License": {
+      "value": "cc-by-sa-4.0",
+      "source": "commons-templates",
+      "hidden": ""
+    }
+  }
+}

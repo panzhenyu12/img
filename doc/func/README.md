@@ -54,6 +54,8 @@ FUNC-编号-功能短名.md
 - [FUNC-014 背景多余人物与杂物去除](FUNC-014-background-person-removal.md)
 - [FUNC-015 皮肤、肤色与妆容（48项肤质/肤色检查，强磨皮自然度失败）](FUNC-015-skin-and-makeup-quality.md)
 - [FUNC-016 客户端与本地服务端 LaMa 填补](FUNC-016-local-model-inpaint.md)
+- [FUNC-017 蒙版效率与身体滑杆缓存](FUNC-017-render-efficiency-and-cache.md)
+- [FUNC-018 手动瑕疵修复与光照匹配（小范围约7.8）](FUNC-018-manual-heal-quality.md)
 - [人像与衣物修图算法调研](../research/portrait-retouching-algorithms.md)
 - [一期验收证据](../qa/phase1-validation.md)
 - [当前工程验证与已知失败](../qa/current-validation.md)

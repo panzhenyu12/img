@@ -51,6 +51,12 @@ export const FILM_PRESETS = [
   { id: 'vivid', name: '鲜艳风景', category: '风景', description: '鲜艳通透色彩' },
   { id: 'mono', name: '银盐黑白', category: '黑白', description: '黑白高反差' },
   { id: 'cinema', name: '青橙电影', category: '电影', description: '阴影青调、高光暖调' },
+  { id: 'provia', name: 'Provia 标准', category: '富士风格', description: '自然反差、干净肤色和细腻高光' },
+  { id: 'astia', name: 'Astia 柔和', category: '富士风格', description: '柔和反差、轻微暖高光，适合人像' },
+  { id: 'velvia', name: 'Velvia 鲜艳', category: '富士风格', description: '高饱和风景色彩，保留亮部层次' },
+  { id: 'classicNegative', name: 'Classic Negative', category: '富士风格', description: '低饱和复古色，青冷阴影和暖高光' },
+  { id: 'eterna', name: 'Eterna 电影', category: '富士风格', description: '低反差电影色，压住高光不过曝' },
+  { id: 'acros', name: 'Acros 黑白', category: '黑白', description: '线性光银盐响应，灰阶和高光更平顺' },
 ];
 export const TOOL_BY_ID = Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])) as Record<ToolId, ToolDefinition>;
 export interface PortraitCapabilities {

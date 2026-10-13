@@ -1,0 +1,132 @@
+--- a/core/image-core/src/face.rs
++++ b/core/image-core/src/face.rs
+@@ -400,6 +400,121 @@
+     .flatten()
+ }
+
++/// Experimental hidden-layer composition. The integer donor partition is
++/// only an initial guess for three harmonic coverage fields. Each material
++/// extends its own premultiplied RGB/alpha independently; observed external
++/// material labels are fixed Dirichlet data. Only actual exposed holes commit.
++fn composite_harmonic_underlayers(
++    source: &RgbaImage,
++    target: &[bool],
++    protected: &[bool],
++    known_layer: &[u8],
++    initial_layer: &[u8],
++    holes: &[bool],
++    result: &mut RgbaImage,
++) {
++    let w=source.width as usize;
++    let h=source.height as usize;
++    let n=w*h;
++    let active: Vec<usize> = (0..n).filter(|&i|target[i] && !protected[i]).collect();
++    if active.is_empty() { return; }
++    let mut weights=vec![[0.0_f32;3];n];
++    for i in 0..n {
++        if !protected[i] {
++            weights[i][if target[i] {initial_layer[i]} else {known_layer[i]} as usize]=1.0;
++        }
++    }
++    for _ in 0..128 {
++        let mut residual=0.0_f32;
++        for parity in 0..2 {
++            for &i in &active {
++                if ((i%w+i/w)&1)!=parity {continue;}
++                let mut value=[0.0;3];
++                let mut count=0;
++                for j in neighbors(i,w,h).filter(|&j|!protected[j]) {
++                    for l in 0..3 {value[l]+=weights[j][l];}
++                    count+=1;
++                }
++                if count==0 {continue;}
++                for l in 0..3 {
++                    value[l]/=count as f32;
++                    residual=residual.max((weights[i][l]-value[l]).abs());
++                }
++                weights[i]=value;
++            }
++        }
++        if residual<0.0005 {break;}
++    }
++    let mut mixed=vec![[0.0_f32;4];n];
++    let mut support=vec![0.0_f32;n];
++    for l in 0..3_u8 {
++        let mut known: Vec<bool> = (0..n)
++            .map(|i|!target[i] && !protected[i] && known_layer[i]==l).collect();
++        let mut colors=vec![[0.0_f32;4];n];
++        let mut queue=VecDeque::new();
++        for i in 0..n {
++            if !known[i] {continue;}
++            let a=source.pixels[i*4+3] as f32/255.0;
++            for c in 0..3 {colors[i][c]=source.pixels[i*4+c] as f32*a;}
++            colors[i][3]=a;
++            if neighbors(i,w,h).any(|j|target[j]) {queue.push_back(i);}
++        }
++        while let Some(i)=queue.pop_front() {
++            for j in neighbors(i,w,h) {
++                if !target[j] || protected[j] || known[j] {continue;}
++                let mut value=[0.0;4];
++                let mut count=0;
++                for k in neighbors(j,w,h).filter(|&k|known[k] && !protected[k]) {
++                    for c in 0..4 {value[c]+=colors[k][c];}
++                    count+=1;
++                }
++                if count==0 {continue;}
++                for c in 0..4 {value[c]/=count as f32;}
++                colors[j]=value;
++                known[j]=true;
++                queue.push_back(j);
++            }
++        }
++        for _ in 0..128 {
++            let mut residual=0.0_f32;
++            for parity in 0..2 {
++                for &i in &active {
++                    if !known[i] || ((i%w+i/w)&1)!=parity {continue;}
++                    let mut value=[0.0;4];
++                    let mut count=0;
++                    for j in neighbors(i,w,h).filter(|&j|known[j] && !protected[j]) {
++                        for c in 0..4 {value[c]+=colors[j][c];}
++                        count+=1;
++                    }
++                    if count==0 {continue;}
++                    for c in 0..4 {
++                        value[c]/=count as f32;
++                        residual=residual.max((colors[i][c]-value[c]).abs());
++                    }
++                    colors[i]=value;
++                }
++            }
++            if residual<0.05 {break;}
++        }
++        for &i in &active {
++            if !holes[i] || !known[i] {continue;}
++            let weight=weights[i][l as usize].clamp(0.0,1.0);
++            for c in 0..4 {mixed[i][c]+=colors[i][c]*weight;}
++            support[i]+=weight;
++        }
++    }
++    for &i in &active {
++        if !holes[i] || support[i]<=1e-6 {continue;}
++        let alpha=mixed[i][3]/support[i];
++        for c in 0..3 {
++            result.pixels[i*4+c]=if mixed[i][3]>1e-6 {
++                byte(mixed[i][c]/mixed[i][3])
++            } else {0};
++        }
++        result.pixels[i*4+3]=byte(alpha*255.0);
++    }
++}
++
+ /// Propagate only clean exterior donors into the newly exposed band. The
+ /// surviving original foreground and frozen pixels are never donors. This
+ /// deterministic local fill cannot reconstruct complex hidden scene content.
+@@ -577,6 +692,8 @@
+         }
+         result.pixels[i * 4 + 3] = byte(colors[i][3]);
+     }
++    composite_harmonic_underlayers(
++        source, &target, &protected, known_layer, &layer, holes, &mut result);
+     Ok(result)
+ }

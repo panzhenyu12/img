@@ -1,0 +1,51 @@
+--- a/core/image-core/src/face.rs
++++ b/core/image-core/src/face.rs
+@@ -1442,10 +1442,12 @@
+                 0
+             } else if neck_mask
+                 .as_ref()
+-                .is_some_and(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.8)
++                .is_some_and(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.95)
+             {
+                 1
+-            } else if hair {
++            } else if hair_mask.as_ref().is_some_and(|m| {
++                m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.95
++            }) {
+                 2
+             } else {
+                 0
+@@ -1501,6 +1503,33 @@
+             );
+         }
+     }
++    // Experimental donor purity only: leave all output freezing unchanged.
++    // A class posterior >=.5 permits output protection, but not clean RGB
++    // extrapolation. Keep observed neck/hair donors two pixels away from a
++    // different/uncertain material. Reconstruct their latent border without
++    // rewriting the original observed material's output pixels.
++    let donor_labels = known_layer.clone();
++    for i in 0..count {
++        if donor_labels[i] == 0 {
++            continue;
++        }
++        let x = (i % cw) as isize;
++        let y = (i / cw) as isize;
++        let pure = (-2_isize..=2).all(|dy| {
++            (-2_isize..=2).all(|dx| {
++                if dx * dx + dy * dy > 4 {
++                    return true;
++                }
++                let nx = x + dx;
++                let ny = y + dy;
++                nx >= 0 && ny >= 0 && nx < cw as isize && ny < ch as isize
++                    && donor_labels[ny as usize * cw + nx as usize] == donor_labels[i]
++            })
++        });
++        if !pure {
++            known_layer[i] = 0;
++        }
++    }
+     let crop = RgbaImage::new(cw as u32, ch as u32, crop_pixels)?;
+     mark!("crop masks");
+     // A head alpha includes hair and ears. Using it to sample a facial

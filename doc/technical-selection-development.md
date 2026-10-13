@@ -1,6 +1,6 @@
 # 技术选型与开发文档（Web Demo）
 
-2026-10-13 算法与双端更新：人脸已采用论文 rigid MLS、独立脸/头发/耳朵/配饰层与多尺度 F/B 估计；分类覆盖仍不是真实 matting。身体非零调整必须有真实 subjectMask，已删除无分割的背景拉伸路径；partMask 接口已通，自动 Pose 尚未解决衣物/手/头发部位归属。皮肤采用有蒙版的 Fast Guided Filter。去人保留传统 exemplar，并实现浏览器 ONNX LaMa 与 Go→本地 TorchScript Worker 双端推理，参数 execution 明确选择处理位置。实际效果仍有失败，逐功能 8 分目标尚未达到；当前状态见 [最新验证](qa/current-validation.md) 和 [质量目标](qa/quality-targets.md)。
+2026-10-13 更新：人脸增加局部颜色线 alpha 校正与颈部底层 donor；皮肤增加多尺度细节与紧凑瑕疵的独立修正；身体接入 FASHN 18 类像素解析，结合 Pose 竞争分区得到真部位 mask，并将手、包、头发等作为固定层。分割置信度仍不等于物理 matting，宽袖和外套归属仍有失败。去人保留浏览器 ONNX LaMa 与 Go→Torch Worker；新测 PatchMatch/MI-GAN 未带来可靠净收益，不接入生产。逐功能 8 分目标尚未达到，见 [质量目标](qa/quality-targets.md) 与各项 QA。
 
 版本：v0.2 · 2026-10-12
 
@@ -17,6 +17,7 @@
 | 服务端 | Go + Gin + Viper | HTTP、临时文件、revision、提案、任务状态与取消；不写 Go 像素循环 |
 | 后端像素执行 | 同一 Rust crate 的 `image-render` native CLI | `exec.CommandContext` 调用，限定并发、超时、临时目录，失败不回传未编辑原图冒充成功 |
 | 本地检测 | `@mediapipe/tasks-vision` | Face mesh、Pose 33点、人体分割 alpha 与部位 polygon；本地模型，可选，不等于衣物/皮肤解析 |
+| 身体像素解析 | FASHN Human Parser（SegFormer-B4）+ ONNX Runtime Web | 18类概率、颜色感知测地线和骨轴竞争分区；独立串行Worker；不是现成左右袖/腿检测器 |
 | MCP | 官方 `modelcontextprotocol/go-sdk` | `/mcp` Streamable HTTP；协议 SDK 管理初始化、会话和工具调用 |
 | AI 编排 | Python、LangChain DeepAgents、langchain-mcp-adapters、FastAPI | 模型读取参数目录与预览图像并生成提案；UI 确认后由 Go 应用 |
 | 开发与验收 | Makefile、Cargo、go test/vet/race、Playwright | 编译 WASM/native、实际文件上传、画笔、像素比较和错误恢复 |
@@ -29,11 +30,12 @@ Go 适合 API 和任务编排，Rust 适合浏览器 WASM 与 native 共用图�
 |---|---|---|
 | 可采用 | Gin、Viper、官方 MCP Go SDK、Rust `image`、serde、React、Vite、Playwright | 已使用成熟库，路由、配置、MCP 协议、编解码不重复实现 |
 | 需要二次封装 | MediaPipe Tasks Vision | `landmarks.ts` 隔离模型加载、坐标归一化、Face 有序特征 polygon、Pose 部位支持域、人体 alpha 序列化/资源释放和失败重试 |
+| 需要二次封装，已接入 | FASHN Human Parser、ONNX Runtime Web | 固定模型revision/hash，Torch→ONNX校验；bodyParsing/Worker处理输入、概率恢复、部位归属和独立保护；长外套与重叠同类衣物需手工校正 |
 | 需要二次封装 | wasm-bindgen | `render.worker.ts` / `engine.ts` 隔离 WASM ABI，业务代码只传 Operation |
 | 需要二次封装 | DeepAgents / MCP adapters | 仅暴露 inspect/preview/propose 图像工具；超时、无密钥和服务失败有明确响应；不把 AI 作为启动前置条件 |
 | 需要二次封装，尚未接入 | `rust_mls`、`photon-rs` | 保留为替换算法候选；当前 Cargo 未依赖这两者，不能将自有反向采样称为它们的实现 |
 | 不建议直接依赖 | Compositor 客户端骨架 | SwiftUI/AppKit/Metal 不能作为 Web 客户端代码；仅借鉴编辑图、图层和历史概念 |
-| 不建议直接依赖 | Tract 作为现成美颜方案 | 它是推理运行时，仍需合适模型、算子支持和 Web 绑定；本期没有自有 ONNX 模型 |
+| 不建议直接依赖 | Tract 作为现成美颜方案 | 它是推理运行时，仍需合适模型、算子支持和 Web 绑定；当前选择成熟ORT-Web执行公开ONNX模型 |
 | 不建议直接依赖 | MediaPipe bbox 充当皮肤/衣物 mask | 区域框不具有像素语义；本期这些蒙版由用户手画 |
 | 后续性能路径 | wgpu/WebGPU、WebGL2、Tile、代理图 | 当前尚未接入；已有 CPU 算法作为未来 GPU 对照，不声称实现 30 FPS 大图预览 |
 
@@ -95,11 +97,11 @@ DeepAgent（可选）
 
 人脸轮廓在 `face.rs` 使用source→target轮廓控制和独立前景alpha：`faceContourMask/faceContour`是脸部控制边界（排除头发、耳朵及配饰），`face/faceOutline`是完整头部，`neck`表示收缩下颌后可能露出的脖子底层。Web本地BiSeNet ONNX提供类别解析；概率经保留.5边界的coverage转换，避免把低置信背景当作半透明头部。手工polygon可作为明确近似边界，裸矩形不猜人脸。
 
-五官按实际semantic polygon在像素脸轴处理，避免非方照片的旋转剪切；鼻子矫正依据noseRoot→noseTip与脸轴的实际偏斜。身体粗细使用Pose部位轴、人体分割和近的自由侧跨度，独立形变人物RGB/alpha，背景不位移；窄带按clean donor补背景。没有分割、关键点或参数部位不匹配时拒绝执行。裙装/遮挡/贴合肢体采用保守能力判断，仍不能代替完整body parsing。未完成专用算法的身高、腿长、体态和结构参数拒绝非零调用。
+五官按实际semantic polygon在像素脸轴处理，避免非方照片的旋转剪切；鼻子矫正依据noseRoot→noseTip与脸轴的实际偏斜。身体粗细使用Pose部位轴和实际部位alpha，独立形变该部位RGB/alpha，背景与其他部位不位移；新露窄带按clean donor补背景。FASHN提供服装、肢体、头发、手、包等类别概率；颜色感知测地线与骨轴竞争将同类衣物划给torso/左右肢体，不能保证宽袖和外套遮挡归属正确。真部位mask存在时不再用旧近侧半径启发式剪窄不对称袖子。WASM前景/背景分解有单槽16MiB缓存，精确核对原图和alpha，图片/部位变动失效；native不缓存作为对照。没有分割、关键点或参数部位不匹配时拒绝执行。身高、腿长、体态和结构参数仍拒绝非零调用。
 
-皮肤 mask 优先于 face，减去眼/眉/嘴/毛发与保护区域；磨皮使用有效皮肤 donor 的 Fast Guided Filter（有蒙版区域统计、共用亮度 guide、局部 RGB 线性系数与原始全分辨率 guide），连续混合高频纹理，避免非皮肤颜色污染邻肤。美白与肤色分开调整亮度/色度，保护高光和深阴影。妆容只作用唇/眉/眼下等语义区域，同层先调色再几何采样以跟随特征变化；对称是可靠语义下的保守二维特征位置矫正。检测在当前层输入执行，旧上游几何/顺序变动后需重检测。牙齿在内嘴中独立筛选明亮低饱和像素。衣物平整使用低频与纹理混合。这些是确定性传统算法，尚非深度精修论文模型的完整复现。
+皮肤 mask 优先于 face，减去眼/眉/嘴/毛发与保护区域；磨皮使用有效皮肤donor的Fast Guided Filter明暗基底，并分开处理像素噪声、连贯毛孔/细纹、中尺度肤色与紧凑暗红异常。texture=100仍可修正异常，强磨皮保留连贯毛孔；痣、雀斑和痘印的可靠语义分类尚未解决。避免非皮肤或冻结颜色污染邻肤。美白与肤色分开调整亮度/色度，保护高光和深阴影。妆容只作用唇/眉/眼下等语义区域，同层先调色再几何采样以跟随特征变化；对称是可靠语义下的保守二维特征位置矫正。检测在当前层输入执行，旧上游几何/顺序变动后需重检测。牙齿在内嘴中独立筛选明亮低饱和像素。衣物平整使用低频与纹理混合。这些是确定性传统算法，尚非深度精修论文模型的完整复现。
 
-LaMa 双端方式为浏览器 ORT-Web（固定512正方形输入，保留照片比例后对称补边，约208MB权重）与 Go 代理本地 Python/Torch Worker（默认 full/1024，支持 Poisson）。两端都由 Rust生成 canonical mask并合成一次；客户端没有静默远程回退。执行方式和参数进入同一Operation/MCP catalog。浏览器模型并不需要把图像算法改写成 Go；Go继续负责Gin/Viper、任务、缓存和协议，模型运行时用成熟ORT/Torch。运行方式、限制、候选库及已验证论文见 [FUNC-016](func/FUNC-016-local-model-inpaint.md)、[研究记录](research/lama-client-runtime.md)。
+LaMa 双端方式为浏览器 ORT-Web（固定512正方形输入，保留照片比例后对称补边，约208MB权重）与 Go 代理本地 Python/Torch Worker（默认 full/1024，支持 Poisson）。两端都由 Rust生成 canonical mask并合成一次；客户端没有静默远程回退。执行方式和参数进入同一Operation/MCP catalog。浏览器模型并不需要把图像算法改写成 Go；Go继续负责Gin/Viper、任务、缓存和协议，模型运行时用成熟ORT/Torch。PatchMatch与MI-GAN的实测失败保留在 [补全实验](qa/inpaint-refinement-review.md)，不因论文更新就替换现有输出。运行方式、限制、候选库及已验证论文见 [FUNC-016](func/FUNC-016-local-model-inpaint.md)、[研究记录](research/lama-client-runtime.md)。
 
 修复笔刷可手动取样或自动选择邻近纹理；背景人物/杂物提供手工 polygon 圈选与主体冻结。内容填补使用confidence×isophote优先级和masked SSD匹配完整clean exemplar纹理块，保护和透明RGB排除在donor之外。狭窄背景自适应缩小匹配/复制窗；无合法patch明确报错。街景仍有块状接缝，不生成复杂缺失语义。功能与验收见 [FUNC-012](func/FUNC-012-body-semantic-masks.md)、[FUNC-014](func/FUNC-014-background-person-removal.md)、[FUNC-015](func/FUNC-015-skin-and-makeup-quality.md)。
 
@@ -125,6 +127,7 @@ Demo 导出 `.edit.json` 保存操作，不打包原图；恢复时先导入原�
 
 ```bash
 make setup       # JS依赖、WASM工具、Chromium与本地检测模型
+make body-models # 可选：导出校验人体解析模型，约257MB
 make dev         # 构建 native/WASM/API，启动本地 Web + Go
 make test        # Rust、Go、vet、TS与生产构建
 make e2e         # 浏览器实际交互与像素检查

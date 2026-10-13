@@ -1,0 +1,247 @@
+{
+  "knownForeground": [
+    220,
+    155,
+    100
+  ],
+  "knownBackground": [
+    20,
+    40,
+    60
+  ],
+  "physicalEdgeWidthPixels": 3,
+  "binaryClassMask": true,
+  "baselineUnchangedMixedExterior": 628,
+  "candidateUnchangedMixedExterior": 92,
+  "pureTrueBackgroundChanges": 0,
+  "row120": [
+    {
+      "x": 38,
+      "source": [
+        20,
+        40,
+        60
+      ],
+      "baseline": [
+        20,
+        40,
+        60
+      ],
+      "candidate": [
+        20,
+        40,
+        60
+      ],
+      "knownPhysicalAlpha": 0.0
+    },
+    {
+      "x": 39,
+      "source": [
+        20,
+        40,
+        60
+      ],
+      "baseline": [
+        20,
+        40,
+        60
+      ],
+      "candidate": [
+        20,
+        40,
+        60
+      ],
+      "knownPhysicalAlpha": 0.0
+    },
+    {
+      "x": 40,
+      "source": [
+        46,
+        55,
+        65
+      ],
+      "baseline": [
+        46,
+        55,
+        65
+      ],
+      "candidate": [
+        20,
+        40,
+        60
+      ],
+      "knownPhysicalAlpha": 0.12987617023088854
+    },
+    {
+      "x": 41,
+      "source": [
+        113,
+        93,
+        79
+      ],
+      "baseline": [
+        113,
+        93,
+        79
+      ],
+      "candidate": [
+        20,
+        40,
+        60
+      ],
+      "knownPhysicalAlpha": 0.46313431078648787
+    },
+    {
+      "x": 42,
+      "source": [
+        179,
+        132,
+        92
+      ],
+      "baseline": [
+        110,
+        92,
+        78
+      ],
+      "candidate": [
+        20,
+        40,
+        60
+      ],
+      "knownPhysicalAlpha": 0.7963924513420871
+    },
+    {
+      "x": 43,
+      "source": [
+        220,
+        155,
+        100
+      ],
+      "baseline": [
+        109,
+        91,
+        78
+      ],
+      "candidate": [
+        20,
+        40,
+        60
+      ],
+      "knownPhysicalAlpha": 1.0
+    },
+    {
+      "x": 44,
+      "source": [
+        220,
+        155,
+        100
+      ],
+      "baseline": [
+        110,
+        92,
+        79
+      ],
+      "candidate": [
+        26,
+        43,
+        61
+      ],
+      "knownPhysicalAlpha": 1.0
+    },
+    {
+      "x": 45,
+      "source": [
+        220,
+        155,
+        100
+      ],
+      "baseline": [
+        120,
+        98,
+        80
+      ],
+      "candidate": [
+        44,
+        54,
+        65
+      ],
+      "knownPhysicalAlpha": 1.0
+    },
+    {
+      "x": 46,
+      "source": [
+        220,
+        155,
+        100
+      ],
+      "baseline": [
+        157,
+        119,
+        88
+      ],
+      "candidate": [
+        110,
+        91,
+        78
+      ],
+      "knownPhysicalAlpha": 1.0
+    },
+    {
+      "x": 47,
+      "source": [
+        220,
+        155,
+        100
+      ],
+      "baseline": [
+        198,
+        142,
+        95
+      ],
+      "candidate": [
+        180,
+        133,
+        92
+      ],
+      "knownPhysicalAlpha": 1.0
+    },
+    {
+      "x": 48,
+      "source": [
+        220,
+        155,
+        100
+      ],
+      "baseline": [
+        220,
+        155,
+        100
+      ],
+      "candidate": [
+        220,
+        155,
+        100
+      ],
+      "knownPhysicalAlpha": 1.0
+    },
+    {
+      "x": 49,
+      "source": [
+        220,
+        155,
+        100
+      ],
+      "baseline": [
+        220,
+        155,
+        100
+      ],
+      "candidate": [
+        220,
+        155,
+        100
+      ],
+      "knownPhysicalAlpha": 1.0
+    }
+  ]
+}

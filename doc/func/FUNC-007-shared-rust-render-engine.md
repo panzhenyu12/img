@@ -82,7 +82,7 @@ pub fn apply_graph_json(source: &RgbaImage, graph_json: &str) -> Result<RgbaImag
 | `color.basic` | `exposure,brightness,contrast,highlights,shadows,whites,blacks,temperature,tint,saturation,vibrance,clarity,texture,dehaze,sharpness,noise,blackWhite,blackPoint,whitePoint,gamma` |
 | `color.curves` | `points:[{x,y}]` 归一化；`channel:rgb/red/green/blue`；分段线性颜色查表 |
 | `color.hsl` | `hsl:[{hue,range,shift,saturation,lightness}]`；hue `0..360`、range `1..180` 度，其余百分比 |
-| `filter.film` | `preset,intensity,grain,vignette,glow,halation,fade,seed`；自定义风格 warm/cool/classic/fade/vivid/mono/cinema/neutral，并兼容 pastel/night |
+| `filter.film` | `preset,intensity,grain,vignette,glow,halation,fade,seed`；自定义风格 warm/cool/classic/fade/vivid/mono/cinema/neutral，并兼容 pastel/night；新增 provia/astia/velvia/classicNegative/eterna/acros 线性光风格 |
 | `filter.lut` | `size:2..65,data:RGB[size³],domainMin,domainMax,amount`；RGB 红通道最快的三线性插值 |
 
 `color.basic` 曝光 `-100..100` 映射到 `±2 EV`；色阶 `blackPoint/whitePoint` 为 `0..100`，默认 `0/100`，blackPoint 必须小于 whitePoint；gamma 为 `.1..5`，默认1。`blackWhite` 可用 boolean 或 `0..100`。透明度不随普通调色、磨皮、修复和 LUT 改变。

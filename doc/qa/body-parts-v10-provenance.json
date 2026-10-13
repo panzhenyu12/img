@@ -1,0 +1,10 @@
+{
+  "binary": "/Users/modao/work/img/core/image-core/target/release/image-render",
+  "rendererSha256": "3d0e91c2e9dd09d51ac41752bd079e8273629d3df4fac12d79edde338c252726",
+  "version": "v10",
+  "previousVersion": "v4",
+  "verifiedBeforeAndAfterEveryRender": true,
+  "parserModelSha256": "3b4925715aecbf4996fea5de5e7ce30b173c20f751f21cffe826b5db46ed7729",
+  "adjustment": 60,
+  "checks": 15
+}

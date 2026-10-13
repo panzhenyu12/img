@@ -1,0 +1,91 @@
+--- a/core/image-core/src/geometry.rs
++++ b/core/image-core/src/geometry.rs
+@@ -1553,6 +1553,7 @@
+     cosine: [[f32; 3]; 8],
+     sine: [[f32; 3]; 8],
+     radius: f32,
++    chroma_anchor: f32,
+ }
+ impl HealLighting {
+     fn new(
+@@ -1566,6 +1567,7 @@
+             cosine: [[0.0; 3]; 8],
+             sine: [[0.0; 3]; 8],
+             radius: stroke.radius * 1.05,
++            chroma_anchor: 0.0,
+         };
+         let mut context = Vec::with_capacity(64);
+         let mut difference = Vec::with_capacity(64);
+@@ -1597,6 +1599,26 @@
+             lighting.mean = plane[0];
+             lighting.cosine[0] = plane[1];
+             lighting.sine[0] = plane[2];
++            let (mut predicted_center, mut target_edge) = (0.0, 0.0);
++            for i in 0..32 {
++                let angle = i as f32 * std::f32::consts::TAU / 32.0;
++                let (cx, cy) = (
++                    angle.cos() * stroke.radius * 0.25,
++                    angle.sin() * stroke.radius * 0.25,
++                );
++                let d = sources.visible_sample(donor.0 + cx, donor.1 + cy)?;
++                let correction = lighting.correction(cx, cy);
++                predicted_center += (d[0] + correction[0]) - (d[1] + correction[1]);
++                let e = sample(
++                    target,
++                    stroke.x + angle.cos() * stroke.radius * 0.82,
++                    stroke.y + angle.sin() * stroke.radius * 0.82,
++                    false,
++                );
++                target_edge += e[0] as f32 - e[1] as f32;
++            }
++            let residual = predicted_center / 32.0 - target_edge / 32.0 - 3.0;
++            lighting.chroma_anchor = -residual.max(0.0);
+             return Some(lighting);
+         }
+         for (i, values) in difference.iter().enumerate() {
+@@ -1610,6 +1632,26 @@
+                 }
+             }
+         }
++        let (mut predicted_center, mut target_edge) = (0.0, 0.0);
++        for i in 0..32 {
++            let angle = i as f32 * std::f32::consts::TAU / 32.0;
++            let (cx, cy) = (
++                angle.cos() * stroke.radius * 0.25,
++                angle.sin() * stroke.radius * 0.25,
++            );
++            let d = sources.visible_sample(donor.0 + cx, donor.1 + cy)?;
++            let correction = lighting.correction(cx, cy);
++            predicted_center += (d[0] + correction[0]) - (d[1] + correction[1]);
++            let e = sample(
++                target,
++                stroke.x + angle.cos() * stroke.radius * 0.82,
++                stroke.y + angle.sin() * stroke.radius * 0.82,
++                false,
++            );
++            target_edge += e[0] as f32 - e[1] as f32;
++        }
++        let residual = predicted_center / 32.0 - target_edge / 32.0 - 3.0;
++        lighting.chroma_anchor = -residual.max(0.0);
+         Some(lighting)
+     }
+     fn correction(&self, dx: f32, dy: f32) -> [f32; 3] {
+@@ -1697,12 +1739,17 @@
+                 let Some(cloned) = sources.visible_sample(donor.0 + dx, donor.1 + dy) else {
+                     continue;
+                 };
+-                let correction = lighting
++                let mut correction = lighting
+                     .as_ref()
+                     .map(|v| v.correction(dx, dy))
+                     .unwrap_or([0.0; 3]);
+                 let weight =
+                     (1.0 - smoothstep(if heal { 0.8 } else { 0.65 }, 1.0, d)) * stroke.strength;
++                if let Some(light) = &lighting {
++                    let chroma_weight = 1.0 - smoothstep(0.35, 0.85, d);
++                    correction[0] += light.chroma_anchor * chroma_weight * 0.5;
++                    correction[1] -= light.chroma_anchor * chroma_weight * 0.5;
++                }
+                 for c in 0..3 {
+                     result.pixels[index + c] = byte(
+                         result.pixels[index + c] as f32 * (1.0 - weight)

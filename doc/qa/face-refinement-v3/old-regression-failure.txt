@@ -1,0 +1,19 @@
+   Compiling image-core v0.2.0 (/Users/modao/work/img/.run/face-regression-baseline-src/core/image-core)
+    Finished `release` profile [optimized] target(s) in 1m 49s
+     Running unittests src/lib.rs (.run/face-refinement-target/release/deps/image_core-e1ec6f56bffdd293)
+
+running 1 test
+
+thread 'face::tests::uncertain_face_neck_transition_does_not_freeze_the_old_chin_as_dark_dots' (141631850) panicked at src/face.rs:1763:13:
+old shadow at (54, 186) stayed frozen: [160, 100, 65, 255]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test face::tests::uncertain_face_neck_transition_does_not_freeze_the_old_chin_as_dark_dots ... FAILED
+
+failures:
+
+failures:
+    face::tests::uncertain_face_neck_transition_does_not_freeze_the_old_chin_as_dark_dots
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 143 filtered out; finished in 0.44s
+
+error: test failed, to rerun pass `--lib`

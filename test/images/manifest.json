@@ -275,5 +275,65 @@
     "width": 1566,
     "height": 1470,
     "sha256": "9bce7c4c500b343ee92660be345ccdd2680997e2e41e500018eb2e44df11400e"
+  },
+  {
+    "id": "acne-teen",
+    "path": "acne/acne-teen-original.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Teenager_with_acne.jpg",
+    "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d6/Teenager_with_acne.jpg",
+    "bytes": 307014,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "real-acne",
+      "manual-skin-selection",
+      "blemish-challenge"
+    ],
+    "width": 3096,
+    "height": 4128,
+    "sha256": "da07a56739c5410099c8e9a444ea7dd624699a5c716ba545f9d7e2c3e45c1c92",
+    "purpose": "skin-manual-algorithm",
+    "author": "NikosLikomitros",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  {
+    "id": "acne-oily",
+    "path": "acne/acne-oily-original.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Acne_vulgaris_on_a_very_oily_skin.jpg",
+    "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Acne_vulgaris_on_a_very_oily_skin.jpg",
+    "bytes": 1964140,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "real-acne",
+      "manual-skin-selection",
+      "blemish-challenge"
+    ],
+    "width": 2576,
+    "height": 1932,
+    "sha256": "6190c4f206a01862544816feef23d284ad87fbd4802d3a1042c79e686a02c3fb",
+    "purpose": "skin-manual-algorithm",
+    "author": "Roshu Bangal",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  {
+    "id": "acne-cystic",
+    "path": "acne/acne-cystic-original.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Cysticacne-cropped.jpg",
+    "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1f/Cysticacne-cropped.jpg",
+    "bytes": 752062,
+    "retrieved": "2026-10-13",
+    "labels": [
+      "real-acne",
+      "manual-skin-selection",
+      "blemish-challenge"
+    ],
+    "width": 1450,
+    "height": 2834,
+    "sha256": "4b4b3e1cdc450248160075b51dc3d9d206aab4e5ec397b6128995e7cc6bb7cb3",
+    "purpose": "skin-manual-algorithm",
+    "author": "James Heilman, MD",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
   }
 ]

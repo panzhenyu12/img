@@ -1,0 +1,1855 @@
+{
+  "baselineCommit": "ea5b404",
+  "baselineSha256": "95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab",
+  "candidateSha256": "6a0adbd975b9b4c3df133172e3e118b5340e24bb51777c4143c32fb7d4d9979a",
+  "timingIncludes": "CLI image/graph decoding, validation, kernel and PNG output; concurrent machine work may affect latency",
+  "sourceBinaryPaths": {
+    "baseline": "/Users/modao/work/img/.run/quality-baseline/image-render",
+    "candidate": "/Users/modao/work/img/.run/face-refinement-candidate-image-render"
+  },
+  "snapshotBinaryPaths": {
+    "baseline": "test/results/face-refinement-v3-verified/baseline-95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab-image-render",
+    "candidate": "test/results/face-refinement-v3-verified/candidate-6a0adbd975b9b4c3df133172e3e118b5340e24bb51777c4143c32fb7d4d9979a-image-render"
+  },
+  "rating": "No automatic rating; all real-photo outputs need visual assessment",
+  "cases": [
+    {
+      "name": "fixture-portrait",
+      "key": "faceWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 1635.7,
+      "afterMs": 2881.39,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 239,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 499.35,
+      "afterMs": 521.86,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "temples",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 834.24,
+      "afterMs": 773.22,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "temples",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 484.21,
+      "afterMs": 434.23,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "cheekbones",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 405.34,
+      "afterMs": 399.11,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 19,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "cheekbones",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 404.08,
+      "afterMs": 472.19,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "jaw",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 591.74,
+      "afterMs": 457.24,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 98,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "jaw",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 384.15,
+      "afterMs": 450.52,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "foreheadWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 415.51,
+      "afterMs": 557.58,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "foreheadWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 401.28,
+      "afterMs": 409.26,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "chinWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 390.69,
+      "afterMs": 385.04,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "chinWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 372.91,
+      "afterMs": 401.04,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 75,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "chinPoint",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 459.95,
+      "afterMs": 428.9,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 84,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "chinPoint",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 379.58,
+      "afterMs": 462.16,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "forehead",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 402.62,
+      "afterMs": 450.92,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "forehead",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 401.33,
+      "afterMs": 460.27,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "chin",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 386.74,
+      "afterMs": 392.15,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "chin",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 386.61,
+      "afterMs": 403.18,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 368,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "faceWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 496.35,
+      "afterMs": 519.56,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 41,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 533.73,
+      "afterMs": 524.99,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "temples",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 523.02,
+      "afterMs": 581.85,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "temples",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 513.61,
+      "afterMs": 595.3,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "cheekbones",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 568.11,
+      "afterMs": 1419.36,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "cheekbones",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 929.95,
+      "afterMs": 741.16,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "jaw",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 491.21,
+      "afterMs": 561.75,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 2,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "jaw",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 539.65,
+      "afterMs": 539.16,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "foreheadWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 529.1,
+      "afterMs": 535.22,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "foreheadWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 538.55,
+      "afterMs": 583.58,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chinWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 565.02,
+      "afterMs": 575.54,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chinWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 862.57,
+      "afterMs": 743.29,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 25,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chinPoint",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 578.23,
+      "afterMs": 589.47,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 31,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chinPoint",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 579.22,
+      "afterMs": 679.97,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "forehead",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 587.14,
+      "afterMs": 597.96,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "forehead",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 573.2,
+      "afterMs": 612.14,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chin",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 567.2,
+      "afterMs": 825.23,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chin",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 568.08,
+      "afterMs": 626.09,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 515,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "faceWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 688.01,
+      "afterMs": 898.65,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 315,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 740.51,
+      "afterMs": 686.24,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "temples",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 736.3,
+      "afterMs": 799.03,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "temples",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 752.51,
+      "afterMs": 676.63,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "cheekbones",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 665.9,
+      "afterMs": 728.42,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "cheekbones",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 748.83,
+      "afterMs": 703.37,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "jaw",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 747.71,
+      "afterMs": 687.44,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 132,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "jaw",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 796.51,
+      "afterMs": 814.43,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "foreheadWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 825.36,
+      "afterMs": 921.32,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "foreheadWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 761.95,
+      "afterMs": 1275.86,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chinWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 776.66,
+      "afterMs": 934.26,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chinWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 797.39,
+      "afterMs": 919.47,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 70,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chinPoint",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 713.88,
+      "afterMs": 995.7,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 110,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chinPoint",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 845.51,
+      "afterMs": 990.8,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "forehead",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 743.09,
+      "afterMs": 830.1,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "forehead",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 821.74,
+      "afterMs": 1029.85,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chin",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 1724.65,
+      "afterMs": 2005.19,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chin",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 1526.58,
+      "afterMs": 1093.15,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 1101,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "faceWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 2938.79,
+      "afterMs": 3548.11,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 326,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 2718.65,
+      "afterMs": 2474.1,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "temples",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 1624.77,
+      "afterMs": 2218.77,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "temples",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 1347.56,
+      "afterMs": 1121.63,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "cheekbones",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 1022.81,
+      "afterMs": 1101.01,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 1,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "cheekbones",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 945.08,
+      "afterMs": 872.1,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "jaw",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 935.07,
+      "afterMs": 1010.96,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 154,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "jaw",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 849.44,
+      "afterMs": 808.82,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "foreheadWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 843.82,
+      "afterMs": 876.2,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "foreheadWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 960.41,
+      "afterMs": 944.92,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chinWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 885.61,
+      "afterMs": 894.96,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chinWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 938.91,
+      "afterMs": 928.5,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 95,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chinPoint",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 1135.4,
+      "afterMs": 980.53,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 134,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chinPoint",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 833.3,
+      "afterMs": 978.7,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "forehead",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 1005.39,
+      "afterMs": 900.69,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "forehead",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 769.13,
+      "afterMs": 960.7,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chin",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 867.76,
+      "afterMs": 863.96,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chin",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 838.78,
+      "afterMs": 883.16,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 820,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "faceWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 760.01,
+      "afterMs": 789.92,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 45,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 991.14,
+      "afterMs": 896.65,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "temples",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 810.5,
+      "afterMs": 787.16,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "temples",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 790.98,
+      "afterMs": 774.28,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "cheekbones",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 978.6,
+      "afterMs": 857.17,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "cheekbones",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 759.54,
+      "afterMs": 775.76,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "jaw",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 763.55,
+      "afterMs": 777.75,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 20,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "jaw",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 953.4,
+      "afterMs": 858.67,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "foreheadWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 690.99,
+      "afterMs": 785.55,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "foreheadWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 644.1,
+      "afterMs": 683.58,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chinWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 640.55,
+      "afterMs": 718.03,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chinWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 713.55,
+      "afterMs": 1073.67,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 10,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chinPoint",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 841.9,
+      "afterMs": 701.8,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 23,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chinPoint",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 679.36,
+      "afterMs": 973.49,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "forehead",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 971.61,
+      "afterMs": 817.38,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "forehead",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 808.76,
+      "afterMs": 859.77,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chin",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 661.54,
+      "afterMs": 1219.55,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chin",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 845.63,
+      "afterMs": 700.87,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 563,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "faceWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 621.14,
+      "afterMs": 620.4,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 524.06,
+      "afterMs": 534.13,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "temples",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 515.73,
+      "afterMs": 630.81,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "temples",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 626.05,
+      "afterMs": 599.72,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "cheekbones",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 563.9,
+      "afterMs": 743.31,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "cheekbones",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 588.52,
+      "afterMs": 532.12,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "jaw",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 573.09,
+      "afterMs": 557.95,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "jaw",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 513.15,
+      "afterMs": 538.34,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "foreheadWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 490.15,
+      "afterMs": 503.24,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "foreheadWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 507.68,
+      "afterMs": 768.94,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chinWidth",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 570.06,
+      "afterMs": 531.02,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chinWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 529.79,
+      "afterMs": 582.96,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chinPoint",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 642.25,
+      "afterMs": 698.41,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 1,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chinPoint",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 570.17,
+      "afterMs": 666.34,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "forehead",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 613.92,
+      "afterMs": 531.96,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "forehead",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 590.56,
+      "afterMs": 560.39,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chin",
+      "value": -60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 543.05,
+      "afterMs": 512.44,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chin",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 543.4,
+      "afterMs": 601.63,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 235,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    }
+  ],
+  "finalBaselineSha256": "95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab",
+  "finalCandidateSha256": "6a0adbd975b9b4c3df133172e3e118b5340e24bb51777c4143c32fb7d4d9979a"
+}

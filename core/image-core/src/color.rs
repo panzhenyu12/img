@@ -1,7 +1,9 @@
 use crate::engine::{byte, number, percent, positive};
 use crate::mask::Region;
 use crate::{ImageError, RgbaImage};
-use serde_json::{json, Value};
+#[cfg(test)]
+use serde_json::json;
+use serde_json::Value;
 
 fn luma(r: f32, g: f32, b: f32) -> f32 {
     r * 0.2126 + g * 0.7152 + b * 0.0722
@@ -380,6 +382,7 @@ fn inferred_semantic_weight(bbox: LandmarkBox, name: &str, x: f32, y: f32) -> Op
     Some(weight)
 }
 
+#[cfg(test)]
 fn semantic_mask_value(mask: &Value, x: f32, y: f32, width: u32, height: u32) -> f32 {
     if mask.is_array() {
         // Compact array form is accepted for AI tools and native callers.
@@ -416,6 +419,7 @@ fn semantic_aliases(semantic: &str) -> Option<&'static [&'static str]> {
     })
 }
 
+#[cfg(test)]
 fn semantic_weight(
     params: &Value,
     bbox: Option<LandmarkBox>,
@@ -496,21 +500,6 @@ impl<'a> PreparedSemantic<'a> {
                 .reduce(f32::max)
         })
     }
-}
-
-fn semantic_exclusion(
-    params: &Value,
-    bbox: Option<LandmarkBox>,
-    names: &[&str],
-    x: f32,
-    y: f32,
-    width: u32,
-    height: u32,
-) -> f32 {
-    names
-        .iter()
-        .filter_map(|name| semantic_weight(params, bbox, name, x, y, width, height))
-        .fold(0.0, f32::max)
 }
 
 /// Keep both edit coverage and eligible smoothing donors in the face ROI.
@@ -1116,6 +1105,334 @@ fn skin_guided_base(
     }
 }
 
+/// Keep coherent skin grain separate from pixel noise. The guided plane models
+/// lighting, the medium plane models local tone, and the fine plane separates
+/// single-pixel noise. Compact high-contrast anomalies get their own clean
+/// neighborhood estimate; texture retention does not undo that correction.
+struct SkinDetailPlanes {
+    fine: Vec<[f32; 3]>,
+    medium: Vec<[f32; 3]>,
+    structure: Vec<f32>,
+    blemish: Vec<([f32; 3], f32)>,
+}
+
+struct SkinChromaField {
+    width: usize,
+    height: usize,
+    red: Vec<f32>,
+    yellow: Vec<f32>,
+}
+
+impl SkinChromaField {
+    fn sample(&self, x: u32, y: u32, selection: &LocalSelection) -> f32 {
+        self.sample_plane(&self.red, x, y, selection)
+    }
+
+    fn sample_yellow(&self, x: u32, y: u32, selection: &LocalSelection) -> f32 {
+        self.sample_plane(&self.yellow, x, y, selection)
+    }
+
+    fn sample_plane(&self, plane: &[f32], x: u32, y: u32, selection: &LocalSelection) -> f32 {
+        let px = ((x as f32 + 0.5) * self.width as f32 / selection.width as f32 - 0.5)
+            .clamp(0.0, (self.width - 1) as f32);
+        let py = ((y as f32 + 0.5) * self.height as f32 / selection.height as f32 - 0.5)
+            .clamp(0.0, (self.height - 1) as f32);
+        let x0 = px.floor() as usize;
+        let y0 = py.floor() as usize;
+        let x1 = (x0 + 1).min(self.width - 1);
+        let y1 = (y0 + 1).min(self.height - 1);
+        let tx = px - x0 as f32;
+        let ty = py - y0 as f32;
+        plane[y0 * self.width + x0] * (1.0 - tx) * (1.0 - ty)
+            + plane[y0 * self.width + x1] * tx * (1.0 - ty)
+            + plane[y1 * self.width + x0] * (1.0 - tx) * ty
+            + plane[y1 * self.width + x1] * tx * ty
+    }
+}
+
+/// A bounded, mask-normalized local quantile of relative red chroma supplies
+/// a healthy-neighborhood reference even when a blotch spans many pores.
+/// Correct chroma, never the shading or high-frequency luminance texture.
+/// This is a color statistic, not a learned diagnosis of acne or pigmentation.
+fn skin_chroma_field(
+    source: &RgbaImage,
+    selection: &LocalSelection,
+    face_width: f32,
+) -> SkinChromaField {
+    const BINS: usize = 64;
+    let scale = (192.0 / selection.width.max(selection.height) as f32).min(1.0);
+    let width = ((selection.width as f32 * scale).round() as usize).max(1);
+    let height = ((selection.height as f32 * scale).round() as usize).max(1);
+    let mut cells = vec![[0.0; 3]; width * height];
+    for (i, &(_, weight)) in selection.weights.iter().enumerate() {
+        if weight <= 1e-4 {
+            continue;
+        }
+        let x = i % selection.width as usize;
+        let y = i / selection.width as usize;
+        let index =
+            ((y + selection.y as usize) * source.width as usize + x + selection.x as usize) * 4;
+        let rgb: [f32; 3] = std::array::from_fn(|c| source.pixels[index + c] as f32);
+        let light = luma(rgb[0], rgb[1], rgb[2]);
+        if !(25.0..=235.0).contains(&light) {
+            continue;
+        }
+        let cell = &mut cells[(y * height / selection.height as usize) * width
+            + x * width / selection.width as usize];
+        cell[0] += (rgb[0] - rgb[1]) / (light + 20.0) * 100.0 * weight;
+        cell[1] += (rgb[1] - rgb[2]) / (light + 20.0) * 100.0 * weight;
+        cell[2] += weight;
+    }
+    let stride = width + 1;
+    let mut prefix = vec![[0u32; BINS]; stride * (height + 1)];
+    for y in 0..height {
+        let mut row = [0u32; BINS];
+        for x in 0..width {
+            let cell = cells[y * width + x];
+            if cell[2] > 1e-4 {
+                let red = cell[0] / cell[2];
+                let bin = ((red + 16.0) / 1.5).floor().clamp(0.0, 63.0) as usize;
+                row[bin] += 1;
+            }
+            for (bin, &count) in row.iter().enumerate() {
+                prefix[(y + 1) * stride + x + 1][bin] = prefix[y * stride + x + 1][bin] + count;
+            }
+        }
+    }
+    let radius = ((face_width * scale * 0.055).round() as usize).clamp(3, 20);
+    let mut reference = vec![0.0; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let x0 = x.saturating_sub(radius);
+            let x1 = (x + radius + 1).min(width);
+            let y0 = y.saturating_sub(radius);
+            let y1 = (y + radius + 1).min(height);
+            let histogram: [u32; BINS] = std::array::from_fn(|bin| {
+                // Each rectangle count is nonnegative; subtract in signed
+                // arithmetic to avoid an intermediate unsigned underflow.
+                (prefix[y1 * stride + x1][bin] as i64 + prefix[y0 * stride + x0][bin] as i64
+                    - prefix[y0 * stride + x1][bin] as i64
+                    - prefix[y1 * stride + x0][bin] as i64) as u32
+            });
+            let count: u32 = histogram.iter().sum();
+            if count == 0 {
+                continue;
+            }
+            let target = (count as f32 * 0.35).ceil().max(1.0) as u32;
+            let mut cumulative = 0;
+            for (bin, &count) in histogram.iter().enumerate() {
+                cumulative += count;
+                if cumulative >= target {
+                    reference[y * width + x] = -16.0 + (bin as f32 + 0.5) * 1.5;
+                    break;
+                }
+            }
+        }
+    }
+    // Recover the complementary yellow chroma from locally ordinary skin.
+    // Correcting only red/green turns a dark reddish spot grey/purple when its
+    // green/blue chroma is also atypical. Eligible neighbours keep the local
+    // skin hue without requiring a global reference skin colour.
+    let eligible: Vec<bool> = cells
+        .iter()
+        .zip(&reference)
+        .map(|(cell, &red)| cell[2] > 1e-4 && cell[0] / cell[2] <= red + 2.5)
+        .collect();
+    let yellow_samples: Vec<[f64; 4]> = cells
+        .iter()
+        .map(|cell| {
+            [
+                if cell[2] > 1e-4 {
+                    (cell[1] / cell[2]) as f64
+                } else {
+                    0.0
+                },
+                0.0,
+                0.0,
+                0.0,
+            ]
+        })
+        .collect();
+    let yellow = guided_box_means(&yellow_samples, &eligible, width, height, radius)
+        .into_iter()
+        .map(|cell| cell[0] as f32)
+        .collect();
+    SkinChromaField {
+        width,
+        height,
+        red: reference,
+        yellow,
+    }
+}
+
+fn skin_detail_planes(
+    source: &RgbaImage,
+    selection: &LocalSelection,
+    face_width: f32,
+) -> SkinDetailPlanes {
+    let width = selection.width as usize;
+    let height = selection.height as usize;
+    let normalized = |image: image::Rgba32FImage| {
+        image
+            .pixels()
+            .enumerate()
+            .map(|(i, p)| {
+                if p[3] > 1e-4 {
+                    [p[0] / p[3], p[1] / p[3], p[2] / p[3]]
+                } else {
+                    let index = ((i / width + selection.y as usize) * source.width as usize
+                        + i % width
+                        + selection.x as usize)
+                        * 4;
+                    std::array::from_fn(|c| source.pixels[index + c] as f32)
+                }
+            })
+            .collect::<Vec<[f32; 3]>>()
+    };
+    let fine = normalized(selection_low_frequency(
+        source,
+        selection,
+        (face_width * 0.0015).clamp(0.55, 0.9),
+    ));
+    let medium = normalized(selection_low_frequency(
+        source,
+        selection,
+        (face_width * 0.012).clamp(1.8, 6.0),
+    ));
+    let lights: Vec<f32> = medium.iter().map(|c| luma(c[0], c[1], c[2])).collect();
+    let mut structure = vec![1.0; width * height];
+    let mut candidates = vec![false; width * height];
+    let mut residuals = vec![0.0; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let i = y * width + x;
+            if selection.weights[i].1 <= 1e-4 {
+                continue;
+            }
+            let index =
+                ((y + selection.y as usize) * source.width as usize + x + selection.x as usize) * 4;
+            let original: [f32; 3] = std::array::from_fn(|c| source.pixels[index + c] as f32);
+            let dx = (lights[y * width + (x + 1).min(width - 1)]
+                - lights[y * width + x.saturating_sub(1)])
+            .abs();
+            let dy = (lights[(y + 1).min(height - 1) * width + x]
+                - lights[y.saturating_sub(1) * width + x])
+                .abs();
+            // Wide lighting/material edges must not acquire detail halos.
+            structure[i] = 1.0 - smoothstep(8.0, 25.0, dx.max(dy));
+            let darkness = lights[i] - luma(original[0], original[1], original[2]);
+            let excess_red = (original[0] - original[1]) - (medium[i][0] - medium[i][1]);
+            residuals[i] = darkness.max(excess_red * 1.3);
+            candidates[i] = residuals[i] > 7.0 && structure[i] > 0.6;
+        }
+    }
+    let mut visited = vec![false; width * height];
+    let mut blemish = vec![([0.0; 3], 0.0); width * height];
+    let max_radius = (face_width * 0.028).clamp(4.0, 18.0);
+    let max_area = (std::f32::consts::PI * max_radius.powi(2)) as usize;
+    let padding = (face_width * 0.02).round().clamp(4.0, 12.0) as usize;
+    for start in 0..candidates.len() {
+        if !candidates[start] || visited[start] {
+            continue;
+        }
+        let mut component = vec![start];
+        visited[start] = true;
+        let mut cursor = 0;
+        let mut bounds = [start % width, start / width, start % width, start / width];
+        let mut safe = true;
+        while cursor < component.len() {
+            let i = component[cursor];
+            cursor += 1;
+            let x = i % width;
+            let y = i / width;
+            bounds[0] = bounds[0].min(x);
+            bounds[1] = bounds[1].min(y);
+            bounds[2] = bounds[2].max(x);
+            bounds[3] = bounds[3].max(y);
+            for ny in y.saturating_sub(1)..=(y + 1).min(height - 1) {
+                for nx in x.saturating_sub(1)..=(x + 1).min(width - 1) {
+                    let j = ny * width + nx;
+                    safe &= selection.weights[j].1 > 0.5;
+                    if candidates[j] && !visited[j] {
+                        visited[j] = true;
+                        component.push(j);
+                    }
+                }
+            }
+        }
+        let span_x = bounds[2] - bounds[0] + 1;
+        let span_y = bounds[3] - bounds[1] + 1;
+        let peak = component.iter().map(|&i| residuals[i]).fold(0.0, f32::max);
+        // A dark line, crease, beard edge or large shadow is not a spot.
+        if !safe
+            || (component.len() < 4 && peak < 25.0)
+            || component.len() > max_area
+            || span_x.max(span_y) as f32 > span_x.min(span_y) as f32 * 2.7
+            || component.len() as f32 / ((span_x * span_y) as f32) < 0.3
+        {
+            continue;
+        }
+        let mut sum = [0.0; 3];
+        let mut count = 0.0;
+        for y in bounds[1].saturating_sub(padding)..=(bounds[3] + padding).min(height - 1) {
+            for x in bounds[0].saturating_sub(padding)..=(bounds[2] + padding).min(width - 1) {
+                let i = y * width + x;
+                if (x >= bounds[0] && x <= bounds[2] && y >= bounds[1] && y <= bounds[3])
+                    || selection.weights[i].1 <= 0.5
+                    || residuals[i].abs() > 8.0
+                    || structure[i] < 0.8
+                {
+                    continue;
+                }
+                let index =
+                    ((y + selection.y as usize) * source.width as usize + x + selection.x as usize)
+                        * 4;
+                let weight = selection.weights[i].1;
+                for (c, value) in sum.iter_mut().enumerate() {
+                    *value += source.pixels[index + c] as f32 * weight;
+                }
+                count += weight;
+            }
+        }
+        if count < 8.0 {
+            continue;
+        }
+        let tone = sum.map(|v| v / count);
+        for &i in &component {
+            let amount = smoothstep(2.0, 14.0, residuals[i]);
+            if amount > blemish[i].1 {
+                blemish[i] = (tone, amount);
+            }
+            // A short transition into the surrounding healthy skin avoids a
+            // hard connected-component border. No protected donor is admitted.
+            let x = i % width;
+            let y = i / width;
+            for ny in y.saturating_sub(2)..=(y + 2).min(height - 1) {
+                for nx in x.saturating_sub(2)..=(x + 2).min(width - 1) {
+                    let j = ny * width + nx;
+                    if selection.weights[j].1 <= 0.5 || structure[j] < 0.8 {
+                        continue;
+                    }
+                    let distance =
+                        ((nx as f32 - x as f32).powi(2) + (ny as f32 - y as f32).powi(2)).sqrt();
+                    let spread = amount
+                        * (1.0 - distance / 3.0).max(0.0)
+                        * smoothstep(2.0, 11.0, residuals[j]);
+                    if spread > blemish[j].1 {
+                        blemish[j] = (tone, spread);
+                    }
+                }
+            }
+        }
+    }
+    SkinDetailPlanes {
+        fine,
+        medium,
+        structure,
+        blemish,
+    }
+}
+
 pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
     let values = p.get("adjustments").unwrap_or(p);
     let smooth = positive(values, "smooth");
@@ -1132,6 +1449,18 @@ pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
         .map(|b| b.width * source.width as f32)
         .unwrap_or(selection.width as f32);
     let base = (smooth > 0.0).then(|| skin_guided_base(source, &selection, smooth, face_width));
+    let detail = (smooth > 0.0).then(|| skin_detail_planes(source, &selection, face_width));
+    // The negative redness control neutralizes local excess erythema even
+    // without smoothing. The quantile reference uses eligible skin donors and
+    // is independent of the pixel texture, so a red patch does not force all
+    // surrounding healthy skin towards green/grey.
+    let pigment = (smooth > 0.0 || redness < 0.0).then(|| {
+        // An explicit de-red request can use a wider neighbourhood than
+        // automatic smoothing so coherent inflammation does not set its own
+        // healthy reference. The bounded analysis remains at 192px.
+        let reference_width = face_width * if redness < 0.0 { 1.55 } else { 1.0 };
+        skin_chroma_field(source, &selection, reference_width)
+    });
     let mut out = source.clone();
     for (local_index, &(weight, _)) in selection.weights.iter().enumerate() {
         if weight <= 0.0001 {
@@ -1146,16 +1475,46 @@ pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
         let pixel = &mut out.pixels[index..index + 4];
         let original = [pixel[0] as f32, pixel[1] as f32, pixel[2] as f32];
         let mut rgb = original;
-        if let Some(base) = &base {
+        if let (Some(base), Some(detail)) = (&base, &detail) {
             let low = base.sample(
                 x - selection.x,
                 y - selection.y,
                 &selection,
-                luma(original[0], original[1], original[2]),
+                luma(
+                    detail.medium[local_index][0],
+                    detail.medium[local_index][1],
+                    detail.medium[local_index][2],
+                ),
             );
+            let edge = detail.structure[local_index];
+            let (blemish_tone, blemish_amount) = detail.blemish[local_index];
             for c in 0..3 {
-                let difference = original[c] - low[c];
-                rgb[c] -= difference * smooth * (1.0 - texture * 0.9) * weight;
+                let noise = original[c] - detail.fine[local_index][c];
+                let uneven_tone = detail.medium[local_index][c] - low[c];
+                let target = original[c]
+                    - noise * (0.9 * (1.0 - texture * 0.96)) * edge
+                    - uneven_tone * (0.65 * (1.0 - texture * 0.5)) * edge;
+                let repaired = target + (blemish_tone[c] - target) * blemish_amount * 0.82;
+                rgb[c] += (repaired - original[c]) * smooth * weight;
+            }
+            if let Some(pigment) = &pigment {
+                let light = luma(rgb[0], rgb[1], rgb[2]);
+                let reference = pigment.sample(x - selection.x, y - selection.y, &selection);
+                let excess = ((rgb[0] - rgb[1]) / (light + 20.0) * 100.0 - reference).max(0.0);
+                let correction = (excess - 2.0).max(0.0)
+                    * smoothstep(3.0, 10.0, excess)
+                    * 0.9
+                    * smooth
+                    * weight
+                    * detail.structure[local_index]
+                    * smoothstep(25.0, 80.0, light)
+                    * (1.0 - smoothstep(205.0, 245.0, light))
+                    * (light + 20.0)
+                    / 100.0;
+                rgb = luma_chroma_rgb(
+                    light,
+                    [rgb[0] - light - correction, rgb[1] - light, rgb[2] - light],
+                );
             }
         }
         let light = luma(rgb[0], rgb[1], rgb[2]);
@@ -1166,10 +1525,36 @@ pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
         let midtone = smoothstep(20.0, 80.0, light) * highlight_protection;
         let target_light = light + whiten * weight * 24.0 * midtone;
         let chroma_strength = weight * midtone;
+        let redness_lift = redness.max(0.0);
+        let (neutralization, yellow_recovery) = if redness < 0.0 {
+            let pigment = pigment
+                .as_ref()
+                .expect("negative redness prepares a reference");
+            let reference = pigment.sample(x - selection.x, y - selection.y, &selection);
+            let relative_red = (rgb[0] - rgb[1]) / (light + 20.0) * 100.0;
+            let excess = (relative_red - reference).max(0.0);
+            // Keep a small uniform response for the colour slider, with most
+            // of the correction reserved for neighbourhood outliers. Never
+            // invert the red/green relation of the observed skin tone.
+            let local =
+                (excess - 1.5).max(0.0) * smoothstep(2.0, 7.0, excess) * (light + 20.0) / 100.0;
+            let red_correction =
+                (2.0 + local).min((rgb[0] - rgb[1]).max(0.0) * 0.65) * -redness * chroma_strength;
+            let target_yellow = pigment.sample_yellow(x - selection.x, y - selection.y, &selection);
+            let relative_yellow = (rgb[1] - rgb[2]) / (light + 20.0) * 100.0;
+            let yellow_correction = ((target_yellow - relative_yellow) * (light + 20.0) / 100.0)
+                .clamp(-10.0, 16.0)
+                * smoothstep(2.0, 7.0, excess)
+                * -redness
+                * chroma_strength;
+            (red_correction, yellow_correction)
+        } else {
+            (0.0, 0.0)
+        };
         let tint = [
-            (warmth * 12.0 + redness * 10.0) * chroma_strength,
-            -redness * 3.0 * chroma_strength,
-            (-warmth * 12.0 - redness * 3.0) * chroma_strength,
+            (warmth * 12.0 + redness_lift * 10.0) * chroma_strength - neutralization,
+            -redness_lift * 3.0 * chroma_strength,
+            (-warmth * 12.0 - redness_lift * 3.0) * chroma_strength - yellow_recovery,
         ];
         let tint_light = luma(tint[0], tint[1], tint[2]);
         let chroma = std::array::from_fn(|c| rgb[c] - light + tint[c] - tint_light);
@@ -1224,6 +1609,263 @@ fn clothing_retouch(source: &RgbaImage, p: &Value) -> RgbaImage {
     out
 }
 
+/// Estimate eye-shadow tone from eligible nearby skin, rather than adding a
+/// constant brightness to every pixel in an under-eye polygon. An affine
+/// lighting plane preserves directional illumination, while transferring only
+/// its low-frequency difference leaves pores and fine lower-lid detail intact.
+struct UnderEyeCorrection {
+    selection: LocalSelection,
+    corrections: Vec<[f32; 3]>,
+}
+
+struct UnderEyeDonor {
+    position: [f64; 3],
+    color: [f32; 3],
+    weight: f64,
+}
+
+/// The ring can cross cheek highlights, blush or a small residual mask error.
+/// A robust plane rejects those local outliers instead of moving the healthy
+/// reference toward the lightest / most saturated nearby patch.
+fn under_eye_reference(donors: &[UnderEyeDonor]) -> Option<[f32; 3]> {
+    if donors.len() < 12 {
+        return None;
+    }
+    let mut plane = [[0.0f64; 3]; 3];
+    for iteration in 0..3 {
+        let mut matrix = [[0.0f64; 3]; 3];
+        let mut rhs = [[0.0f64; 3]; 3];
+        let mut used = 0;
+        for donor in donors {
+            let mut weight = donor.weight;
+            if iteration > 0 {
+                let predicted: [f32; 3] = std::array::from_fn(|c| {
+                    (0..3).map(|a| plane[a][c] * donor.position[a]).sum::<f64>() as f32
+                });
+                let observed_light = luma(donor.color[0], donor.color[1], donor.color[2]);
+                let predicted_light = luma(predicted[0], predicted[1], predicted[2]);
+                let chroma_error = (0..3)
+                    .map(|c| {
+                        ((donor.color[c] - observed_light) - (predicted[c] - predicted_light)).abs()
+                    })
+                    .fold(0.0, f32::max);
+                // Tukey's biweight has bounded influence. Smooth falloff
+                // avoids a binary switch when a donor moves by one pixel.
+                let residual =
+                    ((observed_light - predicted_light).abs() / 20.0).max(chroma_error / 14.0);
+                weight *= (1.0 - residual * residual).max(0.0).powi(2) as f64;
+            }
+            if weight <= 1e-4 {
+                continue;
+            }
+            for a in 0..3 {
+                for b in 0..3 {
+                    matrix[a][b] += donor.position[a] * donor.position[b] * weight;
+                    rhs[a][b] += donor.position[a] * donor.color[b] as f64 * weight;
+                }
+            }
+            used += 1;
+        }
+        let m = matrix;
+        let inverse_numerator = [
+            [
+                m[1][1] * m[2][2] - m[1][2] * m[2][1],
+                m[0][2] * m[2][1] - m[0][1] * m[2][2],
+                m[0][1] * m[1][2] - m[0][2] * m[1][1],
+            ],
+            [
+                m[1][2] * m[2][0] - m[1][0] * m[2][2],
+                m[0][0] * m[2][2] - m[0][2] * m[2][0],
+                m[0][2] * m[1][0] - m[0][0] * m[1][2],
+            ],
+            [
+                m[1][0] * m[2][1] - m[1][1] * m[2][0],
+                m[0][1] * m[2][0] - m[0][0] * m[2][1],
+                m[0][0] * m[1][1] - m[0][1] * m[1][0],
+            ],
+        ];
+        let determinant = (0..3)
+            .map(|c| m[0][c] * inverse_numerator[c][0])
+            .sum::<f64>();
+        // A line of visible donors cannot determine a lighting plane.
+        if used < 12 || determinant < m[0][0].powi(3) * 0.002 {
+            return None;
+        }
+        for a in 0..3 {
+            for c in 0..3 {
+                plane[a][c] = (0..3)
+                    .map(|b| inverse_numerator[a][b] * rhs[b][c])
+                    .sum::<f64>()
+                    / determinant;
+            }
+        }
+    }
+    Some(plane[0].map(|v| v as f32))
+}
+
+impl UnderEyeCorrection {
+    fn sample(&self, x: u32, y: u32) -> [f32; 3] {
+        let s = &self.selection;
+        if x < s.x || y < s.y || x >= s.x + s.width || y >= s.y + s.height {
+            return [0.0; 3];
+        }
+        self.corrections[((y - s.y) * s.width + x - s.x) as usize]
+    }
+}
+
+fn under_eye_correction(
+    source: &RgbaImage,
+    p: &Value,
+    bbox: Option<LandmarkBox>,
+) -> UnderEyeCorrection {
+    let mut selection = LocalSelection::skin(source, p, bbox);
+    let count = selection.width as usize * selection.height as usize;
+    let mut corrections = vec![[0.0; 3]; count];
+    if count == 0 {
+        return UnderEyeCorrection {
+            selection,
+            corrections,
+        };
+    }
+    let under_eyes = PreparedSemantic::new(p, bbox, "underEyes");
+    let mut targets = vec![0.0; count];
+    for (i, target) in targets.iter_mut().enumerate() {
+        let x = i as u32 % selection.width + selection.x;
+        let y = i as u32 / selection.width + selection.y;
+        let weight = under_eyes
+            .coverage(
+                (x as f32 + 0.5) / source.width as f32,
+                (y as f32 + 0.5) / source.height as f32,
+                source.width,
+                source.height,
+            )
+            .unwrap_or(0.0);
+        let alpha = source.pixels[(y as usize * source.width as usize + x as usize) * 4 + 3];
+        *target = if alpha == 0 {
+            0.0
+        } else {
+            weight * selection.weights[i].0
+        };
+    }
+    if targets.iter().all(|&weight| weight <= 1e-4) {
+        return UnderEyeCorrection {
+            selection,
+            corrections,
+        };
+    }
+    let face_width = bbox
+        .map(|b| b.width * source.width as f32)
+        .unwrap_or(selection.width as f32);
+    let sigma = (face_width * 0.009).clamp(1.2, 4.0);
+    let low = selection_low_frequency(source, &selection, sigma);
+    // Even the feathered shadow boundary must not become a reference donor.
+    for (i, weights) in selection.weights.iter_mut().enumerate() {
+        if targets[i] > 1e-4 {
+            weights.1 = 0.0;
+        }
+    }
+    let reference_low = selection_low_frequency(source, &selection, sigma);
+    let radius = (face_width * 0.13).clamp(4.0, 72.0);
+    let offsets: Vec<_> = [0.65f32, 1.0, 1.4]
+        .into_iter()
+        .flat_map(|ring| {
+            (0..24).map(move |step| {
+                let angle = step as f32 * std::f32::consts::TAU / 24.0;
+                (
+                    libm::cosf(angle) * ring,
+                    libm::sinf(angle) * ring,
+                    1.0 / ring,
+                )
+            })
+        })
+        .collect();
+    for (i, &weight) in targets.iter().enumerate() {
+        if weight <= 1e-4 || low.as_raw()[i * 4 + 3] <= 1e-4 {
+            continue;
+        }
+        let x = i % selection.width as usize;
+        let y = i / selection.width as usize;
+        let mut donors = Vec::with_capacity(offsets.len());
+        let mut limits = [[f32::INFINITY, f32::NEG_INFINITY]; 3];
+        for &(ox, oy, spatial_weight) in &offsets {
+            let px = x as f32 + ox * radius;
+            let py = y as f32 + oy * radius;
+            if px < 0.0 || py < 0.0 || px >= selection.width as f32 || py >= selection.height as f32
+            {
+                continue;
+            }
+            let px = px.round().min(selection.width as f32 - 1.0) as usize;
+            let py = py.round().min(selection.height as f32 - 1.0) as usize;
+            let j = py * selection.width as usize + px;
+            let donor = selection.weights[j].1;
+            let color = reference_low.get_pixel(px as u32, py as u32).0;
+            if donor <= 0.5 || color[3] <= 1e-4 {
+                continue;
+            }
+            for a in 0..3 {
+                let value = color[a] / color[3];
+                limits[a][0] = limits[a][0].min(value);
+                limits[a][1] = limits[a][1].max(value);
+            }
+            donors.push(UnderEyeDonor {
+                position: [
+                    1.0,
+                    (px as f64 - x as f64) / radius as f64,
+                    (py as f64 - y as f64) / radius as f64,
+                ],
+                color: std::array::from_fn(|c| color[c] / color[3]),
+                weight: (donor * spatial_weight) as f64,
+            });
+        }
+        let Some(predicted) = under_eye_reference(&donors) else {
+            continue;
+        };
+        let reference: [f32; 3] = std::array::from_fn(|c| {
+            predicted[c].clamp(
+                (limits[c][0] - 8.0).max(0.0),
+                (limits[c][1] + 8.0).min(255.0),
+            )
+        });
+        let center = low.get_pixel(x as u32, y as u32).0;
+        let local: [f32; 3] = std::array::from_fn(|c| center[c] / center[3]);
+        let reference_light = luma(reference[0], reference[1], reference[2]);
+        let local_light = luma(local[0], local[1], local[2]);
+        let index =
+            (((y as u32 + selection.y) * source.width) + x as u32 + selection.x) as usize * 4;
+        let original_light = luma(
+            source.pixels[index] as f32,
+            source.pixels[index + 1] as f32,
+            source.pixels[index + 2] as f32,
+        );
+        // A broad chromatic shadow is editable; a narrow dark contour may
+        // instead be eyelashes, eyeglass frames or a lower-lid crease missed
+        // by parsing. Do not turn those outlines into pale painted strokes.
+        let contour_keep = 1.0 - smoothstep(12.0, 28.0, local_light - original_light);
+        let deficit = reference_light - local_light;
+        let confidence = smoothstep(1.5, 7.0, deficit)
+            * smoothstep(18.0, 60.0, local_light)
+            * (1.0 - smoothstep(205.0, 245.0, local_light));
+        // The target is a subtle local fill rather than a flat white wash.
+        // Lift a little more of a genuine broad shadow (the confidence gate
+        // already excludes healthy skin and highlights), while keeping the
+        // chroma transfer separate so blue/brown cast is corrected without
+        // bleaching the surrounding texture.
+        let lift = deficit.clamp(0.0, 38.0) * 0.88 * confidence;
+        for c in 0..3 {
+            // Only a dark region gets a subtle correction of its relative
+            // blue/red cast; healthy skin and specular highlights stay put.
+            let color_difference =
+                ((reference[c] - reference_light) - (local[c] - local_light)).clamp(-12.0, 12.0);
+            corrections[i][c] =
+                (lift + color_difference * confidence * 0.58) * weight * contour_keep;
+        }
+    }
+    UnderEyeCorrection {
+        selection,
+        corrections,
+    }
+}
+
 pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> RgbaImage {
     let values = p.get("adjustments").unwrap_or(p);
     if [
@@ -1261,6 +1903,54 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
     let lip_saturation = percent(values, "lipSaturation");
     let dark_circle = positive(values, "darkCircle");
     let semantic_enabled = p.get("semanticMasks").is_some() || bbox.is_some();
+    let adaptive_under_eye = (dark_circle > 0.0
+        && (bbox.is_some() || p.get("semanticMasks").and_then(|m| m.get("skin")).is_some()))
+    .then(|| under_eye_correction(source, p, bbox));
+    if let Some(correction) = &adaptive_under_eye {
+        if [
+            "smooth",
+            "hue",
+            "saturation",
+            "browColor",
+            "lipColor",
+            "teethWhiten",
+            "brightness",
+            "lipBrightness",
+            "lipSaturation",
+        ]
+        .iter()
+        .all(|key| number(values, key, 0.0).abs() <= 1e-6)
+        {
+            for (i, &delta) in correction.corrections.iter().enumerate() {
+                let s = &correction.selection;
+                let x = i as u32 % s.width + s.x;
+                let y = i as u32 / s.width + s.y;
+                let index = (y as usize * source.width as usize + x as usize) * 4;
+                for (c, &amount) in delta.iter().enumerate() {
+                    out.pixels[index + c] =
+                        byte(source.pixels[index + c] as f32 + amount * dark_circle);
+                }
+            }
+            return out;
+        }
+    }
+    let skin_semantic = PreparedSemantic::new(p, bbox, "skin");
+    let eye_semantic = PreparedSemantic::new(p, bbox, "eyes");
+    let under_eye_semantic = PreparedSemantic::new(p, bbox, "underEyes");
+    let brow_semantic = PreparedSemantic::new(p, bbox, "brows");
+    let lip_semantic = PreparedSemantic::new(p, bbox, "lips");
+    let teeth_semantic = PreparedSemantic::new(p, bbox, "teeth");
+    // A brow polygon includes skin between strands. Estimate that skin from
+    // eligible surrounding texels rather than darkening the entire polygon.
+    let brow_reference = (brow.abs() > 1e-6
+        && (bbox.is_some() || p.get("semanticMasks").and_then(|m| m.get("skin")).is_some()))
+    .then(|| {
+        let selection = LocalSelection::skin(source, p, bbox);
+        let face_width = bbox.map_or(region.width, |b| b.width) * source.width as f32;
+        let low =
+            selection_low_frequency(source, &selection, (face_width * 0.045).clamp(3.0, 28.0));
+        (selection, low)
+    });
     for y in 0..source.height {
         for x in 0..source.width {
             let nx = (x as f32 + 0.5) / source.width as f32;
@@ -1280,7 +1970,9 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
             // regions are present; old region behavior remains unchanged when
             // callers provide no detector data.
             let skin_weight = if semantic_enabled {
-                semantic_weight(p, bbox, "skin", nx, ny, source.width, source.height).unwrap_or(0.0)
+                skin_semantic
+                    .coverage(nx, ny, source.width, source.height)
+                    .unwrap_or(0.0)
             } else {
                 1.0
             };
@@ -1290,7 +1982,8 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
             let fallback_under_eye = (((rx - 0.32) / 0.20).powi(2) + ((ry - 0.46) / 0.09).powi(2))
                 .min(((rx - 0.68) / 0.20).powi(2) + ((ry - 0.46) / 0.09).powi(2));
             let mut under_eye_weight = if semantic_enabled {
-                semantic_weight(p, bbox, "underEyes", nx, ny, source.width, source.height)
+                under_eye_semantic
+                    .coverage(nx, ny, source.width, source.height)
                     .unwrap_or(0.0)
             } else if fallback_under_eye < 1.0 {
                 (1.0 - fallback_under_eye).powi(2)
@@ -1299,17 +1992,21 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
             };
             if semantic_enabled {
                 under_eye_weight *= 1.0
-                    - semantic_exclusion(
-                        p,
-                        bbox,
-                        &["eyes", "brows"],
-                        nx,
-                        ny,
-                        source.width,
-                        source.height,
-                    );
+                    - eye_semantic
+                        .coverage(nx, ny, source.width, source.height)
+                        .unwrap_or(0.0)
+                        .max(
+                            brow_semantic
+                                .coverage(nx, ny, source.width, source.height)
+                                .unwrap_or(0.0),
+                        );
             }
-            if under_eye_weight > 0.0 {
+            if let Some(correction) = &adaptive_under_eye {
+                let delta = correction.sample(x, y);
+                for c in 0..3 {
+                    rgb[c] += delta[c] * dark_circle;
+                }
+            } else if under_eye_weight > 0.0 {
                 let light = luma(rgb[0], rgb[1], rgb[2]);
                 let shadow_lift = (28.0 + (170.0 - light).max(0.0) * 0.08).min(42.0);
                 rgb = brighten_luma(
@@ -1332,28 +2029,59 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
             let fallback_brow = (((rx - 0.32) / 0.21).powi(2) + ((ry - 0.28) / 0.07).powi(2))
                 .min(((rx - 0.68) / 0.21).powi(2) + ((ry - 0.28) / 0.07).powi(2));
             let brow_weight = if semantic_enabled {
-                semantic_weight(p, bbox, "brows", nx, ny, source.width, source.height)
+                brow_semantic
+                    .coverage(nx, ny, source.width, source.height)
                     .unwrap_or(0.0)
             } else if fallback_brow < 1.0 {
                 (1.0 - fallback_brow).powi(2)
             } else {
                 0.0
             };
-            if brow_weight > 0.0 {
-                for value in &mut rgb {
-                    *value *= 1.0 - brow * brow_weight * 0.5;
+            if brow_weight > 0.0 && brow.abs() > 1e-6 {
+                let reference = brow_reference.as_ref().and_then(|(s, low)| {
+                    if x < s.x || y < s.y || x >= s.x + s.width || y >= s.y + s.height {
+                        return None;
+                    }
+                    let color = low.get_pixel(x - s.x, y - s.y).0;
+                    (color[3] >= 0.015)
+                        .then(|| std::array::from_fn::<_, 3, _>(|c| color[c] / color[3]))
+                });
+                if let Some(reference) = reference {
+                    let original =
+                        std::array::from_fn::<_, 3, _>(|c| source.pixels[index + c] as f32);
+                    let light = luma(original[0], original[1], original[2]);
+                    let skin_light = luma(reference[0], reference[1], reference[2]);
+                    let hair = smoothstep(0.04, 0.28, (skin_light - light) / skin_light.max(20.0));
+                    let coverage = brow_weight * hair;
+                    for c in 0..3 {
+                        if brow > 0.0 {
+                            rgb[c] = linear_to_srgb(
+                                srgb_to_linear(rgb[c]) * (1.0 - brow * coverage * 0.52),
+                            );
+                        } else {
+                            rgb[c] += (reference[c] - original[c]) * (-brow) * coverage * 0.32;
+                        }
+                    }
+                } else {
+                    // A standalone hand-drawn brow mask lacks a skin reference.
+                    for value in &mut rgb {
+                        *value *= 1.0 - brow * brow_weight * 0.5;
+                    }
                 }
             }
             let fallback_mouth = ((rx - 0.5) / 0.25).powi(2) + ((ry - 0.76) / 0.09).powi(2);
             let mouth_weight = if semantic_enabled {
-                semantic_weight(p, bbox, "lips", nx, ny, source.width, source.height).unwrap_or(0.0)
+                lip_semantic
+                    .coverage(nx, ny, source.width, source.height)
+                    .unwrap_or(0.0)
             } else if fallback_mouth < 1.0 {
                 1.0 - fallback_mouth
             } else {
                 0.0
             };
             let inner_mouth_weight = if semantic_enabled {
-                semantic_weight(p, bbox, "teeth", nx, ny, source.width, source.height)
+                teeth_semantic
+                    .coverage(nx, ny, source.width, source.height)
                     .unwrap_or(0.0)
             } else {
                 0.0
@@ -1361,17 +2089,35 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
             // Outer lip polygons contain the inner mouth. Subtract that area
             // before applying lipstick, lip brightness or saturation; enamel
             // and mouth cavities must not receive the lip color pass.
-            let lip_weight = mouth_weight * (1.0 - inner_mouth_weight);
+            // A feathered teeth polygon is a hard exclusion for lipstick. A
+            // linear subtraction leaves a colored halo inside enamel because
+            // the polygon edge coverage is rarely exactly 1.0 at 8-bit size.
+            let teeth_exclusion = (inner_mouth_weight > 1e-4) as u8 as f32;
+            let lip_weight = mouth_weight * (1.0 - teeth_exclusion);
             if lip_weight > 0.0 {
-                rgb[0] += lip * lip_weight * 35.0;
-                rgb[1] -= lip * lip_weight * 12.0;
-                rgb[2] -= lip * lip_weight * 4.0;
-                let (h, s, l) = rgb_to_hsl(rgb);
-                rgb = hsl_to_rgb(
-                    h,
-                    s * (1.0 + lip_saturation * lip_weight),
-                    l + lip_brightness * lip_weight * 0.25,
-                );
+                // Change diffuse pigment at fixed luminance. A neutral bright
+                // reflection is lighting, and should not become a red stripe.
+                let original = std::array::from_fn::<_, 3, _>(|c| source.pixels[index + c] as f32);
+                let original_light = luma(original[0], original[1], original[2]);
+                let high = original.into_iter().fold(0.0, f32::max);
+                let low = original.into_iter().fold(255.0, f32::min);
+                let saturation = (high - low) / high.max(1.0);
+                let diffuse = 1.0
+                    - smoothstep(185.0, 245.0, original_light)
+                        * (1.0 - smoothstep(0.06, 0.22, saturation));
+                let light = luma(rgb[0], rgb[1], rgb[2]);
+                let tint = [35.0, -12.0, -4.0];
+                let tint_light = luma(tint[0], tint[1], tint[2]);
+                let chroma: [f32; 3] = std::array::from_fn(|c| {
+                    (rgb[c] - light) * (1.0 + lip_saturation * lip_weight * diffuse)
+                        + (tint[c] - tint_light) * lip * lip_weight * diffuse
+                });
+                let lift = if lip_brightness >= 0.0 {
+                    (255.0 - light) * lip_brightness * 0.32
+                } else {
+                    light * lip_brightness * 0.32
+                };
+                rgb = luma_chroma_rgb(light + lift * lip_weight, chroma);
             }
             // This pass also works when the host provides only a teeth mask.
             // Gate from immutable input color so a lipstick pass cannot turn a
@@ -1404,6 +2150,7 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
 pub(crate) fn film(source: &RgbaImage, p: &Value) -> RgbaImage {
     let preset = p.get("preset").and_then(Value::as_str).unwrap_or("neutral");
     let intensity = number(p, "intensity", 100.0).clamp(0.0, 100.0) / 100.0;
+    let response = crate::film::FilmResponse::new(preset);
     let grain = positive(p, "grain");
     let vignette = positive(p, "vignette");
     let glow = positive(p, "glow");
@@ -1483,6 +2230,15 @@ pub(crate) fn film(source: &RgbaImage, p: &Value) -> RgbaImage {
                     rgb[2] += shadow * 12.0;
                     rgb[0] += (1.0 - shadow) * 14.0;
                     rgb[2] -= (1.0 - shadow) * 8.0;
+                }
+                "provia" | "astia" | "velvia" | "classicNegative" | "eterna" | "acros" => {
+                    // These profiles use the linear-light response above;
+                    // keeping them separate from the legacy presets avoids
+                    // changing existing projects when the new response family
+                    // is added to the preset list.
+                    if let Some(response) = &response {
+                        rgb = response.apply(original);
+                    }
                 }
                 _ => {}
             }
@@ -1683,6 +2439,54 @@ mod tests {
         assert_eq!(means[0], [2.0; 4]);
         assert_eq!(means[4], [4.0; 4]);
         assert_eq!(means[8], [6.0; 4]);
+    }
+
+    #[test]
+    fn prepared_semantics_match_legacy_aliases_and_compact_polygon_masks() {
+        let polygon =
+            json!([{"x":0.2,"y":0.2},{"x":0.8,"y":0.2},{"x":0.7,"y":0.8},{"x":0.25,"y":0.75}]);
+        let params = json!({"semanticMasks":{
+            "face":{"shape":"ellipse","region":{"x":0,"y":0,"width":1,"height":1}},
+            "skin":{"points":polygon,"feather":3},
+            "leftEye":polygon,
+            "rightEye":{"shape":"raster","width":2,"height":2,"data":[0,127,255,30]},
+            "leftUnderEye":{"shape":"rect","region":{"x":0.1,"y":0.2,"width":0.3,"height":0.2}},
+            "rightUnderEye":{"shape":"radial","region":{"x":0.5,"y":0.2,"width":0.3,"height":0.2}},
+            "lips":{"shape":"polygon","points":polygon,"invert":true}
+        }});
+        let bbox = Some(LandmarkBox {
+            x: 0.1,
+            y: 0.1,
+            width: 0.8,
+            height: 0.8,
+        });
+        for name in [
+            "skin",
+            "face",
+            "eyes",
+            "brows",
+            "underEyes",
+            "lips",
+            "teeth",
+            "hair",
+        ] {
+            let prepared = PreparedSemantic::new(&params, bbox, name);
+            for y in -2..66 {
+                for x in -2..66 {
+                    let nx = (x as f32 + 0.5) / 64.0;
+                    let ny = (y as f32 + 0.5) / 64.0;
+                    let old = semantic_weight(&params, bbox, name, nx, ny, 64, 64);
+                    let new = prepared.coverage(nx, ny, 64, 64);
+                    match (old, new) {
+                        (Some(a), Some(b)) => {
+                            assert!((a - b).abs() < 1e-6, "{name} at {x},{y}: {a} != {b}")
+                        }
+                        (None, None) => {}
+                        _ => panic!("semantic existence changed: {name}"),
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -2268,6 +3072,50 @@ mod tests {
     }
 
     #[test]
+    fn film_response_profiles_roll_highlights_and_keep_skin_safe_chroma() {
+        let source = RgbaImage::new(
+            4,
+            1,
+            vec![
+                18, 24, 34, 255, // shadow
+                160, 112, 92, 255, // skin-like midtone
+                232, 184, 142, 255, // warm highlight
+                255, 255, 255, 255,
+            ],
+        )
+        .unwrap();
+        for preset in [
+            "provia",
+            "astia",
+            "velvia",
+            "classicNegative",
+            "eterna",
+            "acros",
+        ] {
+            let output = film(&source, &json!({"preset":preset,"intensity":100}));
+            assert!(output.pixels.chunks_exact(4).all(|p| p[3] == 255));
+            // The response must be monotone in luminance: a profile may
+            // change hue, but it must not invert a highlight and a shadow.
+            let dark = pixel_light(&output, 0);
+            let mid = pixel_light(&output, 1);
+            let bright = pixel_light(&output, 2);
+            assert!(
+                dark < mid && mid < bright,
+                "{preset}: {dark} {mid} {bright}"
+            );
+        }
+        let acros = film(&source, &json!({"preset":"acros"}));
+        for pixel in acros.pixels.chunks_exact(4) {
+            assert_eq!(pixel[0], pixel[1]);
+            assert_eq!(pixel[1], pixel[2]);
+        }
+        let provia = film(&source, &json!({"preset":"provia"}));
+        let eterna = film(&source, &json!({"preset":"eterna"}));
+        assert!(chroma_span(&provia, 1) > chroma_span(&eterna, 1));
+        assert!(pixel_light(&eterna, 2) < pixel_light(&source, 2));
+    }
+
+    #[test]
     fn skin_redness_is_chromatic_and_texture_preserves_detail_only_when_smoothing() {
         let source = RgbaImage::new(1, 1, vec![175, 135, 100, 19]).unwrap();
         let red = skin(&source, &json!({"redness":100}));
@@ -2300,6 +3148,101 @@ mod tests {
         assert!(amplitude(&smoothed) < amplitude(&retained));
         assert!(amplitude(&retained) <= amplitude(&detail));
         assert!(retained.pixels.chunks_exact(4).all(|p| p[3] == 79));
+    }
+
+    #[test]
+    fn redness_neutralization_prefers_local_red_patch_over_healthy_skin_and_keeps_texture() {
+        let width = 160u32;
+        let source = RgbaImage::new(
+            width,
+            96,
+            (0..width * 96)
+                .flat_map(|i| {
+                    let x = i % width;
+                    let y = i / width;
+                    let bump =
+                        (-((x as f32 - 104.0).powi(2) + (y as f32 - 48.0).powi(2)) / 80.0).exp();
+                    let pore = if (x + y).is_multiple_of(2) { 2.0 } else { -2.0 };
+                    let base = 138.0 + x as f32 * 0.12 + y as f32 * 0.06 + pore;
+                    [
+                        byte(base + 32.0 + bump * 20.0),
+                        byte(base - bump * 6.0),
+                        byte(base - 19.0 + bump * 8.0),
+                        173,
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        let output = skin(&source, &json!({"redness":-100,"smooth":0}));
+        let red_at = |image: &RgbaImage, x: usize, y: usize| {
+            let i = (y * width as usize + x) * 4;
+            image.pixels[i] as f32 - image.pixels[i + 1] as f32
+        };
+        let center = 48 * width as usize + 104;
+        let healthy = 48 * width as usize + 40;
+        assert!(red_at(&source, 104, 48) - red_at(&output, 104, 48) > 16.0);
+        assert!((red_at(&source, 40, 48) - red_at(&output, 40, 48)).abs() <= 3.0);
+        let center_pixel = &output.pixels[center * 4..center * 4 + 3];
+        assert!(
+            center_pixel[1] as i32 - center_pixel[2] as i32 >= 14,
+            "de-red must recover local warm skin chroma rather than leave a purple spot"
+        );
+        for i in [center, healthy] {
+            assert!((pixel_light(&output, i) - pixel_light(&source, i)).abs() < 1.0);
+        }
+        let original_grain = pixel_light(&source, healthy) - pixel_light(&source, healthy + 1);
+        let edited_grain = pixel_light(&output, healthy) - pixel_light(&output, healthy + 1);
+        assert!((edited_grain - original_grain).abs() < 1.0);
+        assert!(output.pixels.chunks_exact(4).all(|p| p[3] == 173));
+    }
+
+    #[test]
+    fn redness_reference_cannot_import_frozen_or_semantically_protected_colour() {
+        let make = |blocked: [u8; 3]| {
+            RgbaImage::new(
+                64,
+                40,
+                (0..64 * 40)
+                    .flat_map(|i| {
+                        let (x, y) = (i % 64, i / 64);
+                        let rgb = if (26..38).contains(&x) && (12..28).contains(&y) {
+                            blocked
+                        } else {
+                            [174 + (x % 3) as u8, 136, 110]
+                        };
+                        [rgb[0], rgb[1], rgb[2], 173]
+                    })
+                    .collect(),
+            )
+            .unwrap()
+        };
+        let first = make([255, 0, 0]);
+        let second = make([0, 255, 255]);
+        let protection = json!({"shape":"rect","region":{
+            "x":26.0/64.0,"y":12.0/40.0,"width":12.0/64.0,"height":16.0/40.0}});
+        for semantic in ["skinProtection", "protectMask"] {
+            let mut params = json!({"redness":-100,"smooth":0,"semanticMasks":{
+                "skin":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}}}});
+            if semantic == "protectMask" {
+                params["protectMask"] = protection.clone();
+            } else {
+                params["semanticMasks"][semantic] = protection.clone();
+            }
+            let left = crate::mask::composite(&first, &skin(&first, &params), &params);
+            let right = crate::mask::composite(&second, &skin(&second, &params), &params);
+            for y in 0..40 {
+                for x in 0..64 {
+                    let i = (y * 64 + x) * 4;
+                    if (26..38).contains(&x) && (12..28).contains(&y) {
+                        assert_eq!(&left.pixels[i..i + 4], &first.pixels[i..i + 4]);
+                        assert_eq!(&right.pixels[i..i + 4], &second.pixels[i..i + 4]);
+                    } else {
+                        assert_eq!(&left.pixels[i..i + 4], &right.pixels[i..i + 4]);
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -2389,6 +3332,203 @@ mod tests {
         );
     }
 
+    fn pore_and_blemish_fixture() -> RgbaImage {
+        let width = 192u32;
+        let height = 128u32;
+        let pixels = (0..height)
+            .flat_map(|y| {
+                (0..width).flat_map(move |x| {
+                    let base = 156.0 + x as f32 * 0.08;
+                    // Coherent, low-contrast pore detail spans several pixels;
+                    // it is different from alternating one-pixel sensor noise.
+                    let mut pore = 0.0f32;
+                    for cy in [32.0f32, 56.0, 80.0, 104.0] {
+                        for cx in [32.0f32, 56.0, 80.0] {
+                            let d2 = (x as f32 - cx).powi(2) + (y as f32 - cy).powi(2);
+                            pore += 10.0 * (-d2 / 2.0).exp();
+                        }
+                    }
+                    let d2 = (x as f32 - 136.0).powi(2) + (y as f32 - 64.0).powi(2);
+                    let blemish = 44.0 * (-d2 / 14.0).exp();
+                    [
+                        byte(base - pore - blemish * 0.55),
+                        byte(base - 17.0 - pore - blemish),
+                        byte(base - 29.0 - pore - blemish),
+                        173,
+                    ]
+                })
+            })
+            .collect();
+        RgbaImage::new(width, height, pixels).unwrap()
+    }
+
+    #[test]
+    fn strong_skin_smoothing_keeps_coherent_pores_but_reduces_compact_blemishes() {
+        let source = pore_and_blemish_fixture();
+        let output = skin(&source, &json!({"smooth":100,"texture":0}));
+        let light_at = |image: &RgbaImage, x: usize, y: usize| {
+            pixel_light(image, y * image.width as usize + x)
+        };
+        let pore_before = light_at(&source, 32, 27) - light_at(&source, 32, 32);
+        let pore_after = light_at(&output, 32, 27) - light_at(&output, 32, 32);
+        assert!(
+            pore_after >= pore_before * 0.55,
+            "normal coherent pores must remain under strong smoothing: {pore_before} -> {pore_after}"
+        );
+        let blemish_before = light_at(&source, 136, 51) - light_at(&source, 136, 64);
+        let blemish_after = light_at(&output, 136, 51) - light_at(&output, 136, 64);
+        assert!(
+            blemish_after <= blemish_before * 0.60,
+            "larger high-contrast compact blemishes must improve: {blemish_before} -> {blemish_after}"
+        );
+        assert!(output.pixels.chunks_exact(4).all(|p| p[3] == 173));
+    }
+
+    #[test]
+    fn texture_retention_does_not_disable_compact_blemish_correction() {
+        let source = pore_and_blemish_fixture();
+        let output = skin(&source, &json!({"smooth":100,"texture":100}));
+        let center = 64 * source.width as usize + 136;
+        assert!(
+            pixel_light(&output, center) >= pixel_light(&source, center) + 15.0,
+            "texture slider must preserve healthy grain without preserving every blemish"
+        );
+        let pore = 32 * source.width as usize + 32;
+        assert!(
+            (pixel_light(&output, pore) - pixel_light(&source, pore)).abs() <= 3.0,
+            "a texture-preserved pore must retain its local tone"
+        );
+    }
+
+    #[test]
+    fn texture_preserved_skin_reduces_coherent_red_patch_without_erasing_low_contrast_pores() {
+        let source = RgbaImage::new(
+            192,
+            128,
+            (0..128)
+                .flat_map(|y| {
+                    (0..192).flat_map(move |x| {
+                        let d2 = (x as f32 - 96.0).powi(2) + (y as f32 - 64.0).powi(2);
+                        let spot = (-d2 / 14.0).exp();
+                        [
+                            byte(180.0 + 6.0 * spot),
+                            byte(150.0 - 9.0 * spot),
+                            byte(130.0 - 5.0 * spot),
+                            255,
+                        ]
+                    })
+                })
+                .collect(),
+        )
+        .unwrap();
+        let output = skin(&source, &json!({"smooth":100,"texture":100}));
+        let center = (64 * 192 + 96) * 4;
+        let red_excess =
+            |image: &RgbaImage| image.pixels[center] as i32 - image.pixels[center + 1] as i32 - 30;
+        assert!(
+            red_excess(&output) <= (red_excess(&source) as f32 * 0.65) as i32,
+            "a spatially coherent red patch must be softened even with maximum texture: {} -> {}",
+            red_excess(&source),
+            red_excess(&output)
+        );
+    }
+
+    #[test]
+    fn wide_red_blotch_is_corrected_without_flattening_healthy_lighting() {
+        let source = RgbaImage::new(
+            192,
+            128,
+            (0..128)
+                .flat_map(|y| {
+                    (0..192).flat_map(move |x| {
+                        let base = 170.0 + x as f32 * 0.15;
+                        let d2 = (x as f32 - 96.0).powi(2) + (y as f32 - 64.0).powi(2);
+                        let stain = (-d2 / 72.0).exp();
+                        [
+                            byte(base + 8.0 * stain),
+                            byte(base - 30.0 - 14.0 * stain),
+                            byte(base - 50.0 - 4.0 * stain),
+                            173,
+                        ]
+                    })
+                })
+                .collect(),
+        )
+        .unwrap();
+        let output = skin(&source, &json!({"smooth":100,"texture":100}));
+        let center = (64 * 192 + 96) * 4;
+        let red_excess =
+            |image: &RgbaImage| image.pixels[center] as i32 - image.pixels[center + 1] as i32 - 30;
+        assert!(
+            red_excess(&output) <= 14,
+            "a broad chromatic stain must improve without disabling texture: {} -> {}",
+            red_excess(&source),
+            red_excess(&output)
+        );
+        for x in [20usize, 160] {
+            let i = 20 * 192 + x;
+            assert!((pixel_light(&output, i) - pixel_light(&source, i)).abs() <= 1.0);
+            for c in 0..3 {
+                assert!(
+                    (output.pixels[i * 4 + c] as i32 - source.pixels[i * 4 + c] as i32).abs() <= 1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn brow_tone_does_not_paint_between_hair_strands() {
+        let (w, h) = (96_u32, 48_u32);
+        let mut pixels = Vec::new();
+        for y in 0..h {
+            for x in 0..w {
+                let strand = (18..26).contains(&y) && (12..84).contains(&x) && x % 5 < 2;
+                pixels.extend_from_slice(if strand {
+                    &[54, 42, 31, 255]
+                } else {
+                    &[190, 155, 131, 255]
+                });
+            }
+        }
+        let source = RgbaImage::new(w, h, pixels).unwrap();
+        let masks = json!({"skin":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}},"brows":{"shape":"rect","region":{"x":0.125,"y":0.375,"width":0.75,"height":1.0/6.0}}});
+        for amount in [-100, -60, 60, 100] {
+            let output = local_color(
+                &source,
+                &json!({"semanticMasks":masks,"adjustments":{"browColor":amount}}),
+                false,
+            );
+            for y in 0..h {
+                for x in 0..w {
+                    let i = (y * w + x) as usize;
+                    let strand = (18..26).contains(&y) && (12..84).contains(&x) && x % 5 < 2;
+                    if !strand {
+                        assert_eq!(
+                            &output.pixels[i * 4..i * 4 + 4],
+                            &source.pixels[i * 4..i * 4 + 4]
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn lipstick_keeps_teeth_polygon_bit_exact() {
+        let source = RgbaImage::new(20, 8, [170, 90, 100, 255].repeat(160)).unwrap();
+        let params = json!({"semanticMasks":{"lips":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}},"teeth":{"shape":"rect","region":{"x":0.4,"y":0,"width":0.2,"height":1}}},"adjustments":{"lipColor":100}});
+        let output = local_color(&source, &params, false);
+        for y in 0..8 {
+            for x in 8..12 {
+                let i = (y * 20 + x) as usize;
+                assert_eq!(
+                    &output.pixels[i * 4..i * 4 + 4],
+                    &source.pixels[i * 4..i * 4 + 4]
+                );
+            }
+        }
+    }
+
     #[test]
     fn every_makeup_color_parameter_has_its_own_direction_and_semantic_boundary() {
         let source = RgbaImage::new(
@@ -2450,6 +3590,159 @@ mod tests {
                 source
             );
         }
+    }
+
+    fn under_eye_fixture(shadow: bool) -> (RgbaImage, Value) {
+        let mut pixels = Vec::new();
+        for y in 0..120 {
+            for x in 0..160 {
+                let light = 130.0 + x as f32 * 0.22 + y as f32 * 0.14;
+                let distance =
+                    ((x as f32 - 60.0) / 18.0).powi(2) + ((y as f32 - 55.0) / 8.0).powi(2);
+                let shade = if shadow {
+                    (1.0 - distance).max(0.0) * 30.0
+                } else {
+                    0.0
+                };
+                let pore = if (x / 2 + y / 2) % 2 == 0 { 2.0 } else { -2.0 };
+                pixels.extend_from_slice(&[
+                    byte(light + 25.0 + pore - shade),
+                    byte(light + pore - shade),
+                    byte(light - 16.0 + pore - shade * 0.75),
+                    255,
+                ]);
+            }
+        }
+        let params = json!({"adjustments":{"darkCircle":100},"semanticMasks":{
+            "skin":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}},
+            "underEyes":{"shape":"rect","region":{"x":0.25,"y":0.375,"width":0.25,"height":0.17}}
+        }});
+        (RgbaImage::new(160, 120, pixels).unwrap(), params)
+    }
+
+    #[test]
+    fn under_eye_plane_rejects_local_highlight_and_chroma_outliers() {
+        let mut donors = Vec::new();
+        for step in 0..36 {
+            let angle = step as f32 * std::f32::consts::TAU / 36.0;
+            let (x, y) = (libm::cosf(angle) as f64, libm::sinf(angle) as f64);
+            let light = 145.0 + x * 18.0 + y * 8.0;
+            let mut color = [light as f32 + 24.0, light as f32, light as f32 - 16.0];
+            // A compact ring section passes over bright cheek color / blush.
+            if (4..9).contains(&step) {
+                color = [245.0, 200.0, 190.0];
+            }
+            donors.push(UnderEyeDonor {
+                position: [1.0, x, y],
+                color,
+                weight: 1.0,
+            });
+        }
+        let reference = under_eye_reference(&donors).unwrap();
+        for (actual, expected) in reference.into_iter().zip([169.0, 145.0, 129.0]) {
+            assert!(
+                (actual - expected).abs() < 0.05,
+                "outlier biased reference: {reference:?}"
+            );
+        }
+        // All visible donors on a single line cannot support a plane.
+        for donor in &mut donors {
+            donor.position[2] = 0.0;
+        }
+        assert!(under_eye_reference(&donors).is_none());
+    }
+
+    #[test]
+    fn under_eye_preserves_narrow_dark_contours_inside_the_shadow() {
+        let (mut source, params) = under_eye_fixture(true);
+        // An unparsed eyeglass / eyelash contour inside the requested region.
+        for y in 50..61 {
+            let i = (y * 160 + 60) * 4;
+            source.pixels[i..i + 3].copy_from_slice(&[32, 28, 30]);
+        }
+        let output = local_color(&source, &params, false);
+        for y in 50..61 {
+            let i = (y * 160 + 60) * 4;
+            assert_eq!(&output.pixels[i..i + 4], &source.pixels[i..i + 4]);
+        }
+        let nearby = 55 * 160 + 67;
+        assert!(pixel_light(&output, nearby) > pixel_light(&source, nearby) + 5.0);
+    }
+
+    #[test]
+    fn adaptive_under_eye_reduces_shadow_without_flattening_texture_or_affine_lighting() {
+        let (healthy, params) = under_eye_fixture(false);
+        let (source, _) = under_eye_fixture(true);
+        let output = local_color(&source, &params, false);
+        let center = 55 * 160 + 60;
+        let before = pixel_light(&healthy, center) - pixel_light(&source, center);
+        let after = pixel_light(&healthy, center) - pixel_light(&output, center);
+        assert!(after < before * 0.55, "eye shadow: {before} -> {after}");
+        let healthy_output = local_color(&healthy, &params, false);
+        assert_eq!(
+            healthy_output, healthy,
+            "healthy lit skin must not be brightened"
+        );
+        // The pass transfers low frequency illumination; a two-pixel pore
+        // remains instead of being replaced by a flat patch.
+        let contrast =
+            |image: &RgbaImage| pixel_light(image, center) - pixel_light(image, center + 2);
+        assert!((contrast(&output) - contrast(&source)).abs() < 1.5);
+        let stronger = local_color(&source, &params, false);
+        let mut weaker_params = params.clone();
+        weaker_params["adjustments"]["darkCircle"] = json!(40);
+        let weaker = local_color(&source, &weaker_params, false);
+        assert!(pixel_light(&weaker, center) > pixel_light(&source, center));
+        assert!(pixel_light(&stronger, center) > pixel_light(&weaker, center));
+        for (i, (a, b)) in source
+            .pixels
+            .chunks_exact(4)
+            .zip(output.pixels.chunks_exact(4))
+            .enumerate()
+        {
+            let (x, y) = (i % 160, i / 160);
+            if !(40..80).contains(&x) || !(45..65).contains(&y) {
+                assert_eq!(a, b);
+            }
+            assert_eq!(a[3], b[3]);
+        }
+    }
+
+    #[test]
+    fn adaptive_under_eye_excludes_protected_and_transparent_reference_colors() {
+        let (mut a, mut params) = under_eye_fixture(true);
+        params["semanticMasks"]["skinProtection"] =
+            json!({"shape":"rect","region":{"x":0.35,"y":0.56,"width":0.3,"height":0.15}});
+        let mut b = a.clone();
+        for y in 0..120 {
+            for x in 0..160 {
+                let i = (y * 160 + x) * 4;
+                if (56..104).contains(&x) && (67..85).contains(&y) {
+                    a.pixels[i..i + 3].copy_from_slice(&[10, 240, 30]);
+                    b.pixels[i..i + 3].copy_from_slice(&[240, 10, 230]);
+                }
+                if (82..98).contains(&x) && (40..65).contains(&y) {
+                    a.pixels[i..i + 4].copy_from_slice(&[0, 255, 0, 0]);
+                    b.pixels[i..i + 4].copy_from_slice(&[255, 0, 255, 0]);
+                }
+            }
+        }
+        let first = local_color(&a, &params, false);
+        let second = local_color(&b, &params, false);
+        for y in 45..65 {
+            for x in 40..80 {
+                let i = (y * 160 + x) * 4;
+                assert_eq!(
+                    &first.pixels[i..i + 4],
+                    &second.pixels[i..i + 4],
+                    "excluded donor leaked at {x},{y}"
+                );
+            }
+        }
+        assert_ne!(
+            first.pixels[(55 * 160 + 60) * 4],
+            a.pixels[(55 * 160 + 60) * 4]
+        );
     }
 
     #[test]

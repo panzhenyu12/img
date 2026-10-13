@@ -570,8 +570,22 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
             "preset" => {
                 if !value.as_str().is_some_and(|s| {
                     [
-                        "neutral", "classic", "warm", "cool", "fade", "vivid", "pastel", "mono",
-                        "night", "cinema",
+                        "neutral",
+                        "classic",
+                        "warm",
+                        "cool",
+                        "fade",
+                        "vivid",
+                        "pastel",
+                        "mono",
+                        "night",
+                        "cinema",
+                        "provia",
+                        "astia",
+                        "velvia",
+                        "classicNegative",
+                        "eterna",
+                        "acros",
                     ]
                     .contains(&s)
                 }) {

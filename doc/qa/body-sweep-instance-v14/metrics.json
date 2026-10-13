@@ -1,0 +1,254 @@
+[
+  {
+    "id": "fashion-standing",
+    "part": "right-thigh",
+    "amount": -100,
+    "ms": 2583,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-thigh--100.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-thigh",
+    "amount": -60,
+    "ms": 3020,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-thigh--60.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-thigh",
+    "amount": -30,
+    "ms": 2798,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-thigh--30.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-thigh",
+    "amount": 30,
+    "ms": 2594,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-thigh-30.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-thigh",
+    "amount": 60,
+    "ms": 1647,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-thigh-60.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-thigh",
+    "amount": 100,
+    "ms": 1146,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-thigh-100.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "left-thigh",
+    "amount": -100,
+    "ms": 1187,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-left-thigh--100.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "left-thigh",
+    "amount": -60,
+    "ms": 1142,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-left-thigh--60.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "left-thigh",
+    "amount": -30,
+    "ms": 1145,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-left-thigh--30.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "left-thigh",
+    "amount": 30,
+    "ms": 1113,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-left-thigh-30.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "left-thigh",
+    "amount": 60,
+    "ms": 1197,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-left-thigh-60.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "left-thigh",
+    "amount": 100,
+    "ms": 1162,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-left-thigh-100.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-upper-arm",
+    "amount": -100,
+    "ms": 1055,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-upper-arm--100.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-upper-arm",
+    "amount": -60,
+    "ms": 1291,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-upper-arm--60.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-upper-arm",
+    "amount": -30,
+    "ms": 1321,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-upper-arm--30.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-upper-arm",
+    "amount": 30,
+    "ms": 1087,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-upper-arm-30.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-upper-arm",
+    "amount": 60,
+    "ms": 1134,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-upper-arm-60.png"
+  },
+  {
+    "id": "fashion-standing",
+    "part": "right-upper-arm",
+    "amount": 100,
+    "ms": 1156,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fashion-standing-right-upper-arm-100.png"
+  },
+  {
+    "id": "tilted-shirt",
+    "part": "left-upper-arm",
+    "amount": -100,
+    "ms": 1060,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/tilted-shirt-left-upper-arm--100.png"
+  },
+  {
+    "id": "tilted-shirt",
+    "part": "left-upper-arm",
+    "amount": -60,
+    "ms": 1245,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/tilted-shirt-left-upper-arm--60.png"
+  },
+  {
+    "id": "tilted-shirt",
+    "part": "left-upper-arm",
+    "amount": -30,
+    "ms": 1200,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/tilted-shirt-left-upper-arm--30.png"
+  },
+  {
+    "id": "tilted-shirt",
+    "part": "left-upper-arm",
+    "amount": 30,
+    "ms": 1036,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/tilted-shirt-left-upper-arm-30.png"
+  },
+  {
+    "id": "tilted-shirt",
+    "part": "left-upper-arm",
+    "amount": 60,
+    "ms": 1104,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/tilted-shirt-left-upper-arm-60.png"
+  },
+  {
+    "id": "tilted-shirt",
+    "part": "left-upper-arm",
+    "amount": 100,
+    "ms": 1049,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/tilted-shirt-left-upper-arm-100.png"
+  },
+  {
+    "id": "fullbody-skirt",
+    "part": "right-upper-arm",
+    "amount": -100,
+    "ms": 1023,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fullbody-skirt-right-upper-arm--100.png"
+  },
+  {
+    "id": "fullbody-skirt",
+    "part": "right-upper-arm",
+    "amount": -60,
+    "ms": 992,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fullbody-skirt-right-upper-arm--60.png"
+  },
+  {
+    "id": "fullbody-skirt",
+    "part": "right-upper-arm",
+    "amount": -30,
+    "ms": 1141,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fullbody-skirt-right-upper-arm--30.png"
+  },
+  {
+    "id": "fullbody-skirt",
+    "part": "right-upper-arm",
+    "amount": 30,
+    "ms": 1055,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fullbody-skirt-right-upper-arm-30.png"
+  },
+  {
+    "id": "fullbody-skirt",
+    "part": "right-upper-arm",
+    "amount": 60,
+    "ms": 999,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fullbody-skirt-right-upper-arm-60.png"
+  },
+  {
+    "id": "fullbody-skirt",
+    "part": "right-upper-arm",
+    "amount": 100,
+    "ms": 981,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/fullbody-skirt-right-upper-arm-100.png"
+  },
+  {
+    "id": "action-suit",
+    "part": "waist",
+    "amount": -100,
+    "ms": 1229,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/action-suit-waist--100.png"
+  },
+  {
+    "id": "action-suit",
+    "part": "waist",
+    "amount": -60,
+    "ms": 1324,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/action-suit-waist--60.png"
+  },
+  {
+    "id": "action-suit",
+    "part": "waist",
+    "amount": -30,
+    "ms": 1272,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/action-suit-waist--30.png"
+  },
+  {
+    "id": "action-suit",
+    "part": "waist",
+    "amount": 30,
+    "ms": 1231,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/action-suit-waist-30.png"
+  },
+  {
+    "id": "action-suit",
+    "part": "waist",
+    "amount": 60,
+    "ms": 1269,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/action-suit-waist-60.png"
+  },
+  {
+    "id": "action-suit",
+    "part": "waist",
+    "amount": 100,
+    "ms": 1230,
+    "output": "/Users/modao/work/img/test/results/body-sweep-instance-v14/action-suit-waist-100.png"
+  }
+]

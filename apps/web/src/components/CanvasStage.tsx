@@ -1,13 +1,13 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { PointerEvent, WheelEvent } from 'react';
-import { clampUnit, normalizedRegion, type ControlPoint, type InlineMask, type Point, type Region, type SelectionShape } from '../core/operations';
+import { clampUnit, normalizedRegion, type ControlPoint, type EditableMask, type Point, type Region, type SelectionShape } from '../core/operations';
 import type { ImagePixels } from '../core/engine';
 export type InteractionMode = 'pan' | 'rect' | 'ellipse' | 'lasso' | 'polygon' | 'brush' | 'erase' | 'protect' | 'unprotect' | 'liquify' | 'clone' | 'heal' | 'grid' | 'perspective' | 'linear' | 'radial' | 'paint' | 'paintErase';
 export interface CanvasGesture { mode: InteractionMode; points: Point[]; region: Region; shape: SelectionShape }
 export function CanvasStage({ image, original, compare, compareSplit, onCompareSplit, busy, zoom, onZoom, mode, region, mask, protectMask, controls, sample, radius, onGesture, onSample, onControl, onChoose }: {
   image: ImagePixels | null; original: ImagePixels | null; compare: boolean; compareSplit: boolean; onCompareSplit: (value: boolean) => void;
   busy: boolean; zoom: number; onZoom: (zoom: number) => void; mode: InteractionMode; region: Region | null;
-  mask?: InlineMask; protectMask?: InlineMask; controls: ControlPoint[]; sample: Point | null; radius: number;
+  mask?: EditableMask; protectMask?: EditableMask; controls: ControlPoint[]; sample: Point | null; radius: number;
   onGesture: (gesture: CanvasGesture) => void; onSample: (point: Point) => void; onControl: (index: number, point: Point) => void; onChoose: () => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -105,7 +105,14 @@ export function CanvasStage({ image, original, compare, compareSplit, onCompareS
     {busy && <span className="render-indicator">正在渲染…</span>}
   </div><div className="canvas-toolbar"><span>{current ? `${current.width} × ${current.height} px` : '未导入图片'}</span><div className="zoom-controls"><button onClick={() => onZoom(Math.max(.1, zoom / 1.15))} aria-label="缩小">−</button><span>{Math.round(zoom * fit * 100)}%</span><button onClick={() => onZoom(Math.min(8, zoom * 1.15))} aria-label="放大">＋</button><button onClick={() => { onZoom(1); setPan({ x: 0, y: 0 }); }} aria-label="适应窗口">适应</button><button onClick={() => onZoom(1 / fit)} aria-label="原始像素100%">100%</button><button className={compareSplit ? 'active' : ''} onClick={() => onCompareSplit(!compareSplit)}>分屏对比</button></div></div></section>;
 }
-function MaskOverlay({ mask, className, width, height }: { mask: InlineMask; className: string; width: number; height: number }) {
+function MaskOverlay({ mask, className, width, height }: { mask: EditableMask; className: string; width: number; height: number }) {
+  const rasterUrl = useMemo(() => {
+    if (mask.shape !== 'raster') return undefined;
+    const canvas = document.createElement('canvas'); canvas.width = mask.width; canvas.height = mask.height;
+    const context = canvas.getContext('2d')!; const pixels = context.createImageData(mask.width, mask.height);
+    for (let i = 0; i < mask.data.length; i++) { const value = mask.data[i]; pixels.data.set([value, value, value, 255], i * 4); }
+    context.putImageData(pixels, 0, 0); return canvas.toDataURL('image/png');
+  }, [mask]);
   const id = useId().replace(/:/g, ''); const region = mask.region ?? { x: 0, y: 0, width: 1, height: 1 };
   const from = mask.from ?? { x: region.x, y: region.y }; const to = mask.to ?? { x: region.x + region.width, y: region.y + region.height };
   const feather = Math.max(0, Math.min(100, mask.feather ?? 0)) / 100 * .2;
@@ -122,6 +129,7 @@ function MaskOverlay({ mask, className, width, height }: { mask: InlineMask; cla
         <g filter={mask.invert ? `url(#${id}-inverse)` : undefined}>
           <rect width="1" height="1" fill="black" />
           <g fill="white" filter={feather > 0 && ['rect', 'ellipse', 'polygon'].includes(mask.shape) ? `url(#${id}-feather)` : undefined}>
+            {rasterUrl && <image href={rasterUrl} x="0" y="0" width="1" height="1" preserveAspectRatio="none" />}
             {mask.shape === 'rect' && <rect {...region} />}
             {mask.shape === 'ellipse' && <ellipse {...ellipse} />}
             {mask.shape === 'polygon' && <polygon points={(mask.points ?? []).map((point) => `${point.x},${point.y}`).join(' ')} />}

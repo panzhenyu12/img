@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     args = argparse.ArgumentParser()
-    args.add_argument("--baseline-binary", type=Path, help="A verified pre-guided-filter build; omit for current-only evidence")
+    args.add_argument("--baseline-binary", type=Path, help="A verified comparison build; label defaults to Baseline")
+    args.add_argument("--baseline-label", default="Baseline", help="Explicit verified algorithm/revision label")
     options = args.parse_args()
     binary = ROOT / "core/image-core/target/release/image-render"
     cache = ROOT / "test/results/native-face-contour"
@@ -61,7 +62,7 @@ def main():
                 baseline = out / f"{sid}-{name}-baseline.png"
                 run = subprocess.run([str(options.baseline_binary), "--input", str(source_path), "--output", str(baseline), "--graph", str(graph_path)], capture_output=True)
                 if run.returncode == 0:
-                    panels.append((Image.open(baseline).convert("RGBA"), "Previous Gaussian"))
+                    panels.append((Image.open(baseline).convert("RGBA"), options.baseline_label))
             panels.append((edited_image, "Guided / " + name))
             x = max(0, int(region["x"] * image.width)); y = max(0, int(region["y"] * image.height))
             w = min(image.width - x, int(region["width"] * image.width)); h = min(image.height - y, int(region["height"] * image.height))

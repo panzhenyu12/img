@@ -1,0 +1,1117 @@
+{
+  "binary_sha256": "66eb1f7b1ca3578af4dfab9783d3149f225602cd311e93146e8b81a501bc17d1",
+  "film_source_sha256": "1354d67bb54c03aa08fcdab77a18934fcc6607f98450faa9403ea9235f97e921",
+  "scope": "1024px long edge, first/hot core timing excludes decode/encode, detection and browser initialization",
+  "presets": [
+    "provia",
+    "astia",
+    "velvia",
+    "classicNegative",
+    "eterna",
+    "acros"
+  ],
+  "cases": [
+    {
+      "photo": "portrait-makeup",
+      "preset": "neutral",
+      "source_sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70",
+      "render_input_sha256": "d1ed7c55ec2aded7086d902e6de798bfe9b634395e614d269343ac0ecc5cb3e2",
+      "output_sha256": "a85247cc63f741e61f1031f571b686ed39852d741be4595a111d5822be6aed84",
+      "first_run_ms": 53.869821,
+      "height": 902,
+      "hot_median_ms": 50.351937,
+      "hot_samples_ms": [
+        45.48349,
+        49.558251999999996,
+        50.351937,
+        50.952144999999994,
+        52.702244
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "provia",
+      "source_sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70",
+      "render_input_sha256": "d1ed7c55ec2aded7086d902e6de798bfe9b634395e614d269343ac0ecc5cb3e2",
+      "output_sha256": "4bcfbf8ffdcad1bfd2b946e714dfe7cafa52bfa26804be556011b60a2a440f2e",
+      "first_run_ms": 202.99926,
+      "height": 902,
+      "hot_median_ms": 199.148277,
+      "hot_samples_ms": [
+        197.697979,
+        198.317103,
+        199.148277,
+        206.837032,
+        209.811551
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "astia",
+      "source_sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70",
+      "render_input_sha256": "d1ed7c55ec2aded7086d902e6de798bfe9b634395e614d269343ac0ecc5cb3e2",
+      "output_sha256": "459647db611584899f2f0971bc3d794403d79101e6134f4c8374aee4082370bc",
+      "first_run_ms": 203.916788,
+      "height": 902,
+      "hot_median_ms": 198.293521,
+      "hot_samples_ms": [
+        194.902876,
+        196.610845,
+        198.293521,
+        199.826831,
+        213.058726
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "velvia",
+      "source_sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70",
+      "render_input_sha256": "d1ed7c55ec2aded7086d902e6de798bfe9b634395e614d269343ac0ecc5cb3e2",
+      "output_sha256": "df8b10c230d2a6cdaa5389f5b08baa3943fb929dc7900e6eda48a98d752f945c",
+      "first_run_ms": 231.969254,
+      "height": 902,
+      "hot_median_ms": 202.666383,
+      "hot_samples_ms": [
+        197.964966,
+        198.98236,
+        202.666383,
+        207.231317,
+        212.302388
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "classicNegative",
+      "source_sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70",
+      "render_input_sha256": "d1ed7c55ec2aded7086d902e6de798bfe9b634395e614d269343ac0ecc5cb3e2",
+      "output_sha256": "76128874d59952df1a0bdf031b01661203ec842cb698ca246db658290acdd8d8",
+      "first_run_ms": 188.454471,
+      "height": 902,
+      "hot_median_ms": 183.46750600000001,
+      "hot_samples_ms": [
+        181.22663699999998,
+        181.589833,
+        183.46750600000001,
+        191.822827,
+        195.03874399999998
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "eterna",
+      "source_sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70",
+      "render_input_sha256": "d1ed7c55ec2aded7086d902e6de798bfe9b634395e614d269343ac0ecc5cb3e2",
+      "output_sha256": "d250d963f897ab317355639fce23b129d599a6b02e39ca2cc39497b0db8ce3d6",
+      "first_run_ms": 287.931419,
+      "height": 902,
+      "hot_median_ms": 197.00253800000002,
+      "hot_samples_ms": [
+        195.47804299999999,
+        195.541846,
+        197.00253800000002,
+        232.34699,
+        320.930852
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "acros",
+      "source_sha256": "1b2a0147296ce870f74cbace5bfa2e2d147a8c0b384d79794bc4423266f3fd70",
+      "render_input_sha256": "d1ed7c55ec2aded7086d902e6de798bfe9b634395e614d269343ac0ecc5cb3e2",
+      "output_sha256": "1377fa4adb432272edea536d9b421c789168cb690d3e34263a55d915df3820c3",
+      "first_run_ms": 199.81875599999998,
+      "height": 902,
+      "hot_median_ms": 187.914647,
+      "hot_samples_ms": [
+        176.076705,
+        178.88267399999998,
+        187.914647,
+        194.127701,
+        201.979624
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "neutral",
+      "source_sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271",
+      "render_input_sha256": "0cec1b57fdd4fe58e4c3d2ca641ac6254adf6dec745fb09ddf698317a75d3b2f",
+      "output_sha256": "3427291b0222745d2207ee65308f3bf401725a11eaa93fc77a3aa286280ef99a",
+      "first_run_ms": 38.366864,
+      "height": 1024,
+      "hot_median_ms": 38.422666,
+      "hot_samples_ms": [
+        33.181824,
+        35.546485000000004,
+        38.422666,
+        38.643988,
+        42.036235999999995
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "provia",
+      "source_sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271",
+      "render_input_sha256": "0cec1b57fdd4fe58e4c3d2ca641ac6254adf6dec745fb09ddf698317a75d3b2f",
+      "output_sha256": "795ece56e6052ffe9d289627de230135097109156677f16344b48422ca09c49a",
+      "first_run_ms": 150.912884,
+      "height": 1024,
+      "hot_median_ms": 168.604021,
+      "hot_samples_ms": [
+        148.80079700000002,
+        162.98029499999998,
+        168.604021,
+        173.371449,
+        186.540448
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "astia",
+      "source_sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271",
+      "render_input_sha256": "0cec1b57fdd4fe58e4c3d2ca641ac6254adf6dec745fb09ddf698317a75d3b2f",
+      "output_sha256": "73dca5c9cdae69529ec4f71c8c7039d82b36335d2bd0264bbee0809c0933ced0",
+      "first_run_ms": 155.107741,
+      "height": 1024,
+      "hot_median_ms": 152.484946,
+      "hot_samples_ms": [
+        145.129207,
+        150.23263,
+        152.484946,
+        158.218368,
+        159.725838
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "velvia",
+      "source_sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271",
+      "render_input_sha256": "0cec1b57fdd4fe58e4c3d2ca641ac6254adf6dec745fb09ddf698317a75d3b2f",
+      "output_sha256": "12fdf82f902c8766ea77a58668446a700342545f9b19f991dbb242bae3090f57",
+      "first_run_ms": 157.57889,
+      "height": 1024,
+      "hot_median_ms": 147.606975,
+      "hot_samples_ms": [
+        117.629817,
+        127.09695400000001,
+        147.606975,
+        164.973377,
+        184.848624
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "classicNegative",
+      "source_sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271",
+      "render_input_sha256": "0cec1b57fdd4fe58e4c3d2ca641ac6254adf6dec745fb09ddf698317a75d3b2f",
+      "output_sha256": "4eb63efb7b2ec2af78628b0231e172b99f847d50017373dbb7878d7e9996e103",
+      "first_run_ms": 120.457014,
+      "height": 1024,
+      "hot_median_ms": 113.77622799999999,
+      "hot_samples_ms": [
+        104.095647,
+        112.762045,
+        113.77622799999999,
+        114.425251,
+        118.147313
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "eterna",
+      "source_sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271",
+      "render_input_sha256": "0cec1b57fdd4fe58e4c3d2ca641ac6254adf6dec745fb09ddf698317a75d3b2f",
+      "output_sha256": "a2c61cc70a7fa9dde211f3a64a1cb07941f4cab3d164323071535f83df8c7ed6",
+      "first_run_ms": 117.550224,
+      "height": 1024,
+      "hot_median_ms": 115.86157499999999,
+      "hot_samples_ms": [
+        107.86388099999999,
+        109.186841,
+        115.86157499999999,
+        116.48383399999999,
+        116.497271
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "acros",
+      "source_sha256": "c38d51bad28caaf524f615baea38c423622e225294ba4f614248f0ecb06c0271",
+      "render_input_sha256": "0cec1b57fdd4fe58e4c3d2ca641ac6254adf6dec745fb09ddf698317a75d3b2f",
+      "output_sha256": "1df5debf78269e00c7f4cbee3247a20e34d7fd61d1389a573e0ecbe3d6582f08",
+      "first_run_ms": 102.36612600000001,
+      "height": 1024,
+      "hot_median_ms": 104.105803,
+      "hot_samples_ms": [
+        99.663107,
+        100.103131,
+        104.105803,
+        105.613812,
+        107.24561100000001
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "neutral",
+      "source_sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b",
+      "render_input_sha256": "5bbc79e6f2f9a738d4582bd3add150aa5f1cc4e4b9fcdc6b82afae597a68b63f",
+      "output_sha256": "5eb43caf06ba2226f3e655d2fdb6831372282d23a138a54721a4ed86f692275a",
+      "first_run_ms": 35.045289,
+      "height": 1024,
+      "hot_median_ms": 30.221795,
+      "hot_samples_ms": [
+        28.665268,
+        28.693561,
+        30.221795,
+        33.544058,
+        33.972536
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 784
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "provia",
+      "source_sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b",
+      "render_input_sha256": "5bbc79e6f2f9a738d4582bd3add150aa5f1cc4e4b9fcdc6b82afae597a68b63f",
+      "output_sha256": "96f79dcb4b6443096eb0493db9a96c29bfb864dd625f8058363fc4e09617614c",
+      "first_run_ms": 165.935755,
+      "height": 1024,
+      "hot_median_ms": 280.544511,
+      "hot_samples_ms": [
+        177.55098999999998,
+        215.297404,
+        280.544511,
+        300.377599,
+        328.418632
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 784
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "astia",
+      "source_sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b",
+      "render_input_sha256": "5bbc79e6f2f9a738d4582bd3add150aa5f1cc4e4b9fcdc6b82afae597a68b63f",
+      "output_sha256": "3920e0682ff66fa659d3c177451f3ad68687e6d211ab7ee4cddc5cd5cd9ae92a",
+      "first_run_ms": 163.042044,
+      "height": 1024,
+      "hot_median_ms": 290.485993,
+      "hot_samples_ms": [
+        267.260325,
+        284.310312,
+        290.485993,
+        332.89216500000003,
+        351.451303
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 784
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "velvia",
+      "source_sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b",
+      "render_input_sha256": "5bbc79e6f2f9a738d4582bd3add150aa5f1cc4e4b9fcdc6b82afae597a68b63f",
+      "output_sha256": "bd0524eb4c5609517864156ae80f833a564f7c18fd6f82c98c6b4fb4c43d6cd3",
+      "first_run_ms": 342.688841,
+      "height": 1024,
+      "hot_median_ms": 220.171627,
+      "hot_samples_ms": [
+        192.77185599999999,
+        215.69851300000002,
+        220.171627,
+        222.663593,
+        282.20473699999997
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 784
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "classicNegative",
+      "source_sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b",
+      "render_input_sha256": "5bbc79e6f2f9a738d4582bd3add150aa5f1cc4e4b9fcdc6b82afae597a68b63f",
+      "output_sha256": "2aff6e3725b38ec2e711b94d1be8eb3aaddf27419cec2f5ce1ce9133a095ed1a",
+      "first_run_ms": 180.902009,
+      "height": 1024,
+      "hot_median_ms": 231.83765400000001,
+      "hot_samples_ms": [
+        175.467331,
+        198.07657,
+        231.83765400000001,
+        237.830227,
+        371.384259
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 784
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "eterna",
+      "source_sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b",
+      "render_input_sha256": "5bbc79e6f2f9a738d4582bd3add150aa5f1cc4e4b9fcdc6b82afae597a68b63f",
+      "output_sha256": "254b5f5774211bb2785dc678c83a62f5ff549bce16f581d5f4a6b5d342f35c96",
+      "first_run_ms": 211.25114200000002,
+      "height": 1024,
+      "hot_median_ms": 447.53389500000003,
+      "hot_samples_ms": [
+        238.07578900000001,
+        367.747042,
+        447.53389500000003,
+        474.00519099999997,
+        572.54268
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 784
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "acros",
+      "source_sha256": "7c71d8c2f45142315ee972755cf1f053b0546c392a9b6fe868011d3aa7d41f6b",
+      "render_input_sha256": "5bbc79e6f2f9a738d4582bd3add150aa5f1cc4e4b9fcdc6b82afae597a68b63f",
+      "output_sha256": "77e16499c0d3bc94f28f7fe60db84349980269baf8f1f9c6b064a50a04f36e1d",
+      "first_run_ms": 364.025271,
+      "height": 1024,
+      "hot_median_ms": 443.572135,
+      "hot_samples_ms": [
+        421.49073999999996,
+        433.18163999999996,
+        443.572135,
+        465.34358199999997,
+        479.921854
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 784
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "neutral",
+      "source_sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e",
+      "render_input_sha256": "c5de2a5d9a7c6726e71216375ff72ef27d329e30c10a1c0d94ff6e8efb4e4a32",
+      "output_sha256": "2e22f42b65bb38454dbc480db920b31ceedffa0a75fc75d1c6dd81f63e60db32",
+      "first_run_ms": 52.829788,
+      "height": 1024,
+      "hot_median_ms": 98.560856,
+      "hot_samples_ms": [
+        57.179823999999996,
+        92.260833,
+        98.560856,
+        104.422159,
+        134.947007
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "provia",
+      "source_sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e",
+      "render_input_sha256": "c5de2a5d9a7c6726e71216375ff72ef27d329e30c10a1c0d94ff6e8efb4e4a32",
+      "output_sha256": "b6bc9822d6f68178694636362eb6b24afa3c7596bd357f2204ea32b63b6b39e8",
+      "first_run_ms": 288.50237899999996,
+      "height": 1024,
+      "hot_median_ms": 425.286426,
+      "hot_samples_ms": [
+        380.574291,
+        418.82995,
+        425.286426,
+        431.822881,
+        533.897468
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "astia",
+      "source_sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e",
+      "render_input_sha256": "c5de2a5d9a7c6726e71216375ff72ef27d329e30c10a1c0d94ff6e8efb4e4a32",
+      "output_sha256": "f56bc5862914a2894085c3f2e19340558834f56f224584dca4f237d4cb1ea068",
+      "first_run_ms": 226.186429,
+      "height": 1024,
+      "hot_median_ms": 253.364196,
+      "hot_samples_ms": [
+        182.915529,
+        203.229552,
+        253.364196,
+        302.93361699999997,
+        550.2201180000001
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "velvia",
+      "source_sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e",
+      "render_input_sha256": "c5de2a5d9a7c6726e71216375ff72ef27d329e30c10a1c0d94ff6e8efb4e4a32",
+      "output_sha256": "1a4b95ab3b8fb2e4d9e28dba9d466bd6d4612fa226d32ebc4c9e3b12e0c42b54",
+      "first_run_ms": 299.389118,
+      "height": 1024,
+      "hot_median_ms": 401.49607599999996,
+      "hot_samples_ms": [
+        383.196297,
+        400.208058,
+        401.49607599999996,
+        403.648325,
+        464.154994
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "classicNegative",
+      "source_sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e",
+      "render_input_sha256": "c5de2a5d9a7c6726e71216375ff72ef27d329e30c10a1c0d94ff6e8efb4e4a32",
+      "output_sha256": "075312512d1c2a202f532aac1137f81713005699ee970b051edcacd5c5bac79c",
+      "first_run_ms": 280.84812999999997,
+      "height": 1024,
+      "hot_median_ms": 397.34643400000004,
+      "hot_samples_ms": [
+        355.73565,
+        366.18780699999996,
+        397.34643400000004,
+        407.041519,
+        425.329656
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "eterna",
+      "source_sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e",
+      "render_input_sha256": "c5de2a5d9a7c6726e71216375ff72ef27d329e30c10a1c0d94ff6e8efb4e4a32",
+      "output_sha256": "cabb59b7599f50c37c37c3d52b222763f5f10eb3a34d0c4c1584bbf4bec44d5f",
+      "first_run_ms": 284.554103,
+      "height": 1024,
+      "hot_median_ms": 370.673967,
+      "hot_samples_ms": [
+        332.21110500000003,
+        336.651934,
+        370.673967,
+        379.98607,
+        427.44863
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "acros",
+      "source_sha256": "063a035f567816937e75b37d81e538e339adef24ef3c1e59b9ff18267d348d3e",
+      "render_input_sha256": "c5de2a5d9a7c6726e71216375ff72ef27d329e30c10a1c0d94ff6e8efb4e4a32",
+      "output_sha256": "0a4b08e94b72d7a788ae5a4e27c4fea0580367cb191dd3696a862f33ceb1e0ed",
+      "first_run_ms": 194.21058399999998,
+      "height": 1024,
+      "hot_median_ms": 238.999881,
+      "hot_samples_ms": [
+        194.929216,
+        226.62956,
+        238.999881,
+        257.862362,
+        325.377223
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 683
+    },
+    {
+      "photo": "cityscape",
+      "preset": "neutral",
+      "source_sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb",
+      "render_input_sha256": "61268ad5ba16e85cfdab25fdba73918d3f9d177bc22223f4d59062269ef49ebd",
+      "output_sha256": "d94a1613ea5f244b3e3d7dea425fcbfdc4ea6e6186ae4c3785d4f896ebd233b2",
+      "first_run_ms": 49.789193000000004,
+      "height": 682,
+      "hot_median_ms": 42.128029999999995,
+      "hot_samples_ms": [
+        39.21519,
+        39.378918999999996,
+        42.128029999999995,
+        44.666987999999996,
+        44.679333
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "cityscape",
+      "preset": "provia",
+      "source_sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb",
+      "render_input_sha256": "61268ad5ba16e85cfdab25fdba73918d3f9d177bc22223f4d59062269ef49ebd",
+      "output_sha256": "0271fe7977b2d8569739c3ba57410d07f8d2a7d0c664d42d137c61cf34a91b77",
+      "first_run_ms": 246.830441,
+      "height": 682,
+      "hot_median_ms": 158.62969299999997,
+      "hot_samples_ms": [
+        154.346059,
+        158.275687,
+        158.62969299999997,
+        164.49169899999998,
+        177.151211
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "cityscape",
+      "preset": "astia",
+      "source_sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb",
+      "render_input_sha256": "61268ad5ba16e85cfdab25fdba73918d3f9d177bc22223f4d59062269ef49ebd",
+      "output_sha256": "7ce7023f7261f7467b62dd58c57bd2c0688c05446032ba9021ae34e8a7a271d2",
+      "first_run_ms": 191.42119799999998,
+      "height": 682,
+      "hot_median_ms": 178.462524,
+      "hot_samples_ms": [
+        165.120248,
+        172.63658700000002,
+        178.462524,
+        189.65096,
+        201.327067
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "cityscape",
+      "preset": "velvia",
+      "source_sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb",
+      "render_input_sha256": "61268ad5ba16e85cfdab25fdba73918d3f9d177bc22223f4d59062269ef49ebd",
+      "output_sha256": "69dbd4ce5573e469b149effd78e5e39fbe43290d87a15da8d35d13ddf5432e59",
+      "first_run_ms": 187.52059300000002,
+      "height": 682,
+      "hot_median_ms": 231.613693,
+      "hot_samples_ms": [
+        196.764047,
+        200.163126,
+        231.613693,
+        232.317442,
+        251.44914899999998
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "cityscape",
+      "preset": "classicNegative",
+      "source_sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb",
+      "render_input_sha256": "61268ad5ba16e85cfdab25fdba73918d3f9d177bc22223f4d59062269ef49ebd",
+      "output_sha256": "ead4f1435bb31dbea91cdb0fea32a9a8c8378904600a4f2a924bc706b4e8b42a",
+      "first_run_ms": 165.66877399999998,
+      "height": 682,
+      "hot_median_ms": 167.347199,
+      "hot_samples_ms": [
+        159.285428,
+        162.281199,
+        167.347199,
+        177.332664,
+        246.571344
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "cityscape",
+      "preset": "eterna",
+      "source_sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb",
+      "render_input_sha256": "61268ad5ba16e85cfdab25fdba73918d3f9d177bc22223f4d59062269ef49ebd",
+      "output_sha256": "bf970314cb0dd41685d6f95916e71eb676211b6c7c918dfd2f309d8cf471e71a",
+      "first_run_ms": 182.467246,
+      "height": 682,
+      "hot_median_ms": 165.969211,
+      "hot_samples_ms": [
+        160.017511,
+        161.11056000000002,
+        165.969211,
+        167.38262,
+        171.723724
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "cityscape",
+      "preset": "acros",
+      "source_sha256": "38690fd3bb290b10e30dd3fadb54c46c5729a757afb1567810cc1a04386b5ccb",
+      "render_input_sha256": "61268ad5ba16e85cfdab25fdba73918d3f9d177bc22223f4d59062269ef49ebd",
+      "output_sha256": "b29e5a629645215175a0a6fa09ab55c986c39540b0f4b67f0bd054dea9b53399",
+      "first_run_ms": 155.196675,
+      "height": 682,
+      "hot_median_ms": 145.66145799999998,
+      "hot_samples_ms": [
+        143.830236,
+        144.713893,
+        145.66145799999998,
+        158.44998099999998,
+        159.160328
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "neutral",
+      "source_sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a",
+      "render_input_sha256": "d6d29a5d89268c32125967c378ea583c219b799c0f6f03ef8fe2c6c03e00caa1",
+      "output_sha256": "6a088131c9a10327f364b056db922327fe5e2ad0387e921c363c4b3431dcfcab",
+      "first_run_ms": 33.957161,
+      "height": 683,
+      "hot_median_ms": 43.677211,
+      "hot_samples_ms": [
+        29.367026,
+        35.392782999999994,
+        43.677211,
+        45.575525999999996,
+        47.221473
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "provia",
+      "source_sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a",
+      "render_input_sha256": "d6d29a5d89268c32125967c378ea583c219b799c0f6f03ef8fe2c6c03e00caa1",
+      "output_sha256": "6eb271b2cba196c624f2de9b9672a2c2708e73f2717afbb1f5dc1d4b8fc042bf",
+      "first_run_ms": 152.859668,
+      "height": 683,
+      "hot_median_ms": 173.173353,
+      "hot_samples_ms": [
+        154.906013,
+        157.25378,
+        173.173353,
+        179.50606399999998,
+        317.538506
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "astia",
+      "source_sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a",
+      "render_input_sha256": "d6d29a5d89268c32125967c378ea583c219b799c0f6f03ef8fe2c6c03e00caa1",
+      "output_sha256": "5d527b5e03fc89136c28e697bf1d796d3659b75613a581499b5b423d0f8ae14c",
+      "first_run_ms": 163.41554,
+      "height": 683,
+      "hot_median_ms": 147.430063,
+      "hot_samples_ms": [
+        140.356843,
+        146.106266,
+        147.430063,
+        150.296778,
+        151.429813
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "velvia",
+      "source_sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a",
+      "render_input_sha256": "d6d29a5d89268c32125967c378ea583c219b799c0f6f03ef8fe2c6c03e00caa1",
+      "output_sha256": "d25e2f367823fa3a9a3e8188da6c03db8a14663ca535a347cf47cf9cfa7b639f",
+      "first_run_ms": 165.675717,
+      "height": 683,
+      "hot_median_ms": 156.134786,
+      "hot_samples_ms": [
+        139.56084199999998,
+        149.94961800000002,
+        156.134786,
+        159.109664,
+        159.73129
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "classicNegative",
+      "source_sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a",
+      "render_input_sha256": "d6d29a5d89268c32125967c378ea583c219b799c0f6f03ef8fe2c6c03e00caa1",
+      "output_sha256": "cfdf3a75e281211a747dbd5270bfcb0db562c9f9fba3976bf053261985dbe949",
+      "first_run_ms": 152.107111,
+      "height": 683,
+      "hot_median_ms": 152.45648,
+      "hot_samples_ms": [
+        146.89704600000002,
+        151.99989,
+        152.45648,
+        156.392062,
+        195.678376
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "eterna",
+      "source_sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a",
+      "render_input_sha256": "d6d29a5d89268c32125967c378ea583c219b799c0f6f03ef8fe2c6c03e00caa1",
+      "output_sha256": "6b2cd7a54e090182490e65801c12ac064710fb09c9cbb0c9dbfab35966230b82",
+      "first_run_ms": 164.984858,
+      "height": 683,
+      "hot_median_ms": 158.211857,
+      "hot_samples_ms": [
+        148.90152500000002,
+        156.642284,
+        158.211857,
+        166.778948,
+        172.22442099999998
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "acros",
+      "source_sha256": "24248fc04d108a2c098e72ef74ef9ce35de153bcd91c91d47bea03aa23c75e3a",
+      "render_input_sha256": "d6d29a5d89268c32125967c378ea583c219b799c0f6f03ef8fe2c6c03e00caa1",
+      "output_sha256": "bd40ded216210ce20dfd6ae15f69994eeae6c7cb4ab6b67f0e2f8cb50f53a2dc",
+      "first_run_ms": 171.40018500000002,
+      "height": 683,
+      "hot_median_ms": 134.989329,
+      "hot_samples_ms": [
+        133.847981,
+        134.276215,
+        134.989329,
+        137.895093,
+        140.848491
+      ],
+      "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+      "width": 1024
+    }
+  ],
+  "changes_vs_previous": [
+    {
+      "photo": "portrait-makeup",
+      "preset": "neutral",
+      "previous_output_sha256": "a85247cc63f741e61f1031f571b686ed39852d741be4595a111d5822be6aed84",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "provia",
+      "previous_output_sha256": "4bcfbf8ffdcad1bfd2b946e714dfe7cafa52bfa26804be556011b60a2a440f2e",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "astia",
+      "previous_output_sha256": "459647db611584899f2f0971bc3d794403d79101e6134f4c8374aee4082370bc",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "velvia",
+      "previous_output_sha256": "d00e0fab479bc9cba57a14dc7907cbec769d5515f0e8643d0af9aaf48c95b549",
+      "changed_pixels": 332877
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "classicNegative",
+      "previous_output_sha256": "76128874d59952df1a0bdf031b01661203ec842cb698ca246db658290acdd8d8",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "eterna",
+      "previous_output_sha256": "d250d963f897ab317355639fce23b129d599a6b02e39ca2cc39497b0db8ce3d6",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-makeup",
+      "preset": "acros",
+      "previous_output_sha256": "1377fa4adb432272edea536d9b421c789168cb690d3e34263a55d915df3820c3",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "neutral",
+      "previous_output_sha256": "3427291b0222745d2207ee65308f3bf401725a11eaa93fc77a3aa286280ef99a",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "provia",
+      "previous_output_sha256": "795ece56e6052ffe9d289627de230135097109156677f16344b48422ca09c49a",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "astia",
+      "previous_output_sha256": "73dca5c9cdae69529ec4f71c8c7039d82b36335d2bd0264bbee0809c0933ced0",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "velvia",
+      "previous_output_sha256": "d20dc0725939899bf8ea3abea7e51ac4ebaafcdc902b7aaa009ad8365cab941b",
+      "changed_pixels": 82923
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "classicNegative",
+      "previous_output_sha256": "4eb63efb7b2ec2af78628b0231e172b99f847d50017373dbb7878d7e9996e103",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "eterna",
+      "previous_output_sha256": "a2c61cc70a7fa9dde211f3a64a1cb07941f4cab3d164323071535f83df8c7ed6",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-dark",
+      "preset": "acros",
+      "previous_output_sha256": "1df5debf78269e00c7f4cbee3247a20e34d7fd61d1389a573e0ecbe3d6582f08",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "neutral",
+      "previous_output_sha256": "5eb43caf06ba2226f3e655d2fdb6831372282d23a138a54721a4ed86f692275a",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "provia",
+      "previous_output_sha256": "96f79dcb4b6443096eb0493db9a96c29bfb864dd625f8058363fc4e09617614c",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "astia",
+      "previous_output_sha256": "3920e0682ff66fa659d3c177451f3ad68687e6d211ab7ee4cddc5cd5cd9ae92a",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "velvia",
+      "previous_output_sha256": "8bb88e5530ba83609293028ffbebcb4b988663b5a3bdef4281b9c4b4aa6abd69",
+      "changed_pixels": 396701
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "classicNegative",
+      "previous_output_sha256": "2aff6e3725b38ec2e711b94d1be8eb3aaddf27419cec2f5ce1ce9133a095ed1a",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "eterna",
+      "previous_output_sha256": "254b5f5774211bb2785dc678c83a62f5ff549bce16f581d5f4a6b5d342f35c96",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-hair",
+      "preset": "acros",
+      "previous_output_sha256": "77e16499c0d3bc94f28f7fe60db84349980269baf8f1f9c6b064a50a04f36e1d",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "neutral",
+      "previous_output_sha256": "2e22f42b65bb38454dbc480db920b31ceedffa0a75fc75d1c6dd81f63e60db32",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "provia",
+      "previous_output_sha256": "b6bc9822d6f68178694636362eb6b24afa3c7596bd357f2204ea32b63b6b39e8",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "astia",
+      "previous_output_sha256": "f56bc5862914a2894085c3f2e19340558834f56f224584dca4f237d4cb1ea068",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "velvia",
+      "previous_output_sha256": "75ec8665623f70a3cb2680c18908b6acd29e4ec1b0dce2c60647af5e7e50b085",
+      "changed_pixels": 389037
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "classicNegative",
+      "previous_output_sha256": "075312512d1c2a202f532aac1137f81713005699ee970b051edcacd5c5bac79c",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "eterna",
+      "previous_output_sha256": "cabb59b7599f50c37c37c3d52b222763f5f10eb3a34d0c4c1584bbf4bec44d5f",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "portrait-woman",
+      "preset": "acros",
+      "previous_output_sha256": "0a4b08e94b72d7a788ae5a4e27c4fea0580367cb191dd3696a862f33ceb1e0ed",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "cityscape",
+      "preset": "neutral",
+      "previous_output_sha256": "d94a1613ea5f244b3e3d7dea425fcbfdc4ea6e6186ae4c3785d4f896ebd233b2",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "cityscape",
+      "preset": "provia",
+      "previous_output_sha256": "0271fe7977b2d8569739c3ba57410d07f8d2a7d0c664d42d137c61cf34a91b77",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "cityscape",
+      "preset": "astia",
+      "previous_output_sha256": "7ce7023f7261f7467b62dd58c57bd2c0688c05446032ba9021ae34e8a7a271d2",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "cityscape",
+      "preset": "velvia",
+      "previous_output_sha256": "11d9a6798bb49290e6b75d6e01433bf460671531a782da3b26ca0b161e86d3e4",
+      "changed_pixels": 185464
+    },
+    {
+      "photo": "cityscape",
+      "preset": "classicNegative",
+      "previous_output_sha256": "ead4f1435bb31dbea91cdb0fea32a9a8c8378904600a4f2a924bc706b4e8b42a",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "cityscape",
+      "preset": "eterna",
+      "previous_output_sha256": "bf970314cb0dd41685d6f95916e71eb676211b6c7c918dfd2f309d8cf471e71a",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "cityscape",
+      "preset": "acros",
+      "previous_output_sha256": "b29e5a629645215175a0a6fa09ab55c986c39540b0f4b67f0bd054dea9b53399",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "neutral",
+      "previous_output_sha256": "6a088131c9a10327f364b056db922327fe5e2ad0387e921c363c4b3431dcfcab",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "provia",
+      "previous_output_sha256": "6eb271b2cba196c624f2de9b9672a2c2708e73f2717afbb1f5dc1d4b8fc042bf",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "astia",
+      "previous_output_sha256": "5d527b5e03fc89136c28e697bf1d796d3659b75613a581499b5b423d0f8ae14c",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "velvia",
+      "previous_output_sha256": "d25e2f367823fa3a9a3e8188da6c03db8a14663ca535a347cf47cf9cfa7b639f",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "classicNegative",
+      "previous_output_sha256": "cfdf3a75e281211a747dbd5270bfcb0db562c9f9fba3976bf053261985dbe949",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "eterna",
+      "previous_output_sha256": "6b2cd7a54e090182490e65801c12ac064710fb09c9cbb0c9dbfab35966230b82",
+      "changed_pixels": 0
+    },
+    {
+      "photo": "street-crowd",
+      "preset": "acros",
+      "previous_output_sha256": "bd40ded216210ce20dfd6ae15f69994eeae6c7cb4ab6b67f0e2f8cb50f53a2dc",
+      "changed_pixels": 0
+    }
+  ],
+  "crops": [
+    {
+      "photo": "portrait-makeup",
+      "bounds": [
+        331,
+        131,
+        656,
+        564
+      ],
+      "source_detection_graph_sha256": "3dd581711201135370eb7779ea5144888b7af3681ed692b5e9e1d5f7a44bfa9a",
+      "scale": "100% pixels; normalized existing outline only defines the crop, not the filter",
+      "evidence": "doc/qa/film-response-v2/portrait-makeup-velvia-100pct.png"
+    },
+    {
+      "photo": "portrait-hair",
+      "bounds": [
+        276,
+        208,
+        521,
+        573
+      ],
+      "source_detection_graph_sha256": "5e957bc9f734a8cd598e69945a1c78b669448b83d1b936b60384016af2136318",
+      "scale": "100% pixels; normalized existing outline only defines the crop, not the filter",
+      "evidence": "doc/qa/film-response-v2/portrait-hair-velvia-100pct.png"
+    },
+    {
+      "photo": "portrait-woman",
+      "bounds": [
+        191,
+        268,
+        440,
+        597
+      ],
+      "source_detection_graph_sha256": "da69f14d5433a5802b2f6e4713c69c227d1d2af4dd7ad65b8a4bc2b9929116ec",
+      "scale": "100% pixels; normalized existing outline only defines the crop, not the filter",
+      "evidence": "doc/qa/film-response-v2/portrait-woman-velvia-100pct.png"
+    },
+    {
+      "photo": "portrait-dark",
+      "bounds": [
+        214,
+        322,
+        483,
+        646
+      ],
+      "source_detection_graph_sha256": "6e9f26a4eb5fe8e6b073d62b4d04daea895be67838c6d49abab732a631bb876a",
+      "scale": "100% pixels; normalized existing outline only defines the crop, not the filter",
+      "evidence": "doc/qa/film-response-v2/portrait-dark-velvia-100pct.png"
+    }
+  ]
+}

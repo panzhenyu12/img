@@ -1,0 +1,957 @@
+{
+  "binary_sha256": {
+    "ea5b404": "95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab",
+    "before-bright": "2083d52e9924247faf544aa6e3ef6e89524fc944f159fa869622303e3ebf4f3a",
+    "bright-candidate2": "2083d52e9924247faf544aa6e3ef6e89524fc944f159fa869622303e3ebf4f3a"
+  },
+  "selection_protocol": {
+    "acne-teen": {
+      "region": {
+        "x": 0.06,
+        "y": 0.43,
+        "width": 0.36,
+        "height": 0.28
+      },
+      "points": [
+        [
+          0.095,
+          0.43
+        ],
+        [
+          0.35,
+          0.445
+        ],
+        [
+          0.42,
+          0.54
+        ],
+        [
+          0.34,
+          0.625
+        ],
+        [
+          0.26,
+          0.68
+        ],
+        [
+          0.12,
+          0.7
+        ],
+        [
+          0.065,
+          0.59
+        ]
+      ],
+      "lesions": [
+        {
+          "id": "cheek-red-1",
+          "x": 206,
+          "y": 540,
+          "radius": 5,
+          "ring": [
+            14,
+            22
+          ]
+        },
+        {
+          "id": "cheek-red-2",
+          "x": 232,
+          "y": 578,
+          "radius": 5,
+          "ring": [
+            14,
+            22
+          ]
+        }
+      ],
+      "detail_patch": [
+        252,
+        478,
+        284,
+        512
+      ],
+      "crop": [
+        80,
+        460,
+        305,
+        650
+      ]
+    },
+    "acne-oily": {
+      "region": {
+        "x": 0.2,
+        "y": 0.09,
+        "width": 0.67,
+        "height": 0.48
+      },
+      "points": [
+        [
+          0.32,
+          0.09
+        ],
+        [
+          0.75,
+          0.09
+        ],
+        [
+          0.87,
+          0.21
+        ],
+        [
+          0.85,
+          0.47
+        ],
+        [
+          0.65,
+          0.56
+        ],
+        [
+          0.33,
+          0.52
+        ],
+        [
+          0.2,
+          0.34
+        ]
+      ],
+      "lesions": [
+        {
+          "id": "forehead-red",
+          "x": 790,
+          "y": 180,
+          "radius": 7,
+          "ring": [
+            20,
+            30
+          ]
+        },
+        {
+          "id": "forehead-whitehead",
+          "x": 370,
+          "y": 112,
+          "radius": 4,
+          "ring": [
+            12,
+            19
+          ]
+        }
+      ],
+      "detail_patch": [
+        490,
+        230,
+        545,
+        285
+      ],
+      "crop": [
+        300,
+        65,
+        870,
+        275
+      ]
+    },
+    "acne-cystic": {
+      "region": {
+        "x": 0.26,
+        "y": 0.5,
+        "width": 0.44,
+        "height": 0.27
+      },
+      "points": [
+        [
+          0.32,
+          0.5
+        ],
+        [
+          0.67,
+          0.52
+        ],
+        [
+          0.7,
+          0.65
+        ],
+        [
+          0.6,
+          0.76
+        ],
+        [
+          0.35,
+          0.74
+        ],
+        [
+          0.26,
+          0.62
+        ]
+      ],
+      "lesions": [
+        {
+          "id": "cheek-red",
+          "x": 278,
+          "y": 611,
+          "radius": 6,
+          "ring": [
+            15,
+            24
+          ]
+        },
+        {
+          "id": "outside-selection-control",
+          "x": 312,
+          "y": 810,
+          "radius": 6,
+          "ring": [
+            15,
+            24
+          ],
+          "purpose": "negative control outside the manual selection; must stay unchanged"
+        }
+      ],
+      "detail_patch": [
+        235,
+        685,
+        275,
+        725
+      ],
+      "crop": [
+        140,
+        550,
+        355,
+        790
+      ]
+    }
+  },
+  "rows": [
+    {
+      "sample": "acne-teen",
+      "case": "natural",
+      "parameters": {
+        "smooth": 60,
+        "texture": 60
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-teen-original.jpg",
+      "original_sha256": "da07a56739c5410099c8e9a444ea7dd624699a5c716ba545f9d7e2c3e45c1c92",
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "69d187f0ffc65ef5e0751784ff6f6e0e2f98ec51bf7623cca3486be9e2e357a0",
+      "lesions": {
+        "cheek-red-1": {
+          "annotation": {
+            "id": "cheek-red-1",
+            "x": 206,
+            "y": 540,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "original": {
+            "red_excess": 13.565579918412233,
+            "light_contrast": 23.952600000000004
+          },
+          "ea5b404": {
+            "red_excess": 11.856276031055412,
+            "light_contrast": 21.30319999999999
+          },
+          "before-bright": {
+            "red_excess": 6.297168575166058,
+            "light_contrast": 20.93180000000001
+          },
+          "bright-candidate2": {
+            "red_excess": 6.297168575166058,
+            "light_contrast": 20.93180000000001
+          }
+        },
+        "cheek-red-2": {
+          "annotation": {
+            "id": "cheek-red-2",
+            "x": 232,
+            "y": 578,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "original": {
+            "red_excess": 8.595534287231203,
+            "light_contrast": 19.4396
+          },
+          "ea5b404": {
+            "red_excess": 7.499614632421533,
+            "light_contrast": 17.473700000000022
+          },
+          "before-bright": {
+            "red_excess": 5.90224625397131,
+            "light_contrast": 18.792600000000007
+          },
+          "bright-candidate2": {
+            "red_excess": 5.90224625397131,
+            "light_contrast": 18.792600000000007
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 198.1323231011629,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 1621.677674818784,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 1807.6271186582744,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-teen-natural-100pct.png"
+    },
+    {
+      "sample": "acne-teen",
+      "case": "strong",
+      "parameters": {
+        "smooth": 100,
+        "texture": 0
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-teen-original.jpg",
+      "original_sha256": "da07a56739c5410099c8e9a444ea7dd624699a5c716ba545f9d7e2c3e45c1c92",
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "bc2a069335a05db6d0e380222bcd5d7777839a07456c766e78027b5c5821dfd5",
+      "lesions": {
+        "cheek-red-1": {
+          "annotation": {
+            "id": "cheek-red-1",
+            "x": 206,
+            "y": 540,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "original": {
+            "red_excess": 13.565579918412233,
+            "light_contrast": 23.952600000000004
+          },
+          "ea5b404": {
+            "red_excess": 6.180974308312482,
+            "light_contrast": 12.506600000000006
+          },
+          "before-bright": {
+            "red_excess": 4.534692974657585,
+            "light_contrast": 13.578800000000001
+          },
+          "bright-candidate2": {
+            "red_excess": 4.534692974657585,
+            "light_contrast": 13.578800000000001
+          }
+        },
+        "cheek-red-2": {
+          "annotation": {
+            "id": "cheek-red-2",
+            "x": 232,
+            "y": 578,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "original": {
+            "red_excess": 8.595534287231203,
+            "light_contrast": 19.4396
+          },
+          "ea5b404": {
+            "red_excess": 4.0467249796460365,
+            "light_contrast": 10.971099999999993
+          },
+          "before-bright": {
+            "red_excess": 4.81907726520955,
+            "light_contrast": 13.864799999999988
+          },
+          "bright-candidate2": {
+            "red_excess": 4.81907726520955,
+            "light_contrast": 13.864799999999988
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 212.58286805823445,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 307.84894386306405,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 252.3287571966648,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-teen-strong-100pct.png"
+    },
+    {
+      "sample": "acne-teen",
+      "case": "texture",
+      "parameters": {
+        "smooth": 80,
+        "texture": 100
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-teen-original.jpg",
+      "original_sha256": "da07a56739c5410099c8e9a444ea7dd624699a5c716ba545f9d7e2c3e45c1c92",
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "f5c91a51a28d783fb7cfe1e349e5c50da34a48ccc1600fa536c43e9e41d45722",
+      "lesions": {
+        "cheek-red-1": {
+          "annotation": {
+            "id": "cheek-red-1",
+            "x": 206,
+            "y": 540,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "original": {
+            "red_excess": 13.565579918412233,
+            "light_contrast": 23.952600000000004
+          },
+          "ea5b404": {
+            "red_excess": 12.852758675712515,
+            "light_contrast": 23.1652
+          },
+          "before-bright": {
+            "red_excess": 4.743377006921346,
+            "light_contrast": 18.42920000000001
+          },
+          "bright-candidate2": {
+            "red_excess": 4.743377006921346,
+            "light_contrast": 18.42920000000001
+          }
+        },
+        "cheek-red-2": {
+          "annotation": {
+            "id": "cheek-red-2",
+            "x": 232,
+            "y": 578,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "original": {
+            "red_excess": 8.595534287231203,
+            "light_contrast": 19.4396
+          },
+          "ea5b404": {
+            "red_excess": 8.387781022919402,
+            "light_contrast": 18.652200000000008
+          },
+          "before-bright": {
+            "red_excess": 5.268323651598529,
+            "light_contrast": 18.077399999999997
+          },
+          "bright-candidate2": {
+            "red_excess": 5.268323651598529,
+            "light_contrast": 18.077399999999997
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 234.4458270817995,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 294.498304836452,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 260.0887198932469,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-teen-texture-100pct.png"
+    },
+    {
+      "sample": "acne-oily",
+      "case": "natural",
+      "parameters": {
+        "smooth": 60,
+        "texture": 60
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-oily-original.jpg",
+      "original_sha256": "6190c4f206a01862544816feef23d284ad87fbd4802d3a1042c79e686a02c3fb",
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "c0be6907b8de4f3cb8614915adc535a5251cd5d6e261353d9ae7981193bed950",
+      "lesions": {
+        "forehead-red": {
+          "annotation": {
+            "id": "forehead-red",
+            "x": 790,
+            "y": 180,
+            "radius": 7,
+            "ring": [
+              20,
+              30
+            ]
+          },
+          "original": {
+            "red_excess": 7.760003586203041,
+            "light_contrast": 3.3700000000000045
+          },
+          "ea5b404": {
+            "red_excess": 6.64734177744711,
+            "light_contrast": 3.208600000000004
+          },
+          "before-bright": {
+            "red_excess": 2.899176898979789,
+            "light_contrast": 4.17649999999999
+          },
+          "bright-candidate2": {
+            "red_excess": 2.899176898979789,
+            "light_contrast": 4.17649999999999
+          }
+        },
+        "forehead-whitehead": {
+          "annotation": {
+            "id": "forehead-whitehead",
+            "x": 370,
+            "y": 112,
+            "radius": 4,
+            "ring": [
+              12,
+              19
+            ]
+          },
+          "original": {
+            "red_excess": -47.741904030693924,
+            "light_contrast": -54.345500000000015
+          },
+          "ea5b404": {
+            "red_excess": -40.48245331711253,
+            "light_contrast": -49.1921
+          },
+          "before-bright": {
+            "red_excess": -34.48912844828151,
+            "light_contrast": -36.72760000000001
+          },
+          "bright-candidate2": {
+            "red_excess": -34.48912844828151,
+            "light_contrast": -36.72760000000001
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 208.56292406097054,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 467.4962549470365,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 574.175669811666,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-oily-natural-100pct.png"
+    },
+    {
+      "sample": "acne-oily",
+      "case": "strong",
+      "parameters": {
+        "smooth": 100,
+        "texture": 0
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-oily-original.jpg",
+      "original_sha256": "6190c4f206a01862544816feef23d284ad87fbd4802d3a1042c79e686a02c3fb",
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "02a9bdba9121ba9436365b6855a9459ece38dc5a3221098ed8d74446bb1af23b",
+      "lesions": {
+        "forehead-red": {
+          "annotation": {
+            "id": "forehead-red",
+            "x": 790,
+            "y": 180,
+            "radius": 7,
+            "ring": [
+              20,
+              30
+            ]
+          },
+          "original": {
+            "red_excess": 7.760003586203041,
+            "light_contrast": 3.3700000000000045
+          },
+          "ea5b404": {
+            "red_excess": 2.8968350242716667,
+            "light_contrast": 2.502600000000001
+          },
+          "before-bright": {
+            "red_excess": 0.7001473865954608,
+            "light_contrast": 4.568799999999982
+          },
+          "bright-candidate2": {
+            "red_excess": 0.7001473865954608,
+            "light_contrast": 4.568799999999982
+          }
+        },
+        "forehead-whitehead": {
+          "annotation": {
+            "id": "forehead-whitehead",
+            "x": 370,
+            "y": 112,
+            "radius": 4,
+            "ring": [
+              12,
+              19
+            ]
+          },
+          "original": {
+            "red_excess": -47.741904030693924,
+            "light_contrast": -54.345500000000015
+          },
+          "ea5b404": {
+            "red_excess": -15.990331815209629,
+            "light_contrast": -27.561600000000006
+          },
+          "before-bright": {
+            "red_excess": -22.641569309602005,
+            "light_contrast": -24.437600000000003
+          },
+          "bright-candidate2": {
+            "red_excess": -22.641569309602005,
+            "light_contrast": -24.437600000000003
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 295.0737136416137,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 567.8563639521599,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 501.0943282395601,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-oily-strong-100pct.png"
+    },
+    {
+      "sample": "acne-oily",
+      "case": "texture",
+      "parameters": {
+        "smooth": 80,
+        "texture": 100
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-oily-original.jpg",
+      "original_sha256": "6190c4f206a01862544816feef23d284ad87fbd4802d3a1042c79e686a02c3fb",
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "a483405026e945bff04d0bfa2470109e4a2e93bf7e4dd4ce43d495b748973707",
+      "lesions": {
+        "forehead-red": {
+          "annotation": {
+            "id": "forehead-red",
+            "x": 790,
+            "y": 180,
+            "radius": 7,
+            "ring": [
+              20,
+              30
+            ]
+          },
+          "original": {
+            "red_excess": 7.760003586203041,
+            "light_contrast": 3.3700000000000045
+          },
+          "ea5b404": {
+            "red_excess": 8.265794463305156,
+            "light_contrast": 3.3700000000000045
+          },
+          "before-bright": {
+            "red_excess": 1.8154903006641518,
+            "light_contrast": 3.9558999999999997
+          },
+          "bright-candidate2": {
+            "red_excess": 1.8154903006641518,
+            "light_contrast": 3.9558999999999997
+          }
+        },
+        "forehead-whitehead": {
+          "annotation": {
+            "id": "forehead-whitehead",
+            "x": 370,
+            "y": 112,
+            "radius": 4,
+            "ring": [
+              12,
+              19
+            ]
+          },
+          "original": {
+            "red_excess": -47.741904030693924,
+            "light_contrast": -54.345500000000015
+          },
+          "ea5b404": {
+            "red_excess": -46.33612160688547,
+            "light_contrast": -52.770700000000005
+          },
+          "before-bright": {
+            "red_excess": -29.895114196752722,
+            "light_contrast": -30.512400000000014
+          },
+          "bright-candidate2": {
+            "red_excess": -29.895114196752722,
+            "light_contrast": -30.512400000000014
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 290.20728589966893,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 462.7523380331695,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 432.3195070028305,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-oily-texture-100pct.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "case": "natural",
+      "parameters": {
+        "smooth": 60,
+        "texture": 60
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-cystic-original.jpg",
+      "original_sha256": "4b4b3e1cdc450248160075b51dc3d9d206aab4e5ec397b6128995e7cc6bb7cb3",
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "f5fff1a99322c36a0b31fab6bc46e12340160405d7c83c34013f4fe9f1ca50ce",
+      "lesions": {
+        "cheek-red": {
+          "annotation": {
+            "id": "cheek-red",
+            "x": 278,
+            "y": 611,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ]
+          },
+          "original": {
+            "red_excess": 8.044858764662251,
+            "light_contrast": 5.447400000000016
+          },
+          "ea5b404": {
+            "red_excess": 7.9549733925453765,
+            "light_contrast": 5.716399999999965
+          },
+          "before-bright": {
+            "red_excess": 7.382866981362682,
+            "light_contrast": 5.502399999999994
+          },
+          "bright-candidate2": {
+            "red_excess": 7.382866981362682,
+            "light_contrast": 5.502399999999994
+          }
+        },
+        "outside-selection-control": {
+          "annotation": {
+            "id": "outside-selection-control",
+            "x": 312,
+            "y": 810,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ],
+            "purpose": "negative control outside the manual selection; must stay unchanged"
+          },
+          "original": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "ea5b404": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "before-bright": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "bright-candidate2": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 130.20796794444323,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 177.9736578464508,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 200.92056412249804,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-cystic-natural-100pct.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "case": "strong",
+      "parameters": {
+        "smooth": 100,
+        "texture": 0
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-cystic-original.jpg",
+      "original_sha256": "4b4b3e1cdc450248160075b51dc3d9d206aab4e5ec397b6128995e7cc6bb7cb3",
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "638f960cc5820adafcb3c2ddd90494da1b6357be63eddc3016ae7ae353243fb0",
+      "lesions": {
+        "cheek-red": {
+          "annotation": {
+            "id": "cheek-red",
+            "x": 278,
+            "y": 611,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ]
+          },
+          "original": {
+            "red_excess": 8.044858764662251,
+            "light_contrast": 5.447400000000016
+          },
+          "ea5b404": {
+            "red_excess": 7.137536289550049,
+            "light_contrast": 6.508400000000023
+          },
+          "before-bright": {
+            "red_excess": 7.0612960483752545,
+            "light_contrast": 5.513000000000005
+          },
+          "bright-candidate2": {
+            "red_excess": 7.0612960483752545,
+            "light_contrast": 5.513000000000005
+          }
+        },
+        "outside-selection-control": {
+          "annotation": {
+            "id": "outside-selection-control",
+            "x": 312,
+            "y": 810,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ],
+            "purpose": "negative control outside the manual selection; must stay unchanged"
+          },
+          "original": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "ea5b404": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "before-bright": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "bright-candidate2": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 146.21804282069206,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 164.80551101267338,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 187.43777507916093,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-cystic-strong-100pct.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "case": "texture",
+      "parameters": {
+        "smooth": 80,
+        "texture": 100
+      },
+      "selection": "fixed manual polygon; no detector invoked",
+      "original_path": "test/images/acne/acne-cystic-original.jpg",
+      "original_sha256": "4b4b3e1cdc450248160075b51dc3d9d206aab4e5ec397b6128995e7cc6bb7cb3",
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "f8c3cfbc83b155ef450e41371fb2094e38e13f3025b3e7ce459328ed3cae21ec",
+      "lesions": {
+        "cheek-red": {
+          "annotation": {
+            "id": "cheek-red",
+            "x": 278,
+            "y": 611,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ]
+          },
+          "original": {
+            "red_excess": 8.044858764662251,
+            "light_contrast": 5.447400000000016
+          },
+          "ea5b404": {
+            "red_excess": 8.044309971646832,
+            "light_contrast": 5.40270000000001
+          },
+          "before-bright": {
+            "red_excess": 7.268589017514479,
+            "light_contrast": 5.615299999999991
+          },
+          "bright-candidate2": {
+            "red_excess": 7.268589017514479,
+            "light_contrast": 5.615299999999991
+          }
+        },
+        "outside-selection-control": {
+          "annotation": {
+            "id": "outside-selection-control",
+            "x": 312,
+            "y": 810,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ],
+            "purpose": "negative control outside the manual selection; must stay unchanged"
+          },
+          "original": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "ea5b404": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "before-bright": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "bright-candidate2": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          }
+        }
+      },
+      "ea5b404_native_total_ms": 158.5099222138524,
+      "ea5b404_outside_changes": 0,
+      "ea5b404_alpha_changes": 0,
+      "before-bright_native_total_ms": 178.5352136939764,
+      "before-bright_outside_changes": 0,
+      "before-bright_alpha_changes": 0,
+      "bright-candidate2_native_total_ms": 201.4726991765201,
+      "bright-candidate2_outside_changes": 0,
+      "bright-candidate2_alpha_changes": 0,
+      "evidence": "test/results/skin-acne/bright-candidate2/acne-cystic-texture-100pct.png"
+    }
+  ],
+  "note": "No automatic aesthetic score; annotations include known failures."
+}

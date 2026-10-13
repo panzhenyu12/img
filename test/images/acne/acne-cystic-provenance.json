@@ -1,0 +1,89 @@
+{
+  "title": "File:Cysticacne-cropped.jpg",
+  "commons_page": "https://commons.wikimedia.org/wiki/File:Cysticacne-cropped.jpg",
+  "original_url": "https://upload.wikimedia.org/wikipedia/commons/1/1f/Cysticacne-cropped.jpg",
+  "sha256": "4b4b3e1cdc450248160075b51dc3d9d206aab4e5ec397b6128995e7cc6bb7cb3",
+  "original_size": [
+    1450,
+    2834
+  ],
+  "test_size": [
+    524,
+    1024
+  ],
+  "metadata": {
+    "DateTime": {
+      "value": "2022-11-12 18:24:03",
+      "source": "mediawiki-metadata",
+      "hidden": ""
+    },
+    "ObjectName": {
+      "value": "Cysticacne-cropped",
+      "source": "mediawiki-metadata"
+    },
+    "CommonsMetadataExtension": {
+      "value": 1.2,
+      "source": "extension",
+      "hidden": ""
+    },
+    "Categories": {
+      "value": "Personality rights warning|Cystic acne",
+      "source": "commons-categories",
+      "hidden": ""
+    },
+    "Assessments": {
+      "value": "",
+      "source": "commons-categories",
+      "hidden": ""
+    },
+    "ImageDescription": {
+      "value": "Closeup photo of a severe case of cystic acne.",
+      "source": "commons-desc-page"
+    },
+    "DateTimeOriginal": {
+      "value": "2010-06-23 15:57:57",
+      "source": "commons-desc-page"
+    },
+    "Credit": {
+      "value": "Derivative work of <a href=\"//commons.wikimedia.org/wiki/File:Cysticacne.JPG\" title=\"File:Cysticacne.JPG\">File:Cysticacne.JPG</a>",
+      "source": "commons-desc-page"
+    },
+    "Artist": {
+      "value": "James Heilman, MD",
+      "source": "commons-desc-page"
+    },
+    "LicenseShortName": {
+      "value": "CC BY-SA 3.0",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "UsageTerms": {
+      "value": "Creative Commons Attribution-Share Alike 3.0",
+      "source": "commons-desc-page"
+    },
+    "AttributionRequired": {
+      "value": "true",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "LicenseUrl": {
+      "value": "https://creativecommons.org/licenses/by-sa/3.0",
+      "source": "commons-desc-page"
+    },
+    "Copyrighted": {
+      "value": "True",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "Restrictions": {
+      "value": "personality",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "License": {
+      "value": "cc-by-sa-3.0",
+      "source": "commons-templates",
+      "hidden": ""
+    }
+  }
+}

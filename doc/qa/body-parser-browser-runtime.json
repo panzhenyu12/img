@@ -1,0 +1,15 @@
+{
+  "id": "fullbody-side-fashion",
+  "elapsedMs": 26018.03000020981,
+  "width": 768,
+  "height": 512,
+  "runtime": {
+    "loadMs": 7096.159999847412,
+    "inferenceMs": 18254.324999809265,
+    "requestedThreads": 4,
+    "crossOriginIsolated": true,
+    "provider": "wasm"
+  },
+  "provider": "wasm",
+  "modelPath": "/models/bodyparser.onnx"
+}

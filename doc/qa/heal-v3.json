@@ -1,0 +1,327 @@
+{
+  "label": "v3",
+  "binary_sha256": {
+    "Baseline": "3a2be78946e6b3906738894399eb699a21d2bacceb565be6cbc8bff5734ce75d",
+    "v3": "4df8ca35cddd64e67256af4a5175f86912e81bc0b820ae09d8ef17d1514366d2"
+  },
+  "algorithm_source_sha256": "818b3d4b907a8aabcffb592f3b8b9c140fb9a12c73061ab5740da045ef452903",
+  "scope": "three independent real acne photographs; five fixed manual spots; 1024px prepared inputs",
+  "timing_scope": "native total incl. process startup, PNG decode, edit graph validation, processing, encode; not isolated hot edit time",
+  "selection_protocol": {
+    "acne-teen": [
+      [
+        206,
+        540,
+        12
+      ],
+      [
+        232,
+        578,
+        12
+      ]
+    ],
+    "acne-oily": [
+      [
+        790,
+        180,
+        21
+      ],
+      [
+        370,
+        112,
+        10
+      ]
+    ],
+    "acne-cystic": [
+      [
+        278,
+        611,
+        16
+      ]
+    ]
+  },
+  "rows": [
+    {
+      "sample": "acne-teen",
+      "original_sha256": "da07a56739c5410099c8e9a444ea7dd624699a5c716ba545f9d7e2c3e45c1c92",
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "67a5bf3227eca07cf20811f875612edcfbc6e2f0695e10290ca4037df778b75d",
+      "fixed_strokes_pixels": [
+        [
+          206,
+          540,
+          12
+        ],
+        [
+          232,
+          578,
+          12
+        ]
+      ],
+      "lesions": {
+        "cheek-red-1": {
+          "annotation": {
+            "id": "cheek-red-1",
+            "x": 206,
+            "y": 540,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "Original": {
+            "red_excess": 13.565579918412233,
+            "light_contrast": 23.952600000000004
+          },
+          "Baseline": {
+            "red_excess": 0.9083962242871522,
+            "light_contrast": 4.073399999999992
+          },
+          "v3": {
+            "red_excess": 0.9083962242871522,
+            "light_contrast": 4.073399999999992
+          }
+        },
+        "cheek-red-2": {
+          "annotation": {
+            "id": "cheek-red-2",
+            "x": 232,
+            "y": 578,
+            "radius": 5,
+            "ring": [
+              14,
+              22
+            ]
+          },
+          "Original": {
+            "red_excess": 8.595534287231203,
+            "light_contrast": 19.4396
+          },
+          "Baseline": {
+            "red_excess": 3.2445753624311244,
+            "light_contrast": 4.652200000000022
+          },
+          "v3": {
+            "red_excess": 3.2445753624311244,
+            "light_contrast": 4.652200000000022
+          }
+        }
+      },
+      "Baseline": {
+        "outside_brush_changes": 0,
+        "alpha_changes": 0,
+        "hidden_rgb_changes": 0,
+        "changed_pixels": 793,
+        "output_sha256": "438101a0f4144f7e3b1c6201df5f8d8fa371aed7425b67e2a042dbf18fba596c",
+        "native_total_ms": [
+          86.49622090160847,
+          78.07141682133079,
+          82.69096724689007
+        ],
+        "native_total_median_ms": 82.69096724689007
+      },
+      "v3": {
+        "outside_brush_changes": 0,
+        "alpha_changes": 0,
+        "hidden_rgb_changes": 0,
+        "changed_pixels": 793,
+        "output_sha256": "438101a0f4144f7e3b1c6201df5f8d8fa371aed7425b67e2a042dbf18fba596c",
+        "native_total_ms": [
+          909.6611212007701,
+          90.03018215298653,
+          97.17776300385594
+        ],
+        "native_total_median_ms": 97.17776300385594
+      },
+      "evidence": "doc/qa/heal-v3/acne-teen-100pct.png"
+    },
+    {
+      "sample": "acne-oily",
+      "original_sha256": "6190c4f206a01862544816feef23d284ad87fbd4802d3a1042c79e686a02c3fb",
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "ccb236bb5579ae45059a49dfd8d588402c11a35c3a5c0db0619632fb3df4d12c",
+      "fixed_strokes_pixels": [
+        [
+          790,
+          180,
+          21
+        ],
+        [
+          370,
+          112,
+          10
+        ]
+      ],
+      "lesions": {
+        "forehead-red": {
+          "annotation": {
+            "id": "forehead-red",
+            "x": 790,
+            "y": 180,
+            "radius": 7,
+            "ring": [
+              20,
+              30
+            ]
+          },
+          "Original": {
+            "red_excess": 7.760003586203041,
+            "light_contrast": 3.3700000000000045
+          },
+          "Baseline": {
+            "red_excess": 0.26284199991255264,
+            "light_contrast": -0.07219999999999516
+          },
+          "v3": {
+            "red_excess": 0.26284199991255264,
+            "light_contrast": -0.07219999999999516
+          }
+        },
+        "forehead-whitehead": {
+          "annotation": {
+            "id": "forehead-whitehead",
+            "x": 370,
+            "y": 112,
+            "radius": 4,
+            "ring": [
+              12,
+              19
+            ]
+          },
+          "Original": {
+            "red_excess": -47.741904030693924,
+            "light_contrast": -54.345500000000015
+          },
+          "Baseline": {
+            "red_excess": 1.9276414469854757,
+            "light_contrast": -2.2421000000000078
+          },
+          "v3": {
+            "red_excess": 1.182587061105849,
+            "light_contrast": -2.2421000000000078
+          }
+        }
+      },
+      "Baseline": {
+        "outside_brush_changes": 0,
+        "alpha_changes": 0,
+        "hidden_rgb_changes": 0,
+        "changed_pixels": 1578,
+        "output_sha256": "00141afaf35209b49156fb8d1688768523203a7ac2014c7ff81b2c1a6518e9b4",
+        "native_total_ms": [
+          95.64430685713887,
+          90.88717214763165,
+          94.11322697997093
+        ],
+        "native_total_median_ms": 94.11322697997093
+      },
+      "v3": {
+        "outside_brush_changes": 0,
+        "alpha_changes": 0,
+        "hidden_rgb_changes": 0,
+        "changed_pixels": 1578,
+        "output_sha256": "6dfda9e68afde2285b9d71137952df0d48f3fd4c95004a4f3a277229c2b78861",
+        "native_total_ms": [
+          86.83443395420909,
+          90.92369396239519,
+          93.46973011270165
+        ],
+        "native_total_median_ms": 90.92369396239519
+      },
+      "evidence": "doc/qa/heal-v3/acne-oily-100pct.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "original_sha256": "4b4b3e1cdc450248160075b51dc3d9d206aab4e5ec397b6128995e7cc6bb7cb3",
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "b6114f29919519cd5afa9fdda8ea8cdd3b68d48ea9227326464a3b277ba40d7f",
+      "fixed_strokes_pixels": [
+        [
+          278,
+          611,
+          16
+        ]
+      ],
+      "lesions": {
+        "cheek-red": {
+          "annotation": {
+            "id": "cheek-red",
+            "x": 278,
+            "y": 611,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ]
+          },
+          "Original": {
+            "red_excess": 8.044858764662251,
+            "light_contrast": 5.447400000000016
+          },
+          "Baseline": {
+            "red_excess": 3.0997194136351425,
+            "light_contrast": -0.4887999999999977
+          },
+          "v3": {
+            "red_excess": 3.0997194136351425,
+            "light_contrast": -0.4887999999999977
+          }
+        },
+        "outside-selection-control": {
+          "annotation": {
+            "id": "outside-selection-control",
+            "x": 312,
+            "y": 810,
+            "radius": 6,
+            "ring": [
+              15,
+              24
+            ],
+            "purpose": "negative control outside the manual selection; must stay unchanged"
+          },
+          "Original": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "Baseline": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          },
+          "v3": {
+            "red_excess": 29.467106012814305,
+            "light_contrast": 26.176999999999992
+          }
+        }
+      },
+      "Baseline": {
+        "outside_brush_changes": 0,
+        "alpha_changes": 0,
+        "hidden_rgb_changes": 0,
+        "changed_pixels": 745,
+        "output_sha256": "7a429c1000d4d000d5b8e2c9e0b2698f07777ccb9a2618f019ca08faefddc797",
+        "native_total_ms": [
+          74.12589387968183,
+          77.28630723431706,
+          68.08652123436332
+        ],
+        "native_total_median_ms": 74.12589387968183
+      },
+      "v3": {
+        "outside_brush_changes": 0,
+        "alpha_changes": 0,
+        "hidden_rgb_changes": 0,
+        "changed_pixels": 745,
+        "output_sha256": "7a429c1000d4d000d5b8e2c9e0b2698f07777ccb9a2618f019ca08faefddc797",
+        "native_total_ms": [
+          73.89452215284109,
+          73.33994191139936,
+          73.65075126290321
+        ],
+        "native_total_median_ms": 73.65075126290321
+      },
+      "evidence": "doc/qa/heal-v3/acne-cystic-100pct.png"
+    }
+  ],
+  "note": "No automatic aesthetic score. Original-scale and enlarged crops require visual review. Other unmarked acne is deliberately left in the source."
+}

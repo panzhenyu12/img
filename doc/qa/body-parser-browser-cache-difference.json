@@ -1,0 +1,13 @@
+{
+  "id": "fullbody-side-fashion",
+  "classRaster": [
+    384,
+    256
+  ],
+  "comparedPixels": 98304,
+  "argmaxMismatchPixels": 54,
+  "argmaxMismatchRate": 0.00054931640625,
+  "maxQuantizedProbabilityError": 24,
+  "meanQuantizedProbabilityError": 0.030747025101273147,
+  "note": "Actual browser input/decoder differs from cached official Torch preprocessing/decoder; this is end-to-end probability difference, not same-input ONNX error, not quality score."
+}

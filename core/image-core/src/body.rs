@@ -3,7 +3,9 @@
 //! Detector polygons remain approximate selections; they are not parsing.
 
 use crate::engine::{byte, number, percent};
-use crate::mask::{coverage, Region};
+#[cfg(test)]
+use crate::mask::coverage;
+use crate::mask::{PreparedMask, Region};
 use crate::{ImageError, RgbaImage};
 use serde_json::Value;
 
@@ -295,20 +297,21 @@ fn neighbors(index: usize, width: usize, height: usize) -> impl Iterator<Item = 
     .flatten()
 }
 
-/// Check before filling that each revealed component can be reached from
-/// actual background. Interior foreground and protected pixels cannot seed
-/// the fill, including when the selected person touches the canvas edge.
+/// A separated part can reveal an enclosed sliver behind a stationary hand
+/// or sleeve. It needs a clean context donor, but that donor need not touch
+/// the sliver: a protected occluder is not a background sample.
 fn check_background_donors(
     holes: &[bool],
     protected: &[bool],
     width: usize,
     height: usize,
 ) -> Result<(), ImageError> {
-    let reached = reachable_background_targets(holes, protected, width, height);
-    if holes
-        .iter()
-        .zip(reached)
-        .any(|(&hole, reached)| hole && !reached)
+    debug_assert_eq!(holes.len(), width * height);
+    if holes.iter().any(|&v| v)
+        && !holes
+            .iter()
+            .zip(protected)
+            .any(|(&hole, &blocked)| !hole && !blocked)
     {
         return Err(missing_background());
     }
@@ -395,17 +398,14 @@ fn reconstruction_targets(
         .map(|(i, &alpha)| (alpha > 1.0 / 255.0 && !candidates[i]) || user_protected[i])
         .collect();
     let reached = reachable_background_targets(&candidates, &protected, width, height);
-    // Only requested revealed pixels are mandatory. Isolated soft confidence
-    // islands inside opaque foreground are excluded, rather than becoming
-    // either erroneous donor colors or unrelated fill failures.
-    if holes
+    // Enclosed requested slivers use the bounded nearest clean context in
+    // the reconstruction crop. Unrelated enclosed confidence islands remain
+    // excluded. None of the stationary occluder RGB becomes a donor.
+    Ok(reached
         .iter()
-        .zip(&reached)
-        .any(|(&hole, &reached)| hole && !reached)
-    {
-        return Err(missing_background());
-    }
-    Ok(reached)
+        .zip(holes)
+        .map(|(&reachable, &hole)| reachable || hole)
+        .collect())
 }
 
 /// Estimate a segment's actual half-width from contiguous subject spans.
@@ -464,6 +464,7 @@ fn subject_radius(axis: Axis, subject: &[f32], width: usize, height: usize, cent
 struct ContourProfile {
     warp: Warp,
     sections: Vec<(f32, f32)>,
+    section_anchors: Vec<(f32, f32)>,
     fringe: f32,
 }
 impl ContourProfile {
@@ -549,9 +550,39 @@ impl ContourProfile {
                 }
             }
         }
+        // A fixed occluder can cross the bone core, leaving no measurable
+        // section while the visible shirt farther from the core continues.
+        // Switching the whole next section directly to identity tears an
+        // internal garment edge. Anchor continuously along the axis before
+        // these missing sections, while retaining the prescribed silhouette
+        // displacement on the other valid sections.
+        let falloff = (sections.iter().map(|&(a, b)| a.max(b)).fold(0.0, f32::max)
+            * warp.amount.abs()
+            * 0.26
+            * 1.8
+            + 3.0)
+            .max(8.0);
+        let step = warp.axis.length / (sections.len() - 1) as f32;
+        let section_anchors: Vec<(f32, f32)> = sections
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                let anchor = |side: usize| {
+                    let distance = sections
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, pair)| if side == 0 { pair.0 } else { pair.1 } <= 0.0)
+                        .map(|(j, _)| i.abs_diff(j) as f32 * step)
+                        .fold(f32::INFINITY, f32::min);
+                    smoothstep(0.0, falloff, distance)
+                };
+                (anchor(0), anchor(1))
+            })
+            .collect();
         Self {
             warp,
             sections,
+            section_anchors,
             fringe,
         }
     }
@@ -590,7 +621,10 @@ impl ContourProfile {
         } else {
             radius + output - target
         };
-        let shift = (input - output) * across.signum();
+        let anchor0 = side(self.section_anchors[first]);
+        let anchor1 = side(self.section_anchors[last]);
+        let anchor = anchor0 + (anchor1 - anchor0) * (slot - first as f32);
+        let shift = (input - output) * across.signum() * anchor;
         let n = self.warp.axis.normal();
         (n.0 * shift, n.1 * shift)
     }
@@ -689,10 +723,10 @@ fn rasterize_mask(mask: &Value, width: u32, height: u32) -> Vec<f32> {
     }
     let w = width as usize;
     let h = height as usize;
+    let prepared = PreparedMask::new(&base);
     let mut values: Vec<f32> = (0..w * h)
         .map(|i| {
-            coverage(
-                &base,
+            prepared.coverage(
                 (i % w) as f32 / width as f32 + 0.5 / width as f32,
                 (i / w) as f32 / height as f32 + 0.5 / height as f32,
                 width,
@@ -776,7 +810,7 @@ fn reconstruct_narrow_strip(
         if donors.is_empty() {
             continue;
         }
-        for c in 0..3 {
+        for c in 0..4 {
             result.pixels[i * 4 + c] = (donors
                 .iter()
                 .map(|&n| result.pixels[n * 4 + c] as u32)
@@ -791,7 +825,37 @@ fn reconstruct_narrow_strip(
         }
     }
     if known.iter().any(|v| !v) {
-        return Err(missing_background());
+        // Geodesic ownership can enclose a narrow newly exposed strip at an
+        // arm/torso junction. Find actual observed context through a distance
+        // field, rather than using protected hand/shirt colors or failing the
+        // entire otherwise valid contour edit. Crop bounds limit this search.
+        let mut nearest = vec![usize::MAX; targets.len()];
+        let mut queue = VecDeque::new();
+        for i in 0..targets.len() {
+            if !targets[i] && !protected[i] {
+                nearest[i] = i;
+                queue.push_back(i);
+            }
+        }
+        if queue.is_empty() {
+            return Err(missing_background());
+        }
+        while let Some(i) = queue.pop_front() {
+            for j in neighbors(i, width, height) {
+                if nearest[j] == usize::MAX {
+                    nearest[j] = nearest[i];
+                    queue.push_back(j);
+                }
+            }
+        }
+        for i in 0..targets.len() {
+            if !known[i] {
+                let donor = nearest[i];
+                result.pixels[i * 4..i * 4 + 4]
+                    .copy_from_slice(&source.pixels[donor * 4..donor * 4 + 4]);
+                known[i] = true;
+            }
+        }
     }
     for _ in 0..8 {
         let previous = result.pixels.clone();
@@ -838,13 +902,13 @@ fn fill_revealed_background(
             max_y = max_y.max(i / width);
         }
     }
-    // Inpaint's farthest donor step is twelve pixels. Retaining that margin
-    // keeps surrounding donors available without serializing full-size JSON
-    // masks for a small waist/limb correction on a high-resolution photo.
-    let left = min_x.saturating_sub(12);
-    let top = min_y.saturating_sub(12);
-    let right = (max_x + 13).min(width);
-    let bottom = (max_y + 13).min(height);
+    // The search includes nearby clean context even when a stationary hand
+    // separates it from the exposed strip. It stays bounded to this ROI.
+    let margin = 48;
+    let left = min_x.saturating_sub(margin);
+    let top = min_y.saturating_sub(margin);
+    let right = (max_x + margin + 1).min(width);
+    let bottom = (max_y + margin + 1).min(height);
     let crop_width = right - left;
     let crop_height = bottom - top;
     let mut pixels = Vec::with_capacity(crop_width * crop_height * 4);
@@ -904,6 +968,40 @@ fn fill_revealed_background(
     Ok(result)
 }
 
+/// Slider changes do not change the source/part alpha. Keep exactly one
+/// checked color decomposition in a browser worker or native thread, bounded
+/// to 16 MiB.
+/// Compare actual bytes/alpha rather than an approximate image fingerprint;
+/// another image, part mask or previous graph result cannot reuse stale layers.
+fn body_layer_colors(source: &RgbaImage, alpha: &[f32]) -> Option<(RgbaImage, RgbaImage)> {
+    use std::cell::RefCell;
+    struct Colors {
+        source: RgbaImage,
+        alpha: Vec<f32>,
+        foreground: RgbaImage,
+        background: RgbaImage,
+    }
+    thread_local! {static LAST:RefCell<Option<Colors>>=const {RefCell::new(None)};}
+    LAST.with(|cache| {
+        if let Some(previous) = cache.borrow().as_ref() {
+            if previous.source == *source && previous.alpha == alpha {
+                return Some((previous.foreground.clone(), previous.background.clone()));
+            }
+        }
+        let colors = crate::face_matting::estimate(source, alpha);
+        if source.pixels.len() + alpha.len() * 4 + source.pixels.len() * 2 <= 16 * 1024 * 1024 {
+            *cache.borrow_mut() = colors.as_ref().map(|(foreground, background)| Colors {
+                source: source.clone(),
+                alpha: alpha.to_vec(),
+                foreground: foreground.clone(),
+                background: background.clone(),
+            });
+        } else {
+            *cache.borrow_mut() = None;
+        }
+        colors
+    })
+}
 fn separated_adjust(
     source: &RgbaImage,
     params: &Value,
@@ -914,7 +1012,10 @@ fn separated_adjust(
     let width = source.width as usize;
     let height = source.height as usize;
     let count = width * height;
-    let subject = rasterize_mask(subject_mask, source.width, source.height);
+    let subject = crate::face_matting::refine_alpha(
+        source,
+        &rasterize_mask(subject_mask, source.width, source.height),
+    );
     let has_part_mask = params.get("partMask").is_some_and(Value::is_object);
     let mut target = params
         .get("partMask")
@@ -924,6 +1025,7 @@ fn separated_adjust(
     for (i, alpha) in target.iter_mut().enumerate() {
         *alpha = alpha.min(subject[i]);
     }
+    target = crate::face_matting::refine_alpha(source, &target);
     let selected = params
         .get("mask")
         .map(|m| rasterize_mask(m, source.width, source.height))
@@ -937,7 +1039,7 @@ fn separated_adjust(
                 .collect()
         })
         .unwrap_or_else(|| vec![false; count]);
-    let matte_layers = crate::face_matting::estimate(source, &target);
+    let matte_layers = body_layer_colors(source, &target);
     let mut foreground = matte_layers
         .as_ref()
         .map(|layers| layers.0.clone())
@@ -1042,8 +1144,13 @@ fn separated_adjust(
             changed[i] = true;
             // Only the newly uncovered contour strip requires background.
             // Pixels fully covered by the new foreground need no fill.
-            holes[i] =
-                target[i] > 1.0 / 255.0 && warped_subject[i] < 1.0 - 1e-6 && !user_protected[i];
+            // A soft part boundary already has an estimated fixed context.
+            // Reconstruct only newly revealed coverage. Marking every mixed
+            // output sample as a hole also filled pixels whose foreground
+            // coverage *increased*, including tiny enclosed seam islands.
+            holes[i] = target[i] > 1.0 / 255.0
+                && warped_subject[i] < target[i] - 1.0 / 255.0
+                && !user_protected[i];
         }
     }
     let mut background = matte_layers
@@ -1166,6 +1273,96 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn an_occluder_crossing_the_bone_core_anchors_adjacent_sections_continuously() {
+        let width = 100;
+        let height = 180;
+        let mut alpha = vec![0.0; width * height];
+        for y in 10..170 {
+            for x in 15..85 {
+                if !(100..115).contains(&y) || !(45..55).contains(&x) {
+                    alpha[y * width + x] = 1.0;
+                }
+            }
+        }
+        let profile = ContourProfile::new(
+            Warp {
+                axis: Axis {
+                    origin: (50.0, 10.0),
+                    direction: (0.0, 1.0),
+                    length: 160.0,
+                    radius: 40.0,
+                },
+                center: 0.5,
+                extent: 0.55,
+                amount: 0.8,
+                limb: false,
+            },
+            &alpha,
+            width,
+            height,
+            false,
+            4.0,
+        );
+        // The valid silhouette keeps a visible edit; this does not freeze
+        // the whole shirt to conceal the broken transition.
+        assert!(profile.displacement((80.0, 75.0)).0.abs() > 3.0);
+        assert_eq!(profile.displacement((80.0, 105.0)), (0.0, 0.0));
+        let shifts: Vec<f32> = (85..126)
+            .map(|y| profile.displacement((80.0, y as f32)).0)
+            .collect();
+        let largest_jump = shifts
+            .windows(2)
+            .map(|pair| (pair[1] - pair[0]).abs())
+            .fold(0.0, f32::max);
+        assert!(largest_jump < 1.0, "one-pixel step jumped {largest_jump}");
+    }
+    #[test]
+    fn an_enclosed_revealed_strip_uses_clean_context_without_sampling_an_occluder() {
+        let width = 9usize;
+        let height = 9usize;
+        let mut pixels = [40, 70, 110, 79].repeat(width * height);
+        let mut holes = vec![false; width * height];
+        let mut protected = vec![false; width * height];
+        let center = 4 * width + 4;
+        holes[center] = true;
+        for y in 2..=6 {
+            for x in 2..=6 {
+                let i = y * width + x;
+                if i != center {
+                    protected[i] = true;
+                    pixels[i * 4..i * 4 + 4].copy_from_slice(&[250, 5, 220, 255]);
+                }
+            }
+        }
+        pixels[center * 4..center * 4 + 4].copy_from_slice(&[1, 200, 1, 255]);
+        let source = RgbaImage::new(width as u32, height as u32, pixels).unwrap();
+        check_background_donors(&holes, &protected, width, height).unwrap();
+        let output = reconstruct_narrow_strip(&source, &holes, &protected).unwrap();
+        assert_eq!(
+            &output.pixels[center * 4..center * 4 + 4],
+            &[40, 70, 110, 79]
+        );
+        for i in 0..width * height {
+            if i != center {
+                assert_eq!(
+                    &output.pixels[i * 4..i * 4 + 4],
+                    &source.pixels[i * 4..i * 4 + 4]
+                );
+            }
+        }
+        let mut other = source.clone();
+        for (i, &blocked) in protected.iter().enumerate() {
+            if blocked {
+                other.pixels[i * 4..i * 4 + 4].copy_from_slice(&[0, 255, 0, 1]);
+            }
+        }
+        let changed = reconstruct_narrow_strip(&other, &holes, &protected).unwrap();
+        assert_eq!(
+            &changed.pixels[center * 4..center * 4 + 4],
+            &output.pixels[center * 4..center * 4 + 4]
+        );
+    }
     #[test]
     fn a_nonzero_body_edit_without_a_real_subject_mask_is_rejected() {
         let (source, mut params) = segmented_person(60);
@@ -1336,6 +1533,49 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn body_color_cache_invalidates_image_alpha_and_transparency_changes() {
+        let (w, h) = (36, 44);
+        let alpha: Vec<f32> = (0..w * h)
+            .map(|i| ((i % w) as f32 / 12.0 - 0.5).clamp(0.0, 1.0))
+            .collect();
+        let image = |offset: u8, transparent: bool| {
+            RgbaImage::new(
+                w as u32,
+                h as u32,
+                (0..w * h)
+                    .flat_map(|i| {
+                        [
+                            90 + offset,
+                            100 + (i / w) as u8,
+                            130,
+                            if transparent { 180 } else { 255 },
+                        ]
+                    })
+                    .collect(),
+            )
+            .unwrap()
+        };
+        let first = image(0, false);
+        let second = image(30, false);
+        let changed_alpha: Vec<f32> = alpha.iter().map(|v| 1.0 - v).collect();
+        for (source, mask) in [
+            (&first, &alpha),
+            (&first, &alpha),
+            (&second, &alpha),
+            (&first, &changed_alpha),
+            (&first, &alpha),
+            (&image(0, true), &alpha),
+            (&first, &alpha),
+        ] {
+            assert_eq!(
+                body_layer_colors(source, mask),
+                crate::face_matting::estimate(source, mask)
+            );
+        }
+    }
+
     #[test]
     fn freezing_an_occluding_sleeve_does_not_tear_the_adjacent_fabric() {
         let (width, height) = (160usize, 200usize);

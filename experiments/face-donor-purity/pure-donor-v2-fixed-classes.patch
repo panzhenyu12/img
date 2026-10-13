@@ -1,0 +1,118 @@
+--- a/core/image-core/src/face.rs
++++ b/core/image-core/src/face.rs
+@@ -400,6 +400,57 @@
+     .flatten()
+ }
+
++/// Experimental color supply refinement. Keep the original integer class
++/// map and reconstruction classification front unchanged. Only uncertain
++/// observed neck/hair RGB donors receive colors propagated from the same
++/// observed class's pure interior; the original output layer is untouched.
++fn purify_layer_donor_colors(
++    source: &RgbaImage,
++    observed_layer: &[u8],
++    pure: &[bool],
++    forbidden: &[bool],
++) -> RgbaImage {
++    let w = source.width as usize;
++    let h = source.height as usize;
++    let n = w * h;
++    let mut known: Vec<bool> = (0..n)
++        .map(|i| observed_layer[i] > 0 && pure[i] && !forbidden[i])
++        .collect();
++    let mut queue = VecDeque::new();
++    for i in 0..n {
++        if known[i] { queue.push_back(i); }
++    }
++    let mut out = source.clone();
++    while let Some(i) = queue.pop_front() {
++        for j in neighbors(i,w,h) {
++            if known[j] || forbidden[j] || observed_layer[j] == 0
++                || observed_layer[j] != observed_layer[i] {
++                continue;
++            }
++            let mut color = [0.0_f32; 4];
++            let mut count = 0;
++            for k in neighbors(j,w,h).filter(|&k|
++                known[k] && !forbidden[k] && observed_layer[k] == observed_layer[j]) {
++                let a=out.pixels[k*4+3] as f32/255.0;
++                for c in 0..3 { color[c] += out.pixels[k*4+c] as f32*a; }
++                color[3] += a;
++                count += 1;
++            }
++            if count == 0 { continue; }
++            for c in 0..3 {
++                out.pixels[j*4+c]=if color[3]>1e-6 { byte(color[c]/color[3]) } else {0};
++            }
++            out.pixels[j*4+3]=byte(color[3]/count as f32*255.0);
++            known[j]=true;
++            queue.push_back(j);
++        }
++    }
++    // No same-class pure donor path means no claimed clean reconstruction;
++    // retain that original observation for this control experiment. Never
++    // borrow a neighboring material or change the classification geometry.
++    out
++}
++
+ /// Propagate only clean exterior donors into the newly exposed band. The
+ /// surviving original foreground and frozen pixels are never donors. This
+ /// deterministic local fill cannot reconstruct complex hidden scene content.
+@@ -1399,6 +1450,7 @@
+     let mut protection = Vec::with_capacity(count);
+     let mut donor_excluded = Vec::with_capacity(count);
+     let mut known_layer = Vec::with_capacity(count);
++    let mut pure_color_donor = Vec::with_capacity(count);
+     let mut neck_lighting_known = Vec::with_capacity(count);
+     mark!("prepare");
+     for y in top..bottom {
+@@ -1450,6 +1502,15 @@
+             } else {
+                 0
+             });
++            pure_color_donor.push(match *known_layer.last().unwrap_or(&0) {
++                1 => neck_mask.as_ref().is_some_and(|m| {
++                    m.coverage(p.0/w,p.1/h,source.width,source.height) >= 0.95
++                }),
++                2 => hair_mask.as_ref().is_some_and(|m| {
++                    m.coverage(p.0/w,p.1/h,source.width,source.height) >= 0.95
++                }),
++                _ => false,
++            });
+             // A confidently classified non-neck person pixel is not a soft
+             // facial fringe, even if approximate head alpha overlaps it.
+             // Keep other people, clothing and undetected ears fixed.
+@@ -1501,6 +1562,20 @@
+             );
+         }
+     }
++    let pure_initial = pure_color_donor.clone();
++    for i in 0..count {
++        let x = (i%cw) as isize;
++        let y = (i/cw) as isize;
++        pure_color_donor[i] = pure_initial[i] && (-2_isize..=2).all(|dy| {
++            (-2_isize..=2).all(|dx| {
++                if dx*dx+dy*dy > 4 { return true; }
++                let nx=x+dx; let ny=y+dy;
++                nx>=0 && ny>=0 && nx<cw as isize && ny<ch as isize
++                    && pure_initial[ny as usize*cw+nx as usize]
++                    && known_layer[ny as usize*cw+nx as usize] == known_layer[i]
++            })
++        });
++    }
+     let crop = RgbaImage::new(cw as u32, ch as u32, crop_pixels)?;
+     mark!("crop masks");
+     // A head alpha includes hair and ears. Using it to sample a facial
+@@ -1574,9 +1649,11 @@
+         }
+     }
+     mark!("sample grid");
++    let donor_crop = purify_layer_donor_colors(
++        &crop, &known_layer, &pure_color_donor, &donor_frozen);
+     let mut background = if holes.iter().any(|&h| h) {
+         reconstruct(
+-            &crop,
++            &donor_crop,
+             &holes,
+             moving_alpha,
+             &donor_frozen,

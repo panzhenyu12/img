@@ -1,0 +1,45 @@
+[
+  {
+    "case": "street",
+    "modelBytes": 29546882,
+    "modelSHA256": "593eba0b7e04730f1b61c0a3cbca68d97d8d6a7ff5c6a44a7b9d7fcd880fc5ae",
+    "revision": "406830d0fa60666da0071c342ad2fbc8f30c5c64",
+    "onnxruntime": "1.20.1",
+    "device": "CPU",
+    "threads": 4,
+    "loadMs": 2391.25,
+    "inferenceMs": 7008.62,
+    "sourceSHA256": "b99e83dd92123d85ba227938a4accc70ccdba07b9ba70d7c9e9d6b4be0965a8e",
+    "outsideChangedPixels": 0,
+    "alphaChangedPixels": 0
+  },
+  {
+    "case": "crowd",
+    "modelBytes": 29546882,
+    "modelSHA256": "593eba0b7e04730f1b61c0a3cbca68d97d8d6a7ff5c6a44a7b9d7fcd880fc5ae",
+    "revision": "406830d0fa60666da0071c342ad2fbc8f30c5c64",
+    "onnxruntime": "1.20.1",
+    "device": "CPU",
+    "threads": 4,
+    "loadMs": 2391.25,
+    "inferenceMs": 3007.29,
+    "sourceSHA256": "b33437df529d9cfdf900320d1cbebe7315ba2b2fecea8ec7a856906d63c88c02",
+    "outsideChangedPixels": 0,
+    "alphaChangedPixels": 0
+  },
+  {
+    "case": "architecture",
+    "modelBytes": 29546882,
+    "modelSHA256": "593eba0b7e04730f1b61c0a3cbca68d97d8d6a7ff5c6a44a7b9d7fcd880fc5ae",
+    "revision": "406830d0fa60666da0071c342ad2fbc8f30c5c64",
+    "onnxruntime": "1.20.1",
+    "device": "CPU",
+    "threads": 4,
+    "loadMs": 2391.25,
+    "inferenceMs": 1763.37,
+    "sourceSHA256": "e45f48a68d024d6f228510a7e467999b4db289be7d8fed3a5713248955cc2502",
+    "outsideChangedPixels": 0,
+    "alphaChangedPixels": 0,
+    "targetMAE": 35.216694085041425
+  }
+]

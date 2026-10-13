@@ -14,7 +14,7 @@ export interface DetectedPart {
   region: DetectionRegion;
   points: DetectionPoint[];
   landmarks: DetectionPoint[];
-  protectMask?: InlineMask;
+  protectMask?: InlineMask | RasterMask;
   partMask?: RasterMask;
 }
 export interface DetectedPerson {
@@ -116,7 +116,7 @@ export function measuredLimbSupport(part: DetectedPart, mask: RasterMask, imageW
     if (radius > length*.42 || proximal.length>=2 && distal.length>=2 && median(proximal)>length*.25 && median(proximal)>median(distal)*2.3) return undefined;
   }
   const half = [0,1].map(side => {
-    const visible = spans.map(span=>span.sides[side]).filter(value=>Number.isFinite(value)&&value<=radius*3);
+    const visible = spans.map(span=>span.sides[side]).filter(value=>Number.isFinite(value)&&(part.partMask!==undefined||value<=radius*3));
     return Math.max(3,(visible.length?Math.max(...visible):radius)*1.45+2);
   });
   return [offset(a, nx * half[1] / imageWidth, ny * half[1] / imageHeight), offset(b, nx * half[1] / imageWidth, ny * half[1] / imageHeight), offset(b, -nx * half[0] / imageWidth, -ny * half[0] / imageHeight), offset(a, -nx * half[0] / imageWidth, -ny * half[0] / imageHeight)];
@@ -350,6 +350,37 @@ export async function detectPeople(source: HTMLImageElement | HTMLCanvasElement,
       }
     }));
   }
+  const detected=await detectBodyPose(source);
+  if(!detected.length)return [];
+  const canvas=source instanceof HTMLCanvasElement?source:document.createElement('canvas');
+  if(source instanceof HTMLImageElement){canvas.width=source.naturalWidth;canvas.height=source.naturalHeight;canvas.getContext('2d')!.drawImage(source,0,0);}
+  const {parseBodyClasses,deriveBodyLayers}=await import('./bodyParsing');
+  const classes=await parseBodyClasses(canvas);
+  return detected.map(person=>{
+    // Pose provides a per-instance silhouette even for a single person. Use
+    // it as a conservative ownership bound for FASHN classes: parsing can
+    // label a chair rim, coat tail, or nearby person as `top`, while Pose
+    // still keeps the visible garment. Multi-person scenes retain the same
+    // instance isolation instead of switching semantics by person count.
+    const layers=deriveBodyLayers(canvas,person.points,classes,person.subjectMask);
+    const candidates=bodyParts(person.points,canvas.width,canvas.height),unavailableParts:Array<{id:string;label:string;reason:string}>=[];
+    const parts=candidates.flatMap(part=>{
+      const partMask=layers.partMasks[part.id];if(!partMask)return [];
+      const limb=/(?:upper-arm|forearm|thigh|calf)$/.test(part.id);
+      const paired=part.id.endsWith('thigh')?candidates.find(other=>other.id===(part.id.startsWith('left')?'right-thigh':'left-thigh')):undefined;
+      const measuredPart={...part,partMask};
+      const support=limb?measuredLimbSupport(measuredPart,partMask,canvas.width,canvas.height,paired):measuredTorsoSupport(measuredPart,partMask,canvas.width,canvas.height);
+      if(!support&&part.id!=='full-body'){unavailableParts.push({id:part.id,label:part.label,reason:'未解析到可独立重塑的部位，请校正部位与保护蒙版'});return [];}
+      const polygon=support??part.points;
+      return [{...part,points:polygon,region:regionForPolygon(polygon),partMask,protectMask:layers.protectMask}];
+    });
+    return {...person,subjectMask:layers.subjectMask,parts:unavailableParts.length?parts.filter(part=>part.id!=='full-body'):parts,unavailableParts};
+  });
+}
+
+/** Pose instances only, exposed separately for parser diagnosis/replay. */
+export async function detectBodyPose(source:HTMLImageElement|HTMLCanvasElement):Promise<DetectedPerson[]> {
+  const vision=await FilesetResolver.forVisionTasks('/vision');
   pose ??= PoseLandmarker.createFromOptions(vision, {
     baseOptions: { modelAssetPath: '/models/pose_landmarker_lite.task', delegate: 'CPU' },
     runningMode: 'IMAGE', numPoses: 4, outputSegmentationMasks: true,
@@ -390,7 +421,7 @@ export async function detectPeople(source: HTMLImageElement | HTMLCanvasElement,
         return [{ ...part, points: support, region: regionForPolygon(support), protectMask }];
       });
       const available = unavailableParts.length ? parts.filter(part => part.id !== 'full-body') : parts;
-      return { id: `body-${i + 1}`, kind, region: boxFromPoints(points), points, parts: available, subjectMask, unavailableParts };
+      return { id: `body-${i + 1}`, kind:'body', region: boxFromPoints(points), points, parts: available, subjectMask, unavailableParts };
     });
   } finally { result.close(); }
 }

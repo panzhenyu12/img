@@ -9,6 +9,7 @@ mod color;
 mod engine;
 mod face;
 pub(crate) mod face_matting;
+mod film;
 mod geometry;
 mod inpaint;
 mod mask;

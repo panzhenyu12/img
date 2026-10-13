@@ -1,0 +1,28 @@
+[
+  {
+    "smooth": 100,
+    "texture": 0,
+    "source_sha256": "cf161b3d22a08a9ce90173a3927728d365d4dba16f07080c07c25dbc782c97b7",
+    "original_pore_contrast": 10.0,
+    "original_blemish_contrast": 39.74799999999999,
+    "baseline_pore_contrast": 0.0,
+    "baseline_blemish_contrast": 15.299200000000042,
+    "baseline_blemish_brightened": 23.448799999999977,
+    "current_pore_contrast": 7.999999999999972,
+    "current_blemish_contrast": 19.873999999999995,
+    "current_blemish_brightened": 19.086600000000004
+  },
+  {
+    "smooth": 100,
+    "texture": 100,
+    "source_sha256": "cf161b3d22a08a9ce90173a3927728d365d4dba16f07080c07c25dbc782c97b7",
+    "original_pore_contrast": 10.0,
+    "original_blemish_contrast": 39.74799999999999,
+    "baseline_pore_contrast": 9.0,
+    "baseline_blemish_contrast": 37.17319999999998,
+    "baseline_blemish_brightened": 2.5748000000000104,
+    "current_pore_contrast": 10.0,
+    "current_blemish_contrast": 22.661399999999986,
+    "current_blemish_brightened": 17.086600000000004
+  }
+]

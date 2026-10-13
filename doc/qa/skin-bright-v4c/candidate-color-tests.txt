@@ -1,0 +1,68 @@
+    Finished `release` profile [optimized] target(s) in 0.15s
+     Running unittests src/lib.rs (.run/skin-bright-v4-target/release/deps/image_core-e1ec6f56bffdd293)
+
+running 50 tests
+test color::tests::black_white_is_a_progressive_mix_and_preserves_luminance ... ok
+test color::tests::basic_neutral_settings_preserve_every_channel_and_alpha ... ok
+test color::tests::clothing_hue_saturation_brightness_and_texture_have_correct_local_semantics ... ok
+test color::tests::curves_identity_and_lut_identity_preserve_alpha ... ok
+test color::tests::curves_interpolate_exactly_and_only_touch_the_selected_channel ... ok
+test color::tests::each_film_preset_has_its_declared_color_direction ... ok
+test color::tests::bilateral_noise_reduction_suppresses_noise_without_smearing_a_silhouette ... ok
+test color::tests::clothing_smoothing_strength_is_continuous_and_monotone_from_zero ... ok
+test color::tests::explicit_skin_mask_is_authoritative_over_larger_face_mask ... ok
+test color::tests::exposure_obeys_linear_light_ev_instead_of_encoded_byte_multiplication ... ok
+test color::tests::clothing_smoothing_reduces_fold_contrast_and_keeps_fabric_detail ... ok
+test color::tests::every_makeup_color_parameter_has_its_own_direction_and_semantic_boundary ... ok
+test color::tests::film_grain_is_repeatable_zero_mean_and_seeded_without_color_drift ... ok
+test color::tests::film_vignette_fade_glow_and_halation_have_distinct_spatial_effects ... ok
+test color::tests::guided_statistics_use_only_eligible_samples_and_preserve_constant_fields ... ok
+test color::tests::hsl_changes_selected_hue_without_changing_alpha ... ok
+test color::tests::film_master_intensity_scales_every_effect_and_zero_is_identity ... ok
+test color::tests::detail_controls_use_distinct_scales_and_signed_strengths ... ok
+test color::tests::hsl_global_and_selective_adjustments_respect_hue_saturation_lightness ... ok
+test color::tests::levels_and_gamma_have_stable_endpoints_and_monotone_midtone_behavior ... ok
+test color::tests::lip_adjustments_leave_inner_mouth_and_teeth_untinted ... ok
+test color::tests::lut_rejects_bad_point_count ... ok
+test color::tests::lut_trilinear_interpolation_channel_order_amount_and_domain_are_correct ... ok
+test color::tests::clothing_smoothing_excludes_unselected_and_frozen_color_donors ... ok
+test color::tests::skin_and_film_do_not_change_transparency ... ok
+test color::tests::skin_color_preserves_deep_shadows_and_specular_highlights ... ok
+test color::tests::skin_retouch_preserves_explicit_hair_and_skin_protection ... ok
+test color::tests::semantic_skin_mask_protects_features_and_background ... ok
+test color::tests::skin_tone_separates_luminance_and_chroma_and_protects_highlights ... ok
+test color::tests::software_srgb_transfer_round_trips_every_encoded_byte_monotonically ... ok
+test color::tests::skin_redness_is_chromatic_and_texture_preserves_detail_only_when_smoothing ... ok
+test color::tests::structural_eye_bag_and_tear_trough_are_not_faked_with_brightness ... ok
+test color::tests::teeth_whitening_runs_without_lip_mask_and_rejects_red_and_dark_pixels ... ok
+test color::tests::temperature_tint_saturation_and_vibrance_match_their_color_axes ... ok
+test color::tests::local_makeup_uses_lip_polygon_instead_of_face_ellipse ... ok
+test color::tests::dark_channel_dehaze_reduces_error_on_a_known_atmospheric_veil ... ok
+test color::tests::tonal_sliders_have_correct_direction_and_light_range_preference ... ok
+test color::tests::under_eye_controls_protect_eyes_and_brows_even_when_masks_overlap ... ok
+test color::tests::protected_feature_colors_cannot_contaminate_neighboring_skin_smoothing ... ok
+test color::tests::every_public_basic_parameter_obeys_mask_freeze_opacity_and_alpha ... ok
+test color::tests::skin_smoothing_cannot_import_color_from_outside_the_selection ... ok
+test color::tests::guided_skin_suppresses_fine_noise_and_preserves_strong_edges ... ok
+test color::tests::guided_skin_reduces_small_dark_spots_without_flattening_shading ... ok
+test color::tests::spatial_color_algorithms_cannot_import_frozen_or_unselected_colors ... ok
+test color::tests::texture_preserved_skin_reduces_coherent_red_patch_without_erasing_low_contrast_pores ... ok
+test color::tests::strong_skin_smoothing_keeps_coherent_pores_but_reduces_compact_blemishes ... ok
+test color::tests::pale_compact_bump_is_repaired_without_erasing_same_chroma_highlight_or_small_pore ... ok
+test color::tests::wide_red_blotch_is_corrected_without_flattening_healthy_lighting ... ok
+test color::tests::texture_retention_does_not_disable_compact_blemish_correction ... ok
+test color::tests::bright_spot_classifier_rejects_wide_specular_light_and_protected_donors ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 110 filtered out; finished in 0.07s
+
+     Running unittests src/bin/image-render.rs (.run/skin-bright-v4-target/release/deps/image_render-7551ab135a7dd72d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/algorithm_contracts.rs (.run/skin-bright-v4-target/release/deps/algorithm_contracts-b9344a850a1160cb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s

@@ -217,8 +217,10 @@ func TestRepairAndWarpRespectProtectedMask(t *testing.T) {
 	}{
 		{"color.basic", map[string]any{"exposure": 60, "protectMask": mask}},
 		{"warp.liquify", map[string]any{"strokes": []map[string]any{{"x": 0.5, "y": 0.5, "toX": 0.6, "toY": 0.5, "radius": 0.3, "strength": 100}}, "protectMask": mask}},
-		{"repair.clone", map[string]any{"strokes": []map[string]any{{"x": 0.5, "y": 0.5, "sourceX": 0.05, "sourceY": 0.1, "radius": 0.2}}, "protectMask": mask}},
-		{"repair.heal", map[string]any{"strokes": []map[string]any{{"x": 0.5, "y": 0.5, "sourceX": 0.05, "sourceY": 0.1, "radius": 0.2}}, "protectMask": mask}},
+		// Manual source is inside the frozen half; the full source patch stays
+		// in bounds. Frozen pixels may be read but must never be overwritten.
+		{"repair.clone", map[string]any{"strokes": []map[string]any{{"x": 0.5, "y": 0.5, "sourceX": 0.2, "sourceY": 0.5, "radius": 0.12}}, "protectMask": mask}},
+		{"repair.heal", map[string]any{"strokes": []map[string]any{{"x": 0.5, "y": 0.5, "sourceX": 0.2, "sourceY": 0.5, "radius": 0.12}}, "protectMask": mask}},
 		{"repair.inpaint", map[string]any{"region": map[string]any{"x": 0.45, "y": 0.4, "width": 0.1, "height": 0.04}, "iterations": 3, "protectMask": mask}},
 		{"paint.brush", map[string]any{"color": []int{255, 0, 0}, "strokes": []map[string]any{{"x": 0.5, "y": 0.5, "radius": 0.2, "strength": 100}}, "protectMask": mask}},
 	} {
@@ -240,5 +242,12 @@ func TestRepairAndWarpRespectProtectedMask(t *testing.T) {
 				t.Fatal("unprotected region did not change")
 			}
 		})
+	}
+	// A source patch crossing the image edge has no complete boundary for
+	// lighting reconstruction. Reject it explicitly instead of a black fill.
+	invalidSource := `{"editGraph":{"operations":[{"type":"repair.heal","enabled":true,"params":{"strokes":[{"x":0.5,"y":0.5,"sourceX":0.05,"sourceY":0.1,"radius":0.2}]}}]},"format":"png"}`
+	res := postRender(t, h, sess.ID, invalidSource)
+	if res.Code != http.StatusUnprocessableEntity || !strings.Contains(res.Body.String(), "invalid_operation") || !strings.Contains(res.Body.String(), "image-core rejected") {
+		t.Fatalf("invalid heal source status=%d body=%s", res.Code, res.Body)
 	}
 }

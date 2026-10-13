@@ -1,0 +1,407 @@
+{
+  "diagnosticSource": ".run/face-v9-diagnostic-src",
+  "sourceChange": "trace only; production unchanged",
+  "outputParity": [
+    {
+      "case": "portrait-makeup-faceWidth-100",
+      "pixelSha256": "df6cb22479557a356762d5439dceb2cccac16d2250bd959f2753d50c8fb1503c",
+      "samePixelsAsV9": true
+    },
+    {
+      "case": "portrait-woman-faceWidth-100",
+      "pixelSha256": "25bbea9f686b25511bcde637b57c60f2a71bcc90ede17e74ae3b3c977bb8ae4f",
+      "samePixelsAsV9": true
+    },
+    {
+      "case": "portrait-hair-chin--100",
+      "pixelSha256": "f90bcc199970ee6895534647c29d3e7641762ffdad30745e32d08a5111477c40",
+      "samePixelsAsV9": true
+    }
+  ],
+  "coordinates": "original image pixel indices; owner is BFS seed (not every harmonic contributor)",
+  "layerLabels": {
+    "0": "scene",
+    "1": "neck",
+    "2": "hair"
+  },
+  "badPoints": [
+    {
+      "point": [
+        269,
+        264
+      ],
+      "sourceRGB": [
+        215,
+        168,
+        160
+      ],
+      "candidateRGB": [
+        118,
+        78,
+        65
+      ],
+      "hole": true,
+      "finalLayer": 2,
+      "owner": [
+        255,
+        262
+      ],
+      "ownerRGB": [
+        111,
+        68,
+        60
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.99879,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 1.0,
+      "sampleMembership": 0.12585,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": true,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 2
+    },
+    {
+      "point": [
+        270,
+        300
+      ],
+      "sourceRGB": [
+        183,
+        134,
+        127
+      ],
+      "candidateRGB": [
+        98,
+        67,
+        38
+      ],
+      "hole": true,
+      "finalLayer": 2,
+      "owner": [
+        253,
+        300
+      ],
+      "ownerRGB": [
+        58,
+        35,
+        4
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 1.0,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 1.0,
+      "sampleMembership": 0.34479,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": true,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 2
+    },
+    {
+      "point": [
+        269,
+        337
+      ],
+      "sourceRGB": [
+        139,
+        101,
+        50
+      ],
+      "candidateRGB": [
+        186,
+        144,
+        40
+      ],
+      "hole": true,
+      "finalLayer": 2,
+      "owner": [
+        267,
+        337
+      ],
+      "ownerRGB": [
+        197,
+        153,
+        45
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.65327,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 0.32407,
+      "sampleMembership": 0.0,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": true,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 2
+    },
+    {
+      "point": [
+        476,
+        291
+      ],
+      "sourceRGB": [
+        177,
+        131,
+        107
+      ],
+      "candidateRGB": [
+        158,
+        108,
+        84
+      ],
+      "hole": true,
+      "finalLayer": 2,
+      "owner": [
+        482,
+        291
+      ],
+      "ownerRGB": [
+        167,
+        116,
+        87
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.71207,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 1.0,
+      "sampleMembership": 0.0,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": true,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 2
+    },
+    {
+      "point": [
+        477,
+        299
+      ],
+      "sourceRGB": [
+        199,
+        161,
+        88
+      ],
+      "candidateRGB": [
+        160,
+        108,
+        78
+      ],
+      "hole": true,
+      "finalLayer": 2,
+      "owner": [
+        482,
+        294
+      ],
+      "ownerRGB": [
+        167,
+        111,
+        86
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.5034,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 0.99824,
+      "sampleMembership": 0.0,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": true,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 2
+    },
+    {
+      "point": [
+        477,
+        304
+      ],
+      "sourceRGB": [
+        208,
+        178,
+        83
+      ],
+      "candidateRGB": [
+        212,
+        189,
+        78
+      ],
+      "hole": true,
+      "finalLayer": 0,
+      "owner": [
+        479,
+        310
+      ],
+      "ownerRGB": [
+        212,
+        189,
+        76
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.0,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 0.25998,
+      "sampleMembership": 0.0,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": false,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 0
+    },
+    {
+      "point": [
+        472,
+        311
+      ],
+      "sourceRGB": [
+        192,
+        151,
+        93
+      ],
+      "candidateRGB": [
+        212,
+        189,
+        76
+      ],
+      "hole": true,
+      "finalLayer": 0,
+      "owner": [
+        479,
+        311
+      ],
+      "ownerRGB": [
+        213,
+        191,
+        77
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.0,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 0.99971,
+      "sampleMembership": 0.0,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": false,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 0
+    },
+    {
+      "point": [
+        451,
+        348
+      ],
+      "sourceRGB": [
+        200,
+        152,
+        142
+      ],
+      "candidateRGB": [
+        204,
+        169,
+        54
+      ],
+      "hole": true,
+      "finalLayer": 0,
+      "owner": [
+        463,
+        348
+      ],
+      "ownerRGB": [
+        202,
+        162,
+        48
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.0,
+        "neck": 0.0,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 1.0,
+      "sampleMembership": 0.0,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": false,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 0
+    },
+    {
+      "point": [
+        440,
+        373
+      ],
+      "sourceRGB": [
+        178,
+        130,
+        94
+      ],
+      "candidateRGB": [
+        179,
+        134,
+        101
+      ],
+      "hole": true,
+      "finalLayer": 1,
+      "owner": [
+        440,
+        378
+      ],
+      "ownerRGB": [
+        179,
+        134,
+        104
+      ],
+      "ownerMasks": {
+        "faceContourMask": 0.0,
+        "hair": 0.0,
+        "neck": 0.92685,
+        "ears": 0.0,
+        "accessories": 0.0
+      },
+      "outputFrozen": false,
+      "sourceAlpha": 0.80026,
+      "sampleMembership": 0.0,
+      "ownerRawFacialAlpha": 0.0,
+      "ownerRefinedFacialAlpha": 0.0,
+      "ownerDonorExcluded": true,
+      "ownerDonorFrozen": false,
+      "ownerKnownLayer": 1
+    }
+  ]
+}

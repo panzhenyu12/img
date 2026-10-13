@@ -1,0 +1,9 @@
+{
+  "candidate": ".run/face-donor-purity-v1-frozen-image-render",
+  "sha256": "8e7dedd4be2d2ef6646801b90d43c2b2c3f902a775a3e57c54081061cff96cf5",
+  "candidateSource": "experiments/face-donor-purity/pure-donor-v1.patch",
+  "threshold": 0.95,
+  "erodePixels": 2,
+  "outputFreezeChanged": false,
+  "geometryChanged": false
+}

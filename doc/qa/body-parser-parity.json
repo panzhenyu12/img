@@ -1,0 +1,28 @@
+{
+  "revision": "1f80c34dbab321c5730dda5c3fea279fd3e97498",
+  "weightsSHA256": "e43c8c8a9b04f28798f0a4630cf18caa2cdb27a0d454fae43a5716e6f7078244",
+  "configSHA256": "87bd5b66419dbfa7c02cfbeb94e292454863b1606c5df29526b19a6c1de70d9f",
+  "onnxSHA256": "3b4925715aecbf4996fea5de5e7ce30b173c20f751f21cffe826b5db46ed7729",
+  "onnxBytes": 256750809,
+  "input": [
+    1,
+    3,
+    576,
+    384
+  ],
+  "output": [
+    1,
+    18,
+    144,
+    96
+  ],
+  "opset": 17,
+  "parity": {
+    "source": "test/results/body-contour-v2/fullbody-side-fashion/source.png",
+    "torchMs": 6768.6,
+    "ortMs": 5096.69,
+    "maxLogitError": 1.049041748046875e-05,
+    "meanLogitError": 3.390777010281454e-07,
+    "argmaxMismatchPixels": 0
+  }
+}

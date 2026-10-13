@@ -1,0 +1,173 @@
+[
+  {
+    "file": "portrait-makeup-faceWidth-60-crop-244-168-100pct.png",
+    "source": "test/results/face-core-fresh/portrait-makeup-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-makeup-faceWidth-60-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-makeup-faceWidth-60-after.png",
+    "cropPixels": [
+      244,
+      168,
+      510,
+      428
+    ],
+    "scale": 1,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "portrait-makeup-faceWidth-100-crop-244-168-100pct.png",
+    "source": "test/results/face-core-fresh/portrait-makeup-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-makeup-faceWidth-100-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-makeup-faceWidth-100-after.png",
+    "cropPixels": [
+      244,
+      168,
+      510,
+      428
+    ],
+    "scale": 1,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "portrait-woman-faceWidth-100-crop-145-274-100pct.png",
+    "source": "test/results/face-core-fresh/portrait-woman-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-woman-faceWidth-100-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-woman-faceWidth-100-after.png",
+    "cropPixels": [
+      145,
+      274,
+      340,
+      451
+    ],
+    "scale": 1,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "portrait-hair-chin--100-crop-200-315-100pct.png",
+    "source": "test/results/face-core-fresh/portrait-hair-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-hair-chin--100-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-hair-chin--100-after.png",
+    "cropPixels": [
+      200,
+      315,
+      402,
+      461
+    ],
+    "scale": 1,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "portrait-glasses-street-faceWidth-100-crop-296-225-2x-nearest.png",
+    "source": "test/results/face-core-fresh/portrait-glasses-street-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-glasses-street-faceWidth-100-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-glasses-street-faceWidth-100-after.png",
+    "cropPixels": [
+      296,
+      225,
+      442,
+      361
+    ],
+    "scale": 2,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "portrait-roll-faceWidth-100-crop-282-225-100pct.png",
+    "source": "test/results/face-core-fresh/portrait-roll-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-roll-faceWidth-100-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-roll-faceWidth-100-after.png",
+    "cropPixels": [
+      282,
+      225,
+      480,
+      423
+    ],
+    "scale": 1,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "fixture-portrait-faceWidth-100-crop-202-114-2x-nearest.png",
+    "source": "test/results/face-core-fresh/fixture-portrait-source.png",
+    "baseline": "test/results/face-polygon-v9/fixture-portrait-faceWidth-100-before.png",
+    "candidate": "test/results/face-polygon-v9/fixture-portrait-faceWidth-100-after.png",
+    "cropPixels": [
+      202,
+      114,
+      401,
+      285
+    ],
+    "scale": 2,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "portrait-makeup-faceWidth-100-crop-244-232-4x-nearest.png",
+    "source": "test/results/face-core-fresh/portrait-makeup-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-makeup-faceWidth-100-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-makeup-faceWidth-100-after.png",
+    "cropPixels": [
+      244,
+      232,
+      303,
+      371
+    ],
+    "scale": 4,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  },
+  {
+    "file": "portrait-makeup-faceWidth-100-crop-429-281-4x-nearest.png",
+    "source": "test/results/face-core-fresh/portrait-makeup-source.png",
+    "baseline": "test/results/face-polygon-v9/portrait-makeup-faceWidth-100-before.png",
+    "candidate": "test/results/face-polygon-v9/portrait-makeup-faceWidth-100-after.png",
+    "cropPixels": [
+      429,
+      281,
+      504,
+      396
+    ],
+    "scale": 4,
+    "interpolation": "nearest",
+    "layout": [
+      "original",
+      "baseline demix6",
+      "candidate v9"
+    ]
+  }
+]

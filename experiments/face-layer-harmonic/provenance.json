@@ -1,0 +1,11 @@
+{
+  "baseline": ".run/face-physical-alpha-v10-attempt2-image-render",
+  "baselineSha256": "3b36aaaa0f3b75521cc8f7726a4a3b605619b2e95c9b69818c3cac9af9d718f8",
+  "candidate": ".run/face-layer-harmonic-v1-frozen-image-render",
+  "candidateSha256": "244344e67f02c10c17b9f49291f4d051a84c8cc1f8373bd1ee83ba1ca7169544",
+  "patch": "experiments/face-layer-harmonic/harmonic-weights-v1.patch",
+  "basis": "accepted physical-alpha v10",
+  "outputFreezeChanged": false,
+  "geometryChanged": false,
+  "method": "three independent premultiplied material color fields, harmonic one-hot Dirichlet weight fields, exposed-hole-only mixture"
+}

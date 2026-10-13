@@ -1,0 +1,260 @@
+{
+  "date": "2026-10-13",
+  "rendererSha256": "f315df824db93bd592b159b73b2d5988fa94f05f8cd1a8fcedd3f96ae06f558d",
+  "adjustment": 60,
+  "weights": {
+    "effect": 0.35,
+    "naturalness": 0.35,
+    "protection": 0.2,
+    "editingEfficiency": 0.1
+  },
+  "criterion": "each dimension >= 7 and weighted total >= 8",
+  "passed": 0,
+  "averageScore": 7.08,
+  "reviewOrigin": "human visual review of all 15 immutable renderer crops; not derived from changed pixel counts",
+  "rows": [
+    {
+      "image": "fashion-standing",
+      "part": "waist",
+      "scores": {
+        "effect": 8,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.45,
+      "passed": false,
+      "note": "衬衫两侧真实收缩，腰带、中轴和手保持；袖子交界仍有薄色边，尚不足自然度8。",
+      "elapsedMs": 5803,
+      "graphSha256": "9f717a4a2ae50442926eef536e1702000de4604faaf8b3bad595cb81d251d165",
+      "outputSha256": "6aed0cc033cc5f16e4b00d1bc6ff9d77684526d5330322619f8c737f59919373"
+    },
+    {
+      "image": "fashion-standing",
+      "part": "left-upper-arm",
+      "scores": {
+        "effect": 8,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.45,
+      "passed": false,
+      "note": "袖子外侧真实内移，布纹保持；比V2浅色重边减少，肩/袖的极细边仍可见。",
+      "elapsedMs": 2780,
+      "graphSha256": "3390519112ee870ff501e1ef393e1a011a92f34e88dc1177c89d52e3f863159d",
+      "outputSha256": "1d1aec0710daa0d7e666b1146cb8bf4354b97690762d199f1b3308fa09aed2b3"
+    },
+    {
+      "image": "fashion-standing",
+      "part": "left-thigh",
+      "scores": {
+        "effect": 8,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.45,
+      "passed": false,
+      "note": "裤腿两侧收窄，腿间旧阶梯灰残影显著减少；植物附近窄带仍有软延拓，不能保证原结构恢复。",
+      "elapsedMs": 2321,
+      "graphSha256": "5ced5601d645201ed95c9964be8a42f8a25810e0fae05bc3a77eb680690876f4",
+      "outputSha256": "b004ab2a65555ccb18f31147f708e5122e8f8e06e6aa11d0efb7422876e3b13b"
+    },
+    {
+      "image": "fashion-standing",
+      "part": "right-upper-arm",
+      "scores": {
+        "effect": 8,
+        "naturalness": 6,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.1,
+      "passed": false,
+      "note": "弯臂上袖真实收窄、前臂固定。4×复核确认明显亮细线原图已有且保持原位置，不能计为新增鬼影；新轮廓转折/窄带仍需独立层诊断，本轮自然度评分暂保守保留。",
+      "elapsedMs": 2093,
+      "graphSha256": "a1b9a9fecbe9e0b27537e57c88b867bbfd9154b8656e5e2ab36f1fd3bedfa5a1",
+      "outputSha256": "bf31c56592a224461688b7c10f8956c9b89e64a5a7d25f1d0fc7871787268b3e"
+    },
+    {
+      "image": "fashion-standing",
+      "part": "right-thigh",
+      "scores": {
+        "effect": 8,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.45,
+      "passed": false,
+      "note": "裤腿真实内移、腿间旧阶梯减少；地面窄带轻微模糊与色缝仍可见。",
+      "elapsedMs": 2209,
+      "graphSha256": "1237396b8bfee63223190f00903c03d39295806c3d577f555d952171574a25de",
+      "outputSha256": "272dc84ac5185a335a2cb6da7460cf5d7d24edba98c039b608db8475865e8fa5"
+    },
+    {
+      "image": "fullbody-skirt",
+      "part": "waist",
+      "scores": {
+        "effect": 7,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.1,
+      "passed": false,
+      "note": "已包含真实裙腰，腰侧和裙腰轮廓有变化，袖子保持；可见腰被宽衣/袖遮挡，效果不宜夸大。",
+      "elapsedMs": 2332,
+      "graphSha256": "d64e6de0af274b71b8821881a39ee6ab9bc7343187faa17af4b95ea72b17f299",
+      "outputSha256": "0a02d0d800f93f0aa6c438a7ff32ebd611fcfc0b913c298822bfdc7037b12734"
+    },
+    {
+      "image": "fullbody-skirt",
+      "part": "left-upper-arm",
+      "scores": {
+        "effect": 7,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.1,
+      "passed": false,
+      "note": "浅色袖子真实外侧略收窄、头发保持；袖边的细暗缝仍可见，隐藏肢体没有重建。",
+      "elapsedMs": 2766,
+      "graphSha256": "4183ce17bec9c06f30f9c27fad543de0269c725e87926f3e36da14a9f90e0e74",
+      "outputSha256": "8a0af2bbd11d3f742a33cbda4bb48baeeb414e9c917d213ba550006db6eec036"
+    },
+    {
+      "image": "fullbody-skirt",
+      "part": "right-upper-arm",
+      "scores": {
+        "effect": 7,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.1,
+      "passed": false,
+      "note": "袖子外侧收窄、蕾丝大致保持；袖子与衣身交接细边仍不足以给8分。",
+      "elapsedMs": 2221,
+      "graphSha256": "be5f6c335b26616a83f150d73d2df1f379987a3a2a1ddedb6c01d1dc2277d040",
+      "outputSha256": "99ac2a78c8ed0b3a2d93fcb396833cbe9b57c5e3318a134921286d23452fe51c"
+    },
+    {
+      "image": "fullbody-side-fashion",
+      "part": "waist",
+      "scores": {
+        "effect": 7,
+        "naturalness": 6,
+        "protection": 7,
+        "editingEfficiency": 6
+      },
+      "total": 6.55,
+      "passed": false,
+      "note": "包和手保持、裤腰真实改变，旧外套鬼影减少；垂挂外套与上衣同类，仍不能保证准确独立归属。",
+      "elapsedMs": 1997,
+      "graphSha256": "cd66bd5c791b38cf4ace0dda19720fb45b092705215f3cc5198badbec38fa499",
+      "outputSha256": "e8fbd5061149ee6111b910a303cc9fdc077dabd9533b496bd513508bd73ecfae"
+    },
+    {
+      "image": "fullbody-side-fashion",
+      "part": "right-upper-arm",
+      "scores": {
+        "effect": 8,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.45,
+      "passed": false,
+      "note": "粉袖可见轮廓真实收窄，V2手/头发重影消除；局部袖边仍有细色边。",
+      "elapsedMs": 1969,
+      "graphSha256": "2b6e92c664005a0d2045e37b5d5085ecf24b3f14f031d5f4be8393cc4a5e4ee3",
+      "outputSha256": "17469ec2305fd052974581af37b32b1d4bb378481a10abdcb49359d622f073c2"
+    },
+    {
+      "image": "tilted-shirt",
+      "part": "waist",
+      "scores": {
+        "effect": 6,
+        "naturalness": 6,
+        "protection": 6,
+        "editingEfficiency": 6
+      },
+      "total": 6.0,
+      "passed": false,
+      "note": "右侧宽衣真实收缩；叠在腰前的同类宽袖仍可能分给torso，局部衣料归属和边缘自然度均失败。",
+      "elapsedMs": 2010,
+      "graphSha256": "542e8464fd48a148b24aa3d2cc3209acd7488a6a554d57a349d994b43e61808b",
+      "outputSha256": "c07b41be7d176141bfc13046def716cdca3f84b94388648d025444b872066cc9"
+    },
+    {
+      "image": "tilted-shirt",
+      "part": "left-upper-arm",
+      "scores": {
+        "effect": 8,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.45,
+      "passed": false,
+      "note": "宽袖外轮廓确实改变、头发固定；袖口转折与低对比背景仍有细边。",
+      "elapsedMs": 2414,
+      "graphSha256": "71630d6e281bfe5bc0424047f16144c1bc27b92b407e87d82e63221d4eb61476",
+      "outputSha256": "32e8e4ed35a677f066789f6d45274a353b8b0746a2f511cda0efa1baa532b06d"
+    },
+    {
+      "image": "action-suit",
+      "part": "waist",
+      "scores": {
+        "effect": 7,
+        "naturalness": 5,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 6.4,
+      "passed": false,
+      "note": "电脑主体和边框保持，外套腰侧收缩；白衬衫/外套内部边出现小硬台阶，判自然度失败。",
+      "elapsedMs": 2498,
+      "graphSha256": "860899ec1d1af44e033465bba546c1194ce5d0554022c3d9efef7ca3b29eefd5",
+      "outputSha256": "f66c97eb279eedc6e510d926a9dd1bc4fa239a2dc60bf39593e8d7af0a838d75"
+    },
+    {
+      "image": "action-suit",
+      "part": "left-upper-arm",
+      "scores": {
+        "effect": 7,
+        "naturalness": 6,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 6.75,
+      "passed": false,
+      "note": "抬臂上下边略收窄、躯干大致固定；肩接缝/下袖边有硬转折，效果和自然度未达标。",
+      "elapsedMs": 2248,
+      "graphSha256": "2749fc9251fa176936e6ad394cf3f5808abdb452595b5dd6b99bcfd521cf8c44",
+      "outputSha256": "9f80d8ef202de80cf783592cfa6cda3530e3a3ff194212f14cdb2d13d3d6b9eb"
+    },
+    {
+      "image": "action-suit",
+      "part": "right-upper-arm",
+      "scores": {
+        "effect": 8,
+        "naturalness": 7,
+        "protection": 8,
+        "editingEfficiency": 6
+      },
+      "total": 7.45,
+      "passed": false,
+      "note": "上臂外轮廓真实内移、前臂与电脑保持；腋下/袖边窄带仍可见。",
+      "elapsedMs": 2236,
+      "graphSha256": "ffb4bfd73e702a47f51ccfcb8956bd61311f347ec31297296a252d2ae25770a1",
+      "outputSha256": "60986e712900a48d8ff32fcc22a1bb80e7f805f1f70530b82a7c96dd1746d284"
+    }
+  ],
+  "reviewCorrections": [
+    "4× source/output inspection: right-upper-arm prominent bright line already exists in source and is stationary; removed it as a generated-artifact explanation. Score conservatively unchanged pending layer diagnosis."
+  ]
+}

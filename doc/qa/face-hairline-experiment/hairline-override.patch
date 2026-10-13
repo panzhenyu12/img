@@ -1,0 +1,42 @@
+--- a/core/image-core/src/face.rs
++++ b/core/image-core/src/face.rs
+@@ hair protection setup in adjust
+-    let fixed_masks: Vec<_> = ["accessories", "ears", "hair"]
++    let fixed_masks: Vec<_> = ["accessories", "ears"]
+         .iter()
+         .filter_map(|key| semantics.and_then(|m| m.get(key)))
+         .map(PreparedMask::new)
+         .collect();
++    let hair_mask = semantics.and_then(|m| m.get("hair")).map(PreparedMask::new);
++    // Candidate only: permit target skin to occlude original inner hairline,
++    // bounded by the requested displacement. Outer hairstyle is immutable.
++    let hairline_band = polygon
++        .iter()
++        .zip(&target)
++        .map(|(&source, &destination)| sub(destination, source).0.hypot(sub(destination, source).1))
++        .fold(0.0_f32, f32::max)
++        .min(frame.width() * 0.18)
++        + 2.0;
+@@ after fixed accessory coverage in adjust's crop mask loop
++            let hair = hair_mask
++                .as_ref()
++                .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
++                .unwrap_or(0.0);
++            let hairline_override = hair >= 0.5
++                && hairline_band > 2.0
++                && !inside(p, &polygon)
++                && inside(p, &target)
++                && polygon
++                    .iter()
++                    .enumerate()
++                    .map(|(j, &a)| closest(p, a, polygon[(j + 1) % polygon.len()]).0)
++                    .fold(f32::MAX, f32::min)
++                    <= hairline_band;
+@@ frozen output condition
+-            frozen.push(protected >= 1.0 - 1e-6 || accessory || (other_person && !covered_old_fringe));
++            frozen.push(
++                protected >= 1.0 - 1e-6
++                    || accessory
++                    || (hair >= 0.5 && !hairline_override)
++                    || (other_person && !covered_old_fringe),
++            );

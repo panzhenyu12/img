@@ -1,0 +1,10 @@
+{
+  "id": "fullbody-side-fashion",
+  "source": [
+    768,
+    512
+  ],
+  "maxNormalizedTensorError": 0.017507314682006836,
+  "meanNormalizedTensorError": 0.001667107455432415,
+  "differingTensorValues": 63739
+}

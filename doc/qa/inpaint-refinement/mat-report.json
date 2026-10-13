@@ -1,0 +1,53 @@
+{
+  "modelRevision": "bef6e8b7d535abe2d42fdaeafec903abdfc638a3",
+  "architectureRevision": "5b7681746fe19e563113d27366ba85236bc1ba5b",
+  "loadMs": 5486.13,
+  "torch": "2.2.2",
+  "threads": 4,
+  "seed": 0,
+  "dtype": "float32",
+  "rows": [
+    {
+      "case": "street",
+      "sourceSha256": "b99e83dd92123d85ba227938a4accc70ccdba07b9ba70d7c9e9d6b4be0965a8e",
+      "modelSha256": "309dd6ce6e04034dc4b6b15c7bd2a4844d158e03eb2a139e0eca6b366e40c0de",
+      "inferenceMs": 24367.97,
+      "input": [
+        512,
+        384
+      ],
+      "outsideChanges": 0,
+      "protectChanges": 0,
+      "alphaChanges": 0
+    },
+    {
+      "case": "crowd",
+      "sourceSha256": "b33437df529d9cfdf900320d1cbebe7315ba2b2fecea8ec7a856906d63c88c02",
+      "modelSha256": "309dd6ce6e04034dc4b6b15c7bd2a4844d158e03eb2a139e0eca6b366e40c0de",
+      "inferenceMs": 17244.49,
+      "input": [
+        512,
+        342
+      ],
+      "outsideChanges": 0,
+      "protectChanges": 0,
+      "alphaChanges": 0
+    },
+    {
+      "case": "architecture",
+      "sourceSha256": "e45f48a68d024d6f228510a7e467999b4db289be7d8fed3a5713248955cc2502",
+      "modelSha256": "309dd6ce6e04034dc4b6b15c7bd2a4844d158e03eb2a139e0eca6b366e40c0de",
+      "inferenceMs": 13032.99,
+      "input": [
+        512,
+        341
+      ],
+      "outsideChanges": 0,
+      "protectChanges": 0,
+      "alphaChanges": 0,
+      "targetMaeLama": 29.852088983741645,
+      "targetMaeMat": 40.41930846412639
+    }
+  ],
+  "note": "Independent candidate; visual review required. Architecture is a third-party CPU adaptation, not the authors' CUDA implementation."
+}

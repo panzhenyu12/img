@@ -1,0 +1,49 @@
+    Finished `release` profile [optimized] target(s) in 0.21s
+     Running unittests src/lib.rs (.run/final-core-review-target/release/deps/image_core-e1ec6f56bffdd293)
+
+running 30 tests
+test face::mls::tests::reproduces_global_rigid_transform_at_unseen_points ... ok
+test face::mls::tests::exact_handles_and_degenerate_translation_are_finite ... ok
+test face::mls::tests::agrees_with_independent_paper_matrix_equation ... ok
+test face::tests::contracted_jaw_repositions_neck_illumination_without_warping_texture_or_scene ... ok
+test face::tests::bare_rectangle_is_rejected_and_unsupported_controls_do_not_fake_geometry ... ok
+test face::tests::gradual_probability_edge_is_a_valid_half_alpha_isoline ... ok
+test face::tests::native_cached_face_kernel_benchmark ... ignored, manual native kernel benchmark uses local cached photo graphs
+test face::tests::actual_widest_contour_moves_inward_but_exterior_grid_does_not ... ok
+test face::tests::old_jaw_mixed_pixels_are_not_preserved_as_stationary_neck_texture ... ok
+test face::tests::expanding_chin_covers_a_missed_two_pixel_fringe_without_unfreezing_other_people ... ok
+test face::tests::old_neck_join_is_continuous_and_keeps_protection_and_distant_texture ... ok
+
+thread 'face::tests::full_person_matte_excludes_ears_neck_and_clothing_from_background_donors' (142896767) panicked at src/face.rs:2763:21:
+assertion `left == right` failed
+  left: [29, 52, 130, 255]
+ right: [5, 220, 25, 255]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test face::tests::full_person_matte_excludes_ears_neck_and_clothing_from_background_donors ... FAILED
+test face::tests::rgb_edge_offset_from_the_class_contour_is_demixed_inside_the_neck_layer ... ok
+test face::tests::negative_slimming_expands_foreground_over_stationary_background ... ok
+test face::tests::inner_face_boundary_moves_against_hair_without_moving_outer_hairstyle ... ok
+test face::tests::pixel_matte_moves_the_true_edge_and_rejects_an_unrelated_landmark_oval ... ok
+test face::tests::saturated_binary_parsing_removes_old_physical_fringe_with_correct_background ... ok
+test face::tests::uncovered_neck_uses_observed_shadow_detail_and_never_changes_existing_neck ... ok
+test face::tests::explicit_manual_contour_moves_across_its_original_mask_boundary ... ok
+test face::tests::semantic_feature_and_user_frozen_pixels_remain_exact ... ok
+test face::tests::jaw_reveals_neck_below_the_face_and_keeps_backdrop_donors_separate ... ok
+test face::tests::uncertain_face_neck_transition_does_not_freeze_the_old_chin_as_dark_dots ... ok
+test face::tests::eye_protection_does_not_freeze_the_adjacent_cheek_silhouette ... ok
+test face::tests::zero_controls_are_exact_and_a_second_face_in_the_support_background_is_untouched ... ok
+test face::tests::every_accessory_and_ear_pixel_stays_frozen_during_face_reshaping ... ok
+test face::tests::transparent_backdrop_and_semtransparent_photograph_keep_alpha_layers ... ok
+test face::tests::opacity_and_roi_are_applied_once ... ok
+test face::tests::forehead_and_chin_lengths_move_only_their_endpoint_and_keep_feature_pixels ... ok
+test face::tests::eye_axis_roll_preserves_the_same_contour_travel_in_pixel_coordinates ... ok
+test face::tests::each_supported_width_control_changes_its_actual_contour_in_both_directions ... ok
+
+failures:
+
+failures:
+    face::tests::full_person_matte_excludes_ears_neck_and_clothing_from_background_donors
+
+test result: FAILED. 28 passed; 1 failed; 1 ignored; 0 measured; 152 filtered out; finished in 2.01s
+
+error: test failed, to rerun pass `--lib`

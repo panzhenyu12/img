@@ -1,0 +1,212 @@
+{
+  "baselineCommit": "v9",
+  "neckLightingContract": true,
+  "baselineSha256": "58013da0cc9840dd8d4525e9d49ee7a150ba1a02b7f225c26ad525aa21cbbeb1",
+  "candidateSha256": "e50f9b92621f2feb098a6645cf23c32d23dd18505a758b353bd32db563a586a4",
+  "timingIncludes": "CLI image/graph decoding, validation, kernel and PNG output; concurrent machine work may affect latency",
+  "sourceBinaryPaths": {
+    "baseline": ".run/face-polygon-v9-final-image-render",
+    "candidate": ".run/face-donor-purity-v2-frozen-image-render"
+  },
+  "snapshotBinaryPaths": {
+    "baseline": "test/results/face-donor-purity-v2/width/baseline-58013da0cc9840dd8d4525e9d49ee7a150ba1a02b7f225c26ad525aa21cbbeb1-image-render",
+    "candidate": "test/results/face-donor-purity-v2/width/candidate-e50f9b92621f2feb098a6645cf23c32d23dd18505a758b353bd32db563a586a4-image-render"
+  },
+  "rating": "No automatic rating; all real-photo outputs need visual assessment",
+  "cases": [
+    {
+      "name": "portrait-makeup",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 2414.98,
+      "afterMs": 1931.41,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "featureInteriorChanges": {
+        "lips": 0,
+        "teeth": 0,
+        "leftBrow": 0,
+        "rightBrow": 0,
+        "leftEye": 0,
+        "rightEye": 0,
+        "nose": 0,
+        "noseBridge": 0,
+        "noseWings": 0
+      },
+      "oldHeadExteriorChanges": 1342,
+      "semanticNeckChanges": 1342,
+      "headAndNeckExteriorChanges": 0,
+      "userProtectedChanges": 0,
+      "sceneBackgroundChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "faceWidth",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 700.0,
+      "afterMs": 786.7,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "featureInteriorChanges": {
+        "lips": 0,
+        "teeth": 0,
+        "leftBrow": 0,
+        "rightBrow": 0,
+        "leftEye": 0,
+        "rightEye": 0,
+        "nose": 0,
+        "noseBridge": 0,
+        "noseWings": 0
+      },
+      "oldHeadExteriorChanges": 1331,
+      "semanticNeckChanges": 1331,
+      "headAndNeckExteriorChanges": 0,
+      "userProtectedChanges": 0,
+      "sceneBackgroundChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 558.74,
+      "afterMs": 584.25,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "featureInteriorChanges": {
+        "lips": 0,
+        "teeth": 0,
+        "leftBrow": 0,
+        "rightBrow": 0,
+        "leftEye": 0,
+        "rightEye": 0,
+        "nose": 0,
+        "noseBridge": 0,
+        "noseWings": 0
+      },
+      "oldHeadExteriorChanges": 812,
+      "semanticNeckChanges": 812,
+      "headAndNeckExteriorChanges": 0,
+      "userProtectedChanges": 0,
+      "sceneBackgroundChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "faceWidth",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 569.35,
+      "afterMs": 706.75,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "featureInteriorChanges": {
+        "lips": 0,
+        "teeth": 0,
+        "leftBrow": 0,
+        "rightBrow": 0,
+        "leftEye": 0,
+        "rightEye": 0,
+        "nose": 0,
+        "noseBridge": 0,
+        "noseWings": 0
+      },
+      "oldHeadExteriorChanges": 825,
+      "semanticNeckChanges": 825,
+      "headAndNeckExteriorChanges": 0,
+      "userProtectedChanges": 0,
+      "sceneBackgroundChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "faceWidth",
+      "value": 60,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 495.71,
+      "afterMs": 569.04,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "featureInteriorChanges": {
+        "lips": 0,
+        "teeth": 0,
+        "leftBrow": 0,
+        "rightBrow": 0,
+        "leftEye": 0,
+        "rightEye": 0,
+        "nose": 0,
+        "noseBridge": 0,
+        "noseWings": 0
+      },
+      "oldHeadExteriorChanges": 500,
+      "semanticNeckChanges": 500,
+      "headAndNeckExteriorChanges": 0,
+      "userProtectedChanges": 0,
+      "sceneBackgroundChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "faceWidth",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 587.54,
+      "afterMs": 587.92,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "featureInteriorChanges": {
+        "lips": 0,
+        "teeth": 0,
+        "leftBrow": 0,
+        "rightBrow": 0,
+        "leftEye": 0,
+        "rightEye": 0,
+        "nose": 0,
+        "noseBridge": 0,
+        "noseWings": 0
+      },
+      "oldHeadExteriorChanges": 509,
+      "semanticNeckChanges": 509,
+      "headAndNeckExteriorChanges": 0,
+      "userProtectedChanges": 0,
+      "sceneBackgroundChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    }
+  ],
+  "finalBaselineSha256": "58013da0cc9840dd8d4525e9d49ee7a150ba1a02b7f225c26ad525aa21cbbeb1",
+  "finalCandidateSha256": "e50f9b92621f2feb098a6645cf23c32d23dd18505a758b353bd32db563a586a4"
+}

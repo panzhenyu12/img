@@ -1,0 +1,89 @@
+{
+  "title": "File:Teenager with acne.jpg",
+  "commons_page": "https://commons.wikimedia.org/wiki/File:Teenager_with_acne.jpg",
+  "original_url": "https://upload.wikimedia.org/wikipedia/commons/d/d6/Teenager_with_acne.jpg",
+  "sha256": "da07a56739c5410099c8e9a444ea7dd624699a5c716ba545f9d7e2c3e45c1c92",
+  "original_size": [
+    3096,
+    4128
+  ],
+  "test_size": [
+    768,
+    1024
+  ],
+  "metadata": {
+    "DateTime": {
+      "value": "2023-01-13 01:32:44",
+      "source": "mediawiki-metadata",
+      "hidden": ""
+    },
+    "ObjectName": {
+      "value": "Teenager with acne",
+      "source": "mediawiki-metadata"
+    },
+    "CommonsMetadataExtension": {
+      "value": 1.2,
+      "source": "extension",
+      "hidden": ""
+    },
+    "Categories": {
+      "value": "CC-Zero|Self-published work|Photographs and images by NikosLikomitros|Males with acne",
+      "source": "commons-categories",
+      "hidden": ""
+    },
+    "Assessments": {
+      "value": "",
+      "source": "commons-categories",
+      "hidden": ""
+    },
+    "ImageDescription": {
+      "value": "Teenager with acne, February 2020.",
+      "source": "commons-desc-page"
+    },
+    "DateTimeOriginal": {
+      "value": "2020-02-22 22:29:38",
+      "source": "commons-desc-page"
+    },
+    "Credit": {
+      "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+      "source": "commons-desc-page"
+    },
+    "Artist": {
+      "value": "<a href=\"//commons.wikimedia.org/wiki/User:NikosLikomitros\" title=\"User:NikosLikomitros\">NikosLikomitros</a>",
+      "source": "commons-desc-page"
+    },
+    "LicenseShortName": {
+      "value": "CC0",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "UsageTerms": {
+      "value": "Creative Commons Zero, Public Domain Dedication",
+      "source": "commons-desc-page"
+    },
+    "AttributionRequired": {
+      "value": "false",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "LicenseUrl": {
+      "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "source": "commons-desc-page"
+    },
+    "Copyrighted": {
+      "value": "True",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "Restrictions": {
+      "value": "",
+      "source": "commons-desc-page",
+      "hidden": ""
+    },
+    "License": {
+      "value": "cc0",
+      "source": "commons-templates",
+      "hidden": ""
+    }
+  }
+}

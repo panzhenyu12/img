@@ -4,6 +4,7 @@ dist/
 *.wasm
 services/api/tmp/
 core/image-core/target/
+experiments/**/target/
 .run/
 apps/web/public/wasm/
 apps/web/public/vision/

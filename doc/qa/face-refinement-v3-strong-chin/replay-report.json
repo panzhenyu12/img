@@ -1,0 +1,223 @@
+{
+  "baselineCommit": "ea5b404",
+  "baselineSha256": "95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab",
+  "candidateSha256": "6a0adbd975b9b4c3df133172e3e118b5340e24bb51777c4143c32fb7d4d9979a",
+  "timingIncludes": "CLI image/graph decoding, validation, kernel and PNG output; concurrent machine work may affect latency",
+  "sourceBinaryPaths": {
+    "baseline": "/Users/modao/work/img/.run/quality-baseline/image-render",
+    "candidate": "/Users/modao/work/img/.run/face-refinement-candidate-image-render"
+  },
+  "snapshotBinaryPaths": {
+    "baseline": "test/results/face-refinement-v3-verified-strong-chin/baseline-95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab-image-render",
+    "candidate": "test/results/face-refinement-v3-verified-strong-chin/candidate-6a0adbd975b9b4c3df133172e3e118b5340e24bb51777c4143c32fb7d4d9979a-image-render"
+  },
+  "rating": "No automatic rating; all real-photo outputs need visual assessment",
+  "cases": [
+    {
+      "name": "fixture-portrait",
+      "key": "chin",
+      "value": -100,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 1936.32,
+      "afterMs": 1543.04,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "fixture-portrait",
+      "key": "chin",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/fixture-portrait-faceWidth-60.json",
+      "beforeMs": 444.13,
+      "afterMs": 579.64,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 614,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chin",
+      "value": -100,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 727.17,
+      "afterMs": 717.74,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-woman",
+      "key": "chin",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-woman-faceWidth-60.json",
+      "beforeMs": 575.64,
+      "afterMs": 787.72,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 1041,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chin",
+      "value": -100,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 728.01,
+      "afterMs": 804.93,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-makeup",
+      "key": "chin",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-makeup-faceWidth-60.json",
+      "beforeMs": 677.63,
+      "afterMs": 737.91,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 2104,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chin",
+      "value": -100,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 669.28,
+      "afterMs": 753.61,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-roll",
+      "key": "chin",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-roll-faceWidth-60.json",
+      "beforeMs": 610.1,
+      "afterMs": 621.28,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 1478,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chin",
+      "value": -100,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 613.68,
+      "afterMs": 675.12,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-hair",
+      "key": "chin",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-hair-faceWidth-60.json",
+      "beforeMs": 578.38,
+      "afterMs": 691.04,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 1166,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chin",
+      "value": -100,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 948.85,
+      "afterMs": 879.01,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 0,
+      "pureContraction": true,
+      "hardChecksPassed": true
+    },
+    {
+      "name": "portrait-glasses-street",
+      "key": "chin",
+      "value": 100,
+      "seedGraph": "test/results/face-core-fresh/portrait-glasses-street-faceWidth-60.json",
+      "beforeMs": 851.54,
+      "afterMs": 776.11,
+      "outsideChanges": 0,
+      "protectedChanges": {
+        "hair": 0,
+        "accessories": 0,
+        "ears": 0
+      },
+      "oldHeadExteriorChanges": 481,
+      "pureContraction": false,
+      "hardChecksPassed": true
+    }
+  ],
+  "finalBaselineSha256": "95be1d598f93cd4264bd0b439171016f57b9beb3da6b3ed2ed06611c3ca88fab",
+  "finalCandidateSha256": "6a0adbd975b9b4c3df133172e3e118b5340e24bb51777c4143c32fb7d4d9979a"
+}

@@ -1,0 +1,352 @@
+[
+  {
+    "id": "fashion-standing",
+    "rendererSha256": "d4c0d0ffe234ccebf5de4f21576f194636a876a5357bec453b1d681c367ae5f5",
+    "sourceSha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+    "parserCacheSha256": "1f330b215201030d2e715378b57c49a2a27063c4de85495b2d2d5d3a431cb8f7",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 1797,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 2131,
+        "graphSha256": "d2a9a8cd33996c11d58aa6cccd24d553109059b3e6a7026c73bd1330edf56e87",
+        "outputSha256": "aad7ea12543678b7a5d2aea2d7383e73111e8bb6c8f50ca70d10484a1e893630",
+        "metrics": {
+          "changedPixels": 18383,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 102,
+          "top": 330,
+          "width": 314,
+          "height": 239
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1136,
+        "graphSha256": "af929cb572a43238399def15f092e91bd6eb05e294217127ace964ca030a252a",
+        "outputSha256": "c459c934c142835e65fec59b33727325df6b95c68a3ae3bee60ba3d4b229f3ab",
+        "metrics": {
+          "changedPixels": 6898,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 248,
+          "top": 226,
+          "width": 218,
+          "height": 226
+        }
+      },
+      {
+        "part": "left-thigh",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1123,
+        "graphSha256": "a0b426a7a0f095dd3f25dcb863664b0dc25f2fd52c01fd8fe316ce1e470e4980",
+        "outputSha256": "893248d1c116ee6fc29d54504a9bb5d6ac2949a1ab4cff0303f20a7a06435f17",
+        "metrics": {
+          "changedPixels": 8394,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 212,
+          "top": 510,
+          "width": 234,
+          "height": 258
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1063,
+        "graphSha256": "19631f27d3106ca501a11be228168156b3e3e3fad288fda42a96d594b7639219",
+        "outputSha256": "58c210946a9364806283f84ef2f6ce4f976a764cace1379d408414169168cdaf",
+        "metrics": {
+          "changedPixels": 5742,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 47,
+          "top": 250,
+          "width": 176,
+          "height": 214
+        }
+      },
+      {
+        "part": "right-thigh",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1118,
+        "graphSha256": "d2c70bf7811a870b8aee3ba961ef279898f47d176676808daf26384969da3adf",
+        "outputSha256": "2fe5b0f55ed75db915fac99d828c5b4441889d42eb7e905d7b0c3bf081074563",
+        "metrics": {
+          "changedPixels": 9197,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 113,
+          "top": 521,
+          "width": 218,
+          "height": 247
+        }
+      }
+    ]
+  },
+  {
+    "id": "fullbody-skirt",
+    "rendererSha256": "d4c0d0ffe234ccebf5de4f21576f194636a876a5357bec453b1d681c367ae5f5",
+    "sourceSha256": "a1fef90d0b3907b841147a2d5a857230245071abb5c09d7ddd7eacc53c15ab50",
+    "parserCacheSha256": "fbdd17b1cbeb2d5c1c92a4db45aa0380dd875243f75982ec254a4878b7eadd14",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 995,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 2025,
+        "graphSha256": "68c1057635af69e8d767fcd0e351baa1fa1426b6359bc3dbf5cab4f5203ca46a",
+        "outputSha256": "0a02d0d800f93f0aa6c438a7ff32ebd611fcfc0b913c298822bfdc7037b12734",
+        "metrics": {
+          "changedPixels": 4042,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 153,
+          "top": 241,
+          "width": 173,
+          "height": 138
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1806,
+        "graphSha256": "d6831cac833567a167f87a3a22902185efd36e97afc2fffa01dacce46953b847",
+        "outputSha256": "e55e2c679509459480abeed8bd6de4131e693c9b11314d7d6d95efec233b3c82",
+        "metrics": {
+          "changedPixels": 1273,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 221,
+          "top": 195,
+          "width": 112,
+          "height": 136
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1846,
+        "graphSha256": "7857e8248288d77734ffeb37fa7e6aabfaaabf36fa861db3dfaca4971e01916d",
+        "outputSha256": "ca02bbad7c1fca818c024f29c19b465ba0da31bfbe1980985ab9c6e599990724",
+        "metrics": {
+          "changedPixels": 1687,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 125,
+          "top": 191,
+          "width": 126,
+          "height": 139
+        }
+      }
+    ]
+  },
+  {
+    "id": "fullbody-side-fashion",
+    "rendererSha256": "d4c0d0ffe234ccebf5de4f21576f194636a876a5357bec453b1d681c367ae5f5",
+    "sourceSha256": "ab877cef0c07de053a240a85cd21d453007bce41749c618b5d9230fb398d6b18",
+    "parserCacheSha256": "25a8f6f3ada475703c82f64eb8e1b1b811854b4d261ef990155deb25d2cdcdd8",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 1192,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1868,
+        "graphSha256": "c1b844a918ec41efa4b0e4bf3bd0cd329b7543b86a5100b54bf363e74f2ae4be",
+        "outputSha256": "95a76f3bcf27df692bcef12a9fb0eb62b102ca75320e114daad42d985f98ec85",
+        "metrics": {
+          "changedPixels": 2938,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 250,
+          "top": 176,
+          "width": 208,
+          "height": 157
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 2059,
+        "graphSha256": "960362ca9e5cfe3a9f50a15407c862d258842d738df2fd7b680cfe0062a83864",
+        "outputSha256": "6dca67aeb03487571c2e5ec0f7f02cb8f1732d3b0689f5f2371e774202793e1a",
+        "metrics": {
+          "changedPixels": 2074,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 246,
+          "top": 125,
+          "width": 139,
+          "height": 124
+        }
+      }
+    ]
+  },
+  {
+    "id": "tilted-shirt",
+    "rendererSha256": "d4c0d0ffe234ccebf5de4f21576f194636a876a5357bec453b1d681c367ae5f5",
+    "sourceSha256": "c10d5c84643c857d1476d2954b026bb09eb6020122e94c90502c8c5ed78a2575",
+    "parserCacheSha256": "2f5cade761627a71077180a487fc43c616908f4292de0e6e3f10cad3e4577df6",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 954,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 2865,
+        "graphSha256": "0d9a15bd96c7b127939e6d324d4068c91afa279bba4cca30a198aac60a89a31a",
+        "outputSha256": "b6d65fe24930042dd58fd44816c2d26ed048d4c1b6cd1187d6330c4befb74649",
+        "metrics": {
+          "changedPixels": 15969,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 32,
+          "top": 312,
+          "width": 292,
+          "height": 252
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 2978,
+        "graphSha256": "6a5b8b6b684e95928bb218999c6724758b4de85b14fb03a3b2aed1ca64653356",
+        "outputSha256": "5625d1a3f90a9c29a7997eee5c97755a573d73c8ff98585a85244e658b0102c7",
+        "metrics": {
+          "changedPixels": 8268,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 196,
+          "top": 222,
+          "width": 234,
+          "height": 227
+        }
+      }
+    ]
+  },
+  {
+    "id": "action-suit",
+    "rendererSha256": "d4c0d0ffe234ccebf5de4f21576f194636a876a5357bec453b1d681c367ae5f5",
+    "sourceSha256": "15cbfa1426b0122df0c9ae12bd0f4be4a4a4d6e227a24ecd87935c8e4add48a6",
+    "parserCacheSha256": "e3d74b4bd2b5d455668e1194cafc7cb107e2cd65d26d33f9bcf62c424f4bba36",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 1347,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 3318,
+        "graphSha256": "82e7f5d95cac3ebc2e434b25278765e0d0cd9cf12d9820561a092191e330f895",
+        "outputSha256": "e8f08e100ecfdbfb0ff33fec4fb79c5f5f2651de0f73bacc67aa3ecf4e2f6f35",
+        "metrics": {
+          "changedPixels": 4696,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 104,
+          "top": 311,
+          "width": 289,
+          "height": 218
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 3512,
+        "graphSha256": "4a350c2467260cb4cd025b0fc77292b215a606a1b91466453b9413dc7e28fb65",
+        "outputSha256": "25e4debc62da628e8ae868e3d0b3eb90068c5d3aec7883d0f96b3b91ed47a317",
+        "metrics": {
+          "changedPixels": 1349,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 308,
+          "top": 222,
+          "width": 139,
+          "height": 151
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 2351,
+        "graphSha256": "3d7e1703b58491f5797ecbd2cfb9d9415bfaa888f61787005f413b0fb6547ba7",
+        "outputSha256": "c8d6e58fbf479f5dbf7da5d101ecff4e5ae2a62bd8cb8599c4f2345f9b9ee2b0",
+        "metrics": {
+          "changedPixels": 5247,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 36,
+          "top": 197,
+          "width": 244,
+          "height": 242
+        }
+      }
+    ]
+  }
+]

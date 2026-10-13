@@ -1,0 +1,12 @@
+{
+  "candidate": ".run/face-donor-purity-v2-frozen-image-render",
+  "sha256": "e50f9b92621f2feb098a6645cf23c32d23dd18505a758b353bd32db563a586a4",
+  "candidateSource": "experiments/face-donor-purity/pure-donor-v2-fixed-classes.patch",
+  "threshold": 0.95,
+  "erodePixels": 2,
+  "outputFreezeChanged": false,
+  "geometryChanged": false,
+  "classificationFrontChanged": false,
+  "sameLayerPurePathRequired": true,
+  "noPurePathBehavior": "retains original observation; no color purity claim for unsupported component"
+}

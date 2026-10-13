@@ -8,7 +8,11 @@ export type OperationType =
 export interface Point { x: number; y: number }
 export interface Region extends Point { width: number; height: number }
 /** Detector alpha; normalized full-image coordinates, row-major byte data. */
-export interface RasterMask { shape: 'raster'; width: number; height: number; data: number[] }
+export interface RasterMask {
+  shape: 'raster'; width: number; height: number; data: number[];
+  from?: Point; to?: Point; region?: Region; points?: Point[];
+  strokes?: BrushStroke[]; invert?: boolean; feather?: number;
+}
 export interface ControlPoint extends Point { inX?: number; inY?: number; outX?: number; outY?: number }
 export type SelectionShape = 'rect' | 'ellipse' | 'polygon' | 'brush' | 'linear' | 'radial';
 export interface BrushStroke extends Point {
@@ -24,6 +28,7 @@ export interface InlineMask {
   invert: boolean;
   feather: number;
 }
+export type EditableMask = InlineMask | RasterMask;
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light';
 export interface Operation<TParams = Record<string, unknown>> {
   id: string; type: OperationType; version: string; enabled: boolean;

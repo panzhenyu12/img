@@ -1,0 +1,111 @@
+{
+  "binary": "/Users/modao/work/img/.run/body-strip-target/release/image-render",
+  "binarySha256": "cccd14ed8d5b49ed2a47cc4950e605be7769b7ce3c1ee85924c96358360fd108",
+  "records": [
+    {
+      "id": "fashion-standing",
+      "part": "left-thigh",
+      "ms": 5073,
+      "graphSha256": "0681378292d3870cab818c09fef50b85936c54edeae15c2689b117f2fc4bb37e",
+      "outputSha256": "e612ebce3f2a073fadb88497e922667b5c2d0f3eacd12491d5e9a794f3f366b3",
+      "sourceSha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+      "metrics": {
+        "changedPixels": 8404,
+        "changedProtectedPixels": 0,
+        "changedNonTargetPixels": 0,
+        "changedKnownBackgroundPixels": 0,
+        "changedVsBaseline": 2139
+      },
+      "crop": [
+        212,
+        510,
+        445,
+        768
+      ]
+    },
+    {
+      "id": "fashion-standing",
+      "part": "left-upper-arm",
+      "ms": 2083,
+      "graphSha256": "ff51cd6fed9a21590cb468c0b8d3241ff9e660baa2bbd9ff1dbcbee7993cd52f",
+      "outputSha256": "43fc09f4a761a1f7e001effc9c9b1a2fb818dcdb0be4ea8234e7411f245e2e2a",
+      "sourceSha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+      "metrics": {
+        "changedPixels": 6910,
+        "changedProtectedPixels": 0,
+        "changedNonTargetPixels": 0,
+        "changedKnownBackgroundPixels": 0,
+        "changedVsBaseline": 1613
+      },
+      "crop": [
+        248,
+        226,
+        465,
+        452
+      ]
+    },
+    {
+      "id": "fashion-standing",
+      "part": "right-thigh",
+      "ms": 2999,
+      "graphSha256": "c2d937466d48a1283a77c0b2051495c034aaf2deafee441ddf79e1d901f77754",
+      "outputSha256": "b42c55d0b6f41071dd791f325871e7a2511a850f2f2afa09786646ffbda72320",
+      "sourceSha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+      "metrics": {
+        "changedPixels": 9265,
+        "changedProtectedPixels": 0,
+        "changedNonTargetPixels": 0,
+        "changedKnownBackgroundPixels": 0,
+        "changedVsBaseline": 2335
+      },
+      "crop": [
+        113,
+        521,
+        331,
+        768
+      ]
+    },
+    {
+      "id": "fashion-standing",
+      "part": "right-upper-arm",
+      "ms": 2853,
+      "graphSha256": "2e29bd13e96b88fcfd4e0e6dee6cb8d3366d16e6b20eb30d488d7ec83f21d531",
+      "outputSha256": "547478544c78d87ebf6aaa5c4e42bd92cef6616a9cd711e24bda0d2122daf5c1",
+      "sourceSha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+      "metrics": {
+        "changedPixels": 5746,
+        "changedProtectedPixels": 0,
+        "changedNonTargetPixels": 0,
+        "changedKnownBackgroundPixels": 0,
+        "changedVsBaseline": 1402
+      },
+      "crop": [
+        47,
+        250,
+        223,
+        463
+      ]
+    },
+    {
+      "id": "fashion-standing",
+      "part": "waist",
+      "ms": 6429,
+      "graphSha256": "97de14e51ff090f9cf87bb37e23799f685cd2ac4b8be5c2334fead0a8101478e",
+      "outputSha256": "c7d815496b06932067b4fac45b31eaaa29607294ff738b42dcd4f61aef3e1484",
+      "sourceSha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+      "metrics": {
+        "changedPixels": 18390,
+        "changedProtectedPixels": 0,
+        "changedNonTargetPixels": 0,
+        "changedKnownBackgroundPixels": 0,
+        "changedVsBaseline": 3610
+      },
+      "crop": [
+        102,
+        330,
+        416,
+        569
+      ]
+    }
+  ]
+}

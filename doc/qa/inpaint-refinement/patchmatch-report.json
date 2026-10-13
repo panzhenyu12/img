@@ -1,0 +1,37 @@
+[
+  {
+    "case": "street",
+    "totalProcessMs": 8878.96,
+    "outsideChangedPixels": 0,
+    "protectionChangedPixels": 0,
+    "alphaChangedPixels": 0,
+    "maskPixelsDifferentFromPreviousPillowMask": 0,
+    "sourceSha256": "b99e83dd92123d85ba227938a4accc70ccdba07b9ba70d7c9e9d6b4be0965a8e",
+    "candidateSha256": "ee9d2e9995a263e803424fbc488fd467b167d6864d0695c730f71f8bbdddf92f",
+    "binarySha256": "a7013cfbae04272c3d5f62719c8ded6160fa166ed190f24ac7024589f23d017b"
+  },
+  {
+    "case": "crowd",
+    "totalProcessMs": 5234.42,
+    "outsideChangedPixels": 0,
+    "protectionChangedPixels": 0,
+    "alphaChangedPixels": 0,
+    "maskPixelsDifferentFromPreviousPillowMask": 0,
+    "sourceSha256": "b33437df529d9cfdf900320d1cbebe7315ba2b2fecea8ec7a856906d63c88c02",
+    "candidateSha256": "5f25a363dc354a3f97dc04c990f70efa0c77c4ff0e4f90a89c6c437d5dc6e9d4",
+    "binarySha256": "a7013cfbae04272c3d5f62719c8ded6160fa166ed190f24ac7024589f23d017b"
+  },
+  {
+    "case": "architecture",
+    "totalProcessMs": 5955.44,
+    "outsideChangedPixels": 0,
+    "protectionChangedPixels": 0,
+    "alphaChangedPixels": 0,
+    "maskPixelsDifferentFromPreviousPillowMask": 0,
+    "sourceSha256": "e45f48a68d024d6f228510a7e467999b4db289be7d8fed3a5713248955cc2502",
+    "candidateSha256": "fedbcfc4b27dadd6288a96b59933c1289d0fc944de27a696e6f459dafc55995e",
+    "binarySha256": "a7013cfbae04272c3d5f62719c8ded6160fa166ed190f24ac7024589f23d017b",
+    "targetMaeBefore": 29.852088983741645,
+    "targetMaeAfter": 29.32079498466053
+  }
+]

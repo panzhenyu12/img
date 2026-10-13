@@ -1,0 +1,386 @@
+[
+  {
+    "first_run_ms": 391.967059,
+    "height": 1024,
+    "hot_median_ms": 517.309085,
+    "hot_samples_ms": [
+      385.485805,
+      460.894682,
+      517.309085,
+      533.259861,
+      782.339632
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 820,
+    "sample": "fixture-portrait",
+    "case": "smooth-natural"
+  },
+  {
+    "first_run_ms": 500.449177,
+    "height": 1024,
+    "hot_median_ms": 570.439869,
+    "hot_samples_ms": [
+      507.75406999999996,
+      557.7905629999999,
+      570.439869,
+      699.024319,
+      806.994201
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 820,
+    "sample": "fixture-portrait",
+    "case": "smooth-strong"
+  },
+  {
+    "first_run_ms": 578.639682,
+    "height": 1024,
+    "hot_median_ms": 477.268994,
+    "hot_samples_ms": [
+      421.989934,
+      442.52382,
+      477.268994,
+      555.974041,
+      616.2223369999999
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 820,
+    "sample": "fixture-portrait",
+    "case": "texture-preserved"
+  },
+  {
+    "first_run_ms": 379.79170899999997,
+    "height": 1024,
+    "hot_median_ms": 320.076729,
+    "hot_samples_ms": [
+      318.889127,
+      319.613664,
+      320.076729,
+      323.440902,
+      327.049998
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 820,
+    "sample": "fixture-portrait",
+    "case": "whiten"
+  },
+  {
+    "first_run_ms": 519.017185,
+    "height": 1024,
+    "hot_median_ms": 463.94214999999997,
+    "hot_samples_ms": [
+      441.378202,
+      448.332115,
+      463.94214999999997,
+      470.901279,
+      690.809232
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-dark",
+    "case": "smooth-natural"
+  },
+  {
+    "first_run_ms": 482.400207,
+    "height": 1024,
+    "hot_median_ms": 334.488636,
+    "hot_samples_ms": [
+      307.72517999999997,
+      316.916937,
+      334.488636,
+      356.69384199999996,
+      426.05839499999996
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-dark",
+    "case": "smooth-strong"
+  },
+  {
+    "first_run_ms": 521.9069929999999,
+    "height": 1024,
+    "hot_median_ms": 675.689976,
+    "hot_samples_ms": [
+      489.029871,
+      512.653826,
+      675.689976,
+      797.419824,
+      1054.786416
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-dark",
+    "case": "texture-preserved"
+  },
+  {
+    "first_run_ms": 511.77769399999994,
+    "height": 1024,
+    "hot_median_ms": 323.27230000000003,
+    "hot_samples_ms": [
+      305.71810100000005,
+      319.231969,
+      323.27230000000003,
+      352.448454,
+      572.4773600000001
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-dark",
+    "case": "whiten"
+  },
+  {
+    "first_run_ms": 666.604326,
+    "height": 1024,
+    "hot_median_ms": 531.866978,
+    "hot_samples_ms": [
+      492.483804,
+      510.989931,
+      531.866978,
+      553.0331309999999,
+      562.4170710000001
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 784,
+    "sample": "portrait-hair",
+    "case": "smooth-natural"
+  },
+  {
+    "first_run_ms": 652.527891,
+    "height": 1024,
+    "hot_median_ms": 552.539289,
+    "hot_samples_ms": [
+      502.91699,
+      522.5407829999999,
+      552.539289,
+      576.8194020000001,
+      759.279724
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 784,
+    "sample": "portrait-hair",
+    "case": "smooth-strong"
+  },
+  {
+    "first_run_ms": 655.449123,
+    "height": 1024,
+    "hot_median_ms": 762.692509,
+    "hot_samples_ms": [
+      577.7156839999999,
+      647.449418,
+      762.692509,
+      883.8134269999999,
+      1055.1200919999999
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 784,
+    "sample": "portrait-hair",
+    "case": "texture-preserved"
+  },
+  {
+    "first_run_ms": 526.690084,
+    "height": 1024,
+    "hot_median_ms": 753.45827,
+    "hot_samples_ms": [
+      565.557153,
+      734.763112,
+      753.45827,
+      1193.126262,
+      1438.3363390000002
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 784,
+    "sample": "portrait-hair",
+    "case": "whiten"
+  },
+  {
+    "first_run_ms": 2121.395601,
+    "height": 902,
+    "hot_median_ms": 1982.923347,
+    "hot_samples_ms": [
+      1215.365442,
+      1222.4800579999999,
+      1982.923347,
+      2799.6759899999997,
+      4905.460182
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-makeup",
+    "case": "smooth-natural"
+  },
+  {
+    "first_run_ms": 4859.818303,
+    "height": 902,
+    "hot_median_ms": 4101.736484,
+    "hot_samples_ms": [
+      2883.4423739999997,
+      3649.098391,
+      4101.736484,
+      4273.821613,
+      4813.274755
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-makeup",
+    "case": "smooth-strong"
+  },
+  {
+    "first_run_ms": 4080.7166840000004,
+    "height": 902,
+    "hot_median_ms": 3016.5720189999997,
+    "hot_samples_ms": [
+      2309.750117,
+      2609.973095,
+      3016.5720189999997,
+      4055.711518,
+      4268.2262709999995
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-makeup",
+    "case": "texture-preserved"
+  },
+  {
+    "first_run_ms": 1134.970587,
+    "height": 902,
+    "hot_median_ms": 998.012514,
+    "hot_samples_ms": [
+      899.276764,
+      989.441089,
+      998.012514,
+      1010.534757,
+      1369.4039149999999
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-makeup",
+    "case": "whiten"
+  },
+  {
+    "first_run_ms": 1425.1309110000002,
+    "height": 961,
+    "hot_median_ms": 1303.214842,
+    "hot_samples_ms": [
+      1191.3159150000001,
+      1219.750672,
+      1303.214842,
+      1603.078832,
+      1625.25754
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-roll",
+    "case": "smooth-natural"
+  },
+  {
+    "first_run_ms": 2147.266866,
+    "height": 961,
+    "hot_median_ms": 1115.1867049999998,
+    "hot_samples_ms": [
+      853.055545,
+      911.961772,
+      1115.1867049999998,
+      1120.96952,
+      1306.6446190000001
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-roll",
+    "case": "smooth-strong"
+  },
+  {
+    "first_run_ms": 1372.997146,
+    "height": 961,
+    "hot_median_ms": 1255.536274,
+    "hot_samples_ms": [
+      1049.82918,
+      1237.1705550000001,
+      1255.536274,
+      1264.0689009999999,
+      1504.685413
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-roll",
+    "case": "texture-preserved"
+  },
+  {
+    "first_run_ms": 943.1875229999999,
+    "height": 961,
+    "hot_median_ms": 839.623243,
+    "hot_samples_ms": [
+      766.8546269999999,
+      818.555339,
+      839.623243,
+      848.570562,
+      1043.621921
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 1024,
+    "sample": "portrait-roll",
+    "case": "whiten"
+  },
+  {
+    "first_run_ms": 2317.804735,
+    "height": 1024,
+    "hot_median_ms": 1106.7536300000002,
+    "hot_samples_ms": [
+      820.2987579999999,
+      1074.638234,
+      1106.7536300000002,
+      1228.620331,
+      1365.669376
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-woman",
+    "case": "smooth-natural"
+  },
+  {
+    "first_run_ms": 1118.658794,
+    "height": 1024,
+    "hot_median_ms": 1060.518817,
+    "hot_samples_ms": [
+      832.814193,
+      1054.2855470000002,
+      1060.518817,
+      1167.677492,
+      1388.879173
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-woman",
+    "case": "smooth-strong"
+  },
+  {
+    "first_run_ms": 1469.389565,
+    "height": 1024,
+    "hot_median_ms": 1102.7762500000001,
+    "hot_samples_ms": [
+      935.5190100000001,
+      1079.482916,
+      1102.7762500000001,
+      1139.039763,
+      1680.689055
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-woman",
+    "case": "texture-preserved"
+  },
+  {
+    "first_run_ms": 1021.897978,
+    "height": 1024,
+    "hot_median_ms": 596.635864,
+    "hot_samples_ms": [
+      534.530211,
+      565.394065,
+      596.635864,
+      737.8613280000001,
+      762.0622430000001
+    ],
+    "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+    "width": 683,
+    "sample": "portrait-woman",
+    "case": "whiten"
+  }
+]

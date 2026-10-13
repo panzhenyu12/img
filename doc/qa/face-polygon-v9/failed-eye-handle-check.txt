@@ -1,0 +1,15 @@
+2026-10-14 中间候选失败记录
+
+变更仅包含：实际五官polygon内部+2px过渡冻结。
+仍错误保留：enclosing ellipse极值作为MLS固定handles。
+
+命令：
+cargo test --release --manifest-path core/image-core/Cargo.toml face::tests -- --nocapture
+
+真实几何断言输出：
+eye-adjacent edge stalled: (62, 177) -> (67, 169)
+test face::tests::eye_protection_does_not_freeze_the_adjacent_cheek_silhouette ... FAILED
+test result: FAILED. 24 passed; 1 failed; 1 ignored
+
+处理：没有降低6px验收门槛。将MLS固定handles移到真实polygon内，再执行同一断言通过。
+背景/五官像素恒等检查与真实照片自然度仍独立验证。

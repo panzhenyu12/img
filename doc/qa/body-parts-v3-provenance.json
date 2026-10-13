@@ -1,0 +1,8 @@
+{
+  "binary": "/Users/modao/work/img/.run/body-candidate-immutable/image-render",
+  "rendererSha256": "f315df824db93bd592b159b73b2d5988fa94f05f8cd1a8fcedd3f96ae06f558d",
+  "verifiedBeforeAndAfterEveryRender": true,
+  "parserModelSha256": "3b4925715aecbf4996fea5de5e7ce30b173c20f751f21cffe826b5db46ed7729",
+  "adjustment": 60,
+  "checks": 15
+}

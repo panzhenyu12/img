@@ -226,6 +226,80 @@ test('所有公开滑杆在有效定位输入下 WASM 与 native 输出逐像素
   } finally { await request.delete(`http://127.0.0.1:8080/api/v1/sessions/${session.id}`); }
 });
 
+test('六种线性光胶片响应的 WASM/native、冻结和零强度保持一致', async ({ page, request }) => {
+  await page.goto('/'); const buffer = await fixture(page);
+  const created = await request.post('http://127.0.0.1:8080/api/v1/sessions');
+  expect(created.ok()).toBeTruthy(); const session = await created.json();
+  const uploaded = await request.post(`http://127.0.0.1:8080/api/v1/sessions/${session.id}/assets`, { multipart: { file: { name: 'film.png', mimeType: 'image/png', buffer } } });
+  expect(uploaded.ok()).toBeTruthy(); const asset = await uploaded.json();
+  try {
+    for (const preset of ['provia', 'astia', 'velvia', 'classicNegative', 'eterna', 'acros']) {
+      const graph = { version: '1.0', sourceAssetId: asset.id, operations: [{ id: 'film', type: 'filter.film', version: '1.0', enabled: true, params: { preset, intensity: 100, protectMask: { shape: 'rect', region: { x: 0, y: 0, width: .25, height: 1 } } } }] };
+      const rendered = await request.post(`http://127.0.0.1:8080/api/v1/sessions/${session.id}/render`, { data: { editGraph: graph, format: 'png' } });
+      expect(rendered.status(), preset + ': ' + await rendered.text()).toBe(200);
+      const result = await page.evaluate(async ({ src, native, graph }) => {
+        const { decodeImage, renderImage } = await import('/src/core/engine.ts');
+        const file = (b64: string) => new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'film.png', { type: 'image/png' });
+        const source = await decodeImage(file(src)); const expected = await decodeImage(file(native)); const actual = await renderImage(source, graph, { kind: 'export' });
+        const off = structuredClone(graph); off.operations[0].params.intensity = 0;
+        const identity = await renderImage(source, off, { kind: 'export' });
+        return {
+          mismatches: actual.pixels.reduce((n: number, v: number, i: number) => n + Number(v !== expected.pixels[i]), 0),
+          frozenChanges: actual.pixels.reduce((n: number, v: number, i: number) => n + Number(Math.floor(i / 4) % source.width < source.width / 4 && v !== source.pixels[i]), 0),
+          zeroChanges: identity.pixels.reduce((n: number, v: number, i: number) => n + Number(v !== source.pixels[i]), 0),
+        };
+      }, { src: buffer.toString('base64'), native: (await rendered.body()).toString('base64'), graph });
+      expect(result, preset).toEqual({ mismatches: 0, frozenChanges: 0, zeroChanges: 0 });
+    }
+  } finally { await request.delete(`http://127.0.0.1:8080/api/v1/sessions/${session.id}`); }
+});
+
+test('手动修复可读取冻结源，空选区和零透明度不会阻塞后续图层', async ({ page, request }) => {
+  await page.goto('/'); const buffer = await fixture(page);
+  const created = await request.post('http://127.0.0.1:8080/api/v1/sessions');
+  expect(created.ok()).toBeTruthy(); const session = await created.json();
+  const uploaded = await request.post(`http://127.0.0.1:8080/api/v1/sessions/${session.id}/assets`, { multipart: { file: { name: 'repair.png', mimeType: 'image/png', buffer } } });
+  expect(uploaded.ok()).toBeTruthy(); const asset = await uploaded.json();
+  const frozenHalf = { shape: 'rect', region: { x: 0, y: 0, width: .5, height: 1 } };
+  const invalidStroke = { x: .5, y: .5, sourceX: .01, sourceY: .01, radius: .2, strength: 100 };
+  const cases = [
+    ...['repair.clone', 'repair.heal'].map(type => ({ type, noop: false, params: { strokes: [{ x: .5, y: .5, sourceX: .2, sourceY: .5, radius: .12 }], protectMask: frozenHalf } })),
+    ...[
+      { opacity: 0 },
+      { mask: { shape: 'raster', width: 1, height: 1, data: [0] } },
+      { protectMask: { shape: 'rect', region: { x: 0, y: 0, width: 1, height: 1 } } },
+      { region: { x: 0, y: 0, width: .1, height: .1 } },
+    ].map(restriction => ({ type: 'repair.heal', noop: true, params: { strokes: [invalidStroke], ...restriction } })),
+  ];
+  try {
+    for (const item of cases) {
+      const operations: any[] = [{ id: 'repair', type: item.type, enabled: true, params: item.params }];
+      if (item.noop) operations.push({ id: 'visible', type: 'color.basic', enabled: true, params: { exposure: 30 } });
+      const graph = { version: '1.0', sourceAssetId: asset.id, operations };
+      const rendered = await request.post(`http://127.0.0.1:8080/api/v1/sessions/${session.id}/render`, { data: { editGraph: graph, format: 'png' } });
+      expect(rendered.status(), JSON.stringify(item) + ': ' + await rendered.text()).toBe(200);
+      const result = await page.evaluate(async ({ src, native, graph, noop }) => {
+        const { decodeImage, renderImage } = await import('/src/core/engine.ts');
+        const file = (b64: string) => new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'repair.png', { type: 'image/png' });
+        const source = await decodeImage(file(src)); const expected = await decodeImage(file(native));
+        const actual = await renderImage(source, graph, { kind: 'export' });
+        let identityChanges = 0;
+        if (noop) {
+          const invisible = await renderImage(source, { ...graph, operations: graph.operations.slice(0, 1) }, { kind: 'export' });
+          identityChanges = invisible.pixels.reduce((n: number, v: number, i: number) => n + Number(v !== source.pixels[i]), 0);
+        }
+        return {
+          mismatches: actual.pixels.reduce((n: number, v: number, i: number) => n + Number(v !== expected.pixels[i]), 0),
+          changed: actual.pixels.reduce((n: number, v: number, i: number) => n + Number(v !== source.pixels[i]), 0),
+          frozenChanges: noop ? 0 : actual.pixels.reduce((n: number, v: number, i: number) => n + Number(Math.floor(i / 4) % source.width < source.width / 2 && v !== source.pixels[i]), 0),
+          identityChanges,
+        };
+      }, { src: buffer.toString('base64'), native: (await rendered.body()).toString('base64'), graph, noop: item.noop });
+      expect(result.mismatches).toBe(0); expect(result.frozenChanges).toBe(0); expect(result.identityChanges).toBe(0); expect(result.changed).toBeGreaterThan(0);
+    }
+  } finally { await request.delete(`http://127.0.0.1:8080/api/v1/sessions/${session.id}`); }
+});
+
 test('真实人像本地 MediaPipe 检测以及参数编辑截图', async ({ page }) => {
   await page.goto('/');
   await page.locator('input[type=file][accept="image/jpeg,image/png,image/webp"]').setInputFiles(path.join(import.meta.dirname, 'fixtures/portrait.jpg'));
@@ -291,13 +365,31 @@ test('真实人像 Pose 语义部位使用独立 polygon mask', async ({ page })
     const ctx=montage.getContext('2d')!; ctx.fillStyle='#191c22'; ctx.fillRect(0,0,montage.width,montage.height);
     ctx.fillStyle='#fff'; ctx.font='20px sans-serif'; ctx.fillText('Original',16,28); ctx.fillText('Body: waist 28 / segmented foreground',source.width+16,28);
     ctx.drawImage(pixelsToCanvas(source),0,40); ctx.drawImage(pixelsToCanvas(output),source.width,40);
-    const protectedCenters=(graph.operations.at(-1) as any).params.protectMask.strokes.every((point: any)=>{
-      const x=Math.min(source.width-1,Math.floor(point.x*source.width)); const y=Math.min(source.height-1,Math.floor(point.y*source.height)); const i=(y*source.width+x)*4;
-      return source.pixels.slice(i,i+4).every((v,c)=>v===output.pixels[i+c]);
-    });
-    return { changed: output.pixels.reduce((sum,v,i)=>sum+Number(v!==source.pixels[i]),0), protectedCenters, cornerUnchanged: source.pixels.slice(0,4).every((v,i)=>v===output.pixels[i]), png: montage.toDataURL('image/png').split(',')[1] };
+    const protect=(graph.operations.at(-1) as any).params.protectMask;
+    const protectedPixels:number[]=[];
+    if (protect?.shape==='raster') {
+      // Raster protections are downsampled detector output. Sample every
+      // non-zero cell at its source-image center and verify the renderer
+      // preserves those pixels exactly.
+      for (let py=0; py<protect.height; py+=Math.max(1,Math.floor(protect.height/24))) {
+        for (let px=0; px<protect.width; px+=Math.max(1,Math.floor(protect.width/24))) {
+          if (protect.data[py*protect.width+px] < 128) continue;
+          const x=Math.min(source.width-1,Math.floor((px+.5)*source.width/protect.width));
+          const y=Math.min(source.height-1,Math.floor((py+.5)*source.height/protect.height));
+          protectedPixels.push((y*source.width+x)*4);
+        }
+      }
+    } else {
+      for (const point of protect?.strokes ?? []) {
+        const x=Math.min(source.width-1,Math.floor(point.x*source.width));
+        const y=Math.min(source.height-1,Math.floor(point.y*source.height));
+        protectedPixels.push((y*source.width+x)*4);
+      }
+    }
+    const protectedCenters=protectedPixels.length>0 && protectedPixels.every(i=>source.pixels.slice(i,i+4).every((v,c)=>v===output.pixels[i+c]));
+    return { changed: output.pixels.reduce((sum,v,i)=>sum+Number(v!==source.pixels[i]),0), protectedCenters, protectedCount: protectedPixels.length, cornerUnchanged: source.pixels.slice(0,4).every((v,i)=>v===output.pixels[i]), png: montage.toDataURL('image/png').split(',')[1] };
   }, { encoded: buffer.toString('base64'), graph });
-  expect(evidence.changed).toBeGreaterThan(100); expect(evidence.cornerUnchanged).toBe(true); expect(evidence.protectedCenters).toBe(true);
+  expect(evidence.changed).toBeGreaterThan(100); expect(evidence.cornerUnchanged).toBe(true); expect(evidence.protectedCount).toBeGreaterThan(0); expect(evidence.protectedCenters).toBe(true);
   await fs.writeFile(path.resolve(import.meta.dirname,'../../../doc/qa/portrait-body-comparison.png'),Buffer.from(evidence.png,'base64'));
 });
 
@@ -412,7 +504,7 @@ test('曲线、HSL、胶片缩略图、自定义预设、LUT与图层顺序', as
   await page.getByRole('spinbutton', { name: '饱和度数值', exact: true }).fill('-80'); await ready(page);
   await page.getByRole('button', { name: '胶片模拟', exact: true }).click();
   await page.locator('.film-presets button').filter({ hasText: '暖光人像' }).click(); await ready(page);
-  await expect(page.locator('.preset-thumbnail')).toHaveCount(8);
+  await expect(page.locator('.preset-thumbnail')).toHaveCount(14);
   page.once('dialog', dialog => dialog.accept('验收预设'));
   await page.getByRole('button', { name: '保存预设', exact: true }).click();
   await expect(page.getByRole('button', { name: '验收预设', exact: true })).toBeVisible();

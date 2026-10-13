@@ -1,0 +1,155 @@
+{
+  "binaries_sha256": {
+    "before": "f56fb0fc3c8369da9b400b22e1d20b58d36428aed84a33e948cd21cbdfddf133",
+    "after": "27cdabda9151718534f4c86c654b46119f0600adaed6a41c45f80cd791bb1941"
+  },
+  "binary_checks": "before and after each subprocess and final hash",
+  "scope": "mask.rs-only difference, identical other modules; interleaved processes, 1 first + 5 hot runs per case",
+  "limitations": "Concurrent builds/model experiments. Not a controlled performance acceptance, detection/I/O excluded.",
+  "rows": [
+    {
+      "sample": "portrait-makeup",
+      "case": "whiten",
+      "source_sha256": "8c283f02e8c73d7cb7a52fccfb529db7560839f4b3fe8aaaa8b0a59018b2f79f",
+      "graph_sha256": "9efa06e68f4b5211ff3200f3674da72778f1e8cff5e638479f62b209231fbadf",
+      "before": {
+        "first_run_ms": 533.885718,
+        "height": 902,
+        "hot_median_ms": 487.637008,
+        "hot_samples_ms": [
+          484.969979,
+          486.368771,
+          487.637008,
+          516.629477,
+          521.308804
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 1024
+      },
+      "after": {
+        "first_run_ms": 230.081094,
+        "height": 902,
+        "hot_median_ms": 194.68200299999998,
+        "hot_samples_ms": [
+          186.977475,
+          188.708104,
+          194.68200299999998,
+          207.386162,
+          209.610356
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 1024
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.39923549649865786
+    },
+    {
+      "sample": "portrait-makeup",
+      "case": "smooth-strong",
+      "source_sha256": "8c283f02e8c73d7cb7a52fccfb529db7560839f4b3fe8aaaa8b0a59018b2f79f",
+      "graph_sha256": "5cd19fbf7d6b8b1c3c6d11fbf324174dc429b38c9d9b82410de3ae19346822d3",
+      "after": {
+        "first_run_ms": 553.927596,
+        "height": 902,
+        "hot_median_ms": 458.617228,
+        "hot_samples_ms": [
+          405.61022,
+          410.748087,
+          458.617228,
+          510.19444599999997,
+          584.679458
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 1024
+      },
+      "before": {
+        "first_run_ms": 1167.169736,
+        "height": 902,
+        "hot_median_ms": 938.077771,
+        "hot_samples_ms": [
+          800.5178050000001,
+          919.949359,
+          938.077771,
+          973.678417,
+          1015.602956
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 1024
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.48889041205092154
+    },
+    {
+      "sample": "portrait-dark",
+      "case": "whiten",
+      "source_sha256": "c1999306aa24f649f2aff3c078cbb5f33f060903f88b3326ab2365657336a548",
+      "graph_sha256": "2bb0f795e80db30514fb3d1f4435a6b00f8ee1b6cfa3cc8337edd4023aa442f4",
+      "before": {
+        "first_run_ms": 444.626734,
+        "height": 1024,
+        "hot_median_ms": 450.07697,
+        "hot_samples_ms": [
+          394.385062,
+          441.81640100000004,
+          450.07697,
+          490.117067,
+          595.42917
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 683
+      },
+      "after": {
+        "first_run_ms": 187.338976,
+        "height": 1024,
+        "hot_median_ms": 162.35644900000003,
+        "hot_samples_ms": [
+          149.59017799999998,
+          155.783103,
+          162.35644900000003,
+          167.303236,
+          178.83195800000001
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 683
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.3607304079566658
+    },
+    {
+      "sample": "portrait-hair",
+      "case": "smooth-strong",
+      "source_sha256": "9f19f2feb5dbfef8d6d8f3989639cc7329333f863072794c384c49331a66dc8c",
+      "graph_sha256": "f2ff5c4d9d701debb18b8d1ad78cb92333b21074b44309b8edca3f9aff3b8ae3",
+      "after": {
+        "first_run_ms": 681.404543,
+        "height": 1024,
+        "hot_median_ms": 495.277232,
+        "hot_samples_ms": [
+          341.48573,
+          384.657778,
+          495.277232,
+          505.781391,
+          538.6278540000001
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 784
+      },
+      "before": {
+        "first_run_ms": 1034.381087,
+        "height": 1024,
+        "hot_median_ms": 641.969745,
+        "hot_samples_ms": [
+          599.6587370000001,
+          627.8741709999999,
+          641.969745,
+          777.8184200000001,
+          864.96631
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 784
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.7714962205890249
+    }
+  ]
+}

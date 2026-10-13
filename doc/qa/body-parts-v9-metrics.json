@@ -1,0 +1,182 @@
+[
+  {
+    "id": "action-suit",
+    "rendererSha256": "83e96b9a898ba1eb103056235a74366388b9296c40886ab5584c0520256ead07",
+    "sourceSha256": "15cbfa1426b0122df0c9ae12bd0f4be4a4a4d6e227a24ecd87935c8e4add48a6",
+    "parserCacheSha256": "e3d74b4bd2b5d455668e1194cafc7cb107e2cd65d26d33f9bcf62c424f4bba36",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 2920,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1617,
+        "graphSha256": "860899ec1d1af44e033465bba546c1194ce5d0554022c3d9efef7ca3b29eefd5",
+        "outputSha256": "f66c97eb279eedc6e510d926a9dd1bc4fa239a2dc60bf39593e8d7af0a838d75",
+        "metrics": {
+          "changedPixels": 5173,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 104,
+          "top": 311,
+          "width": 289,
+          "height": 218
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1582,
+        "graphSha256": "2749fc9251fa176936e6ad394cf3f5808abdb452595b5dd6b99bcfd521cf8c44",
+        "outputSha256": "9f80d8ef202de80cf783592cfa6cda3530e3a3ff194212f14cdb2d13d3d6b9eb",
+        "metrics": {
+          "changedPixels": 1748,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 308,
+          "top": 220,
+          "width": 139,
+          "height": 154
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1442,
+        "graphSha256": "ffb4bfd73e702a47f51ccfcb8956bd61311f347ec31297296a252d2ae25770a1",
+        "outputSha256": "60986e712900a48d8ff32fcc22a1bb80e7f805f1f70530b82a7c96dd1746d284",
+        "metrics": {
+          "changedPixels": 5443,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 34,
+          "top": 195,
+          "width": 247,
+          "height": 244
+        }
+      }
+    ]
+  },
+  {
+    "id": "fashion-standing",
+    "rendererSha256": "83e96b9a898ba1eb103056235a74366388b9296c40886ab5584c0520256ead07",
+    "sourceSha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+    "parserCacheSha256": "1f330b215201030d2e715378b57c49a2a27063c4de85495b2d2d5d3a431cb8f7",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 884,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1129,
+        "graphSha256": "9f717a4a2ae50442926eef536e1702000de4604faaf8b3bad595cb81d251d165",
+        "outputSha256": "6aed0cc033cc5f16e4b00d1bc6ff9d77684526d5330322619f8c737f59919373",
+        "metrics": {
+          "changedPixels": 18252,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 97,
+          "top": 330,
+          "width": 319,
+          "height": 239
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1014,
+        "graphSha256": "3390519112ee870ff501e1ef393e1a011a92f34e88dc1177c89d52e3f863159d",
+        "outputSha256": "1d1aec0710daa0d7e666b1146cb8bf4354b97690762d199f1b3308fa09aed2b3",
+        "metrics": {
+          "changedPixels": 7244,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 248,
+          "top": 225,
+          "width": 221,
+          "height": 227
+        }
+      },
+      {
+        "part": "left-thigh",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1063,
+        "graphSha256": "5ced5601d645201ed95c9964be8a42f8a25810e0fae05bc3a77eb680690876f4",
+        "outputSha256": "b004ab2a65555ccb18f31147f708e5122e8f8e06e6aa11d0efb7422876e3b13b",
+        "metrics": {
+          "changedPixels": 8576,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 212,
+          "top": 510,
+          "width": 234,
+          "height": 258
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1057,
+        "graphSha256": "a1b9a9fecbe9e0b27537e57c88b867bbfd9154b8656e5e2ab36f1fd3bedfa5a1",
+        "outputSha256": "bf31c56592a224461688b7c10f8956c9b89e64a5a7d25f1d0fc7871787268b3e",
+        "metrics": {
+          "changedPixels": 8061,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 11,
+          "top": 247,
+          "width": 212,
+          "height": 217
+        }
+      },
+      {
+        "part": "right-thigh",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1062,
+        "graphSha256": "1237396b8bfee63223190f00903c03d39295806c3d577f555d952171574a25de",
+        "outputSha256": "272dc84ac5185a335a2cb6da7460cf5d7d24edba98c039b608db8475865e8fa5",
+        "metrics": {
+          "changedPixels": 9374,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 111,
+          "top": 521,
+          "width": 220,
+          "height": 247
+        }
+      }
+    ]
+  }
+]

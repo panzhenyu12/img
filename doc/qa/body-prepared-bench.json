@@ -1,0 +1,154 @@
+{
+  "binaries_sha256": {
+    "before": "2a712659811bd81f4fc4df518b90883b69bce361edca475f174130ba1cd0597b",
+    "after": "5ef7094ed5023f5f7fab26e36f090c8c7c3a53d0559e2c86d05e946b3915f176"
+  },
+  "scope": "body PreparedMask + bounded native source/alpha F/B cache; same body output; source/graphs frozen v14; cold1/hot5 same process",
+  "limitations": "concurrent development load, four representative graphs, no I/O/detection; not performance acceptance",
+  "rows": [
+    {
+      "sample": "fashion-standing",
+      "part": "left-thigh",
+      "source_sha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+      "graph_sha256": "710d3bb21a844ff8501e49c1a2c4376fceb6b4b5bf1e459c3dfe96ca95b6cba2",
+      "before": {
+        "first_run_ms": 1128.1015830000001,
+        "height": 768,
+        "hot_median_ms": 1071.2453369999998,
+        "hot_samples_ms": [
+          1051.420854,
+          1070.771285,
+          1071.2453369999998,
+          1089.8592019999999,
+          1164.76591
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 540
+      },
+      "after": {
+        "first_run_ms": 337.059426,
+        "height": 768,
+        "hot_median_ms": 204.952235,
+        "hot_samples_ms": [
+          189.372615,
+          190.824286,
+          204.952235,
+          209.036146,
+          224.570744
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 540
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.1913214722352626
+    },
+    {
+      "sample": "fashion-standing",
+      "part": "waist",
+      "source_sha256": "16ec09161b769d5d2553a03ab271dd30a737a88165885384b654ea74b2731cf1",
+      "graph_sha256": "bd6a5e46be3175c590b9d822c39e5f1aaab60b28825209c6db89e51e34217b05",
+      "after": {
+        "first_run_ms": 379.008624,
+        "height": 768,
+        "hot_median_ms": 256.440493,
+        "hot_samples_ms": [
+          221.87354000000002,
+          236.138325,
+          256.440493,
+          261.588519,
+          270.003486
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 540
+      },
+      "before": {
+        "first_run_ms": 1322.400168,
+        "height": 768,
+        "hot_median_ms": 1086.834542,
+        "hot_samples_ms": [
+          1073.268241,
+          1074.138983,
+          1086.834542,
+          1145.235612,
+          1199.8968519999999
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 540
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.2359517323843025
+    },
+    {
+      "sample": "fullbody-side-fashion",
+      "part": "waist",
+      "source_sha256": "ab877cef0c07de053a240a85cd21d453007bce41749c618b5d9230fb398d6b18",
+      "graph_sha256": "de247074b0a27d5dad8f87aa7604b74bdf3006c82a10df512e6ee34f710832fd",
+      "before": {
+        "first_run_ms": 1086.2901169999998,
+        "height": 512,
+        "hot_median_ms": 1040.5959460000001,
+        "hot_samples_ms": [
+          959.816385,
+          965.206906,
+          1040.5959460000001,
+          1045.641042,
+          1060.318299
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 768
+      },
+      "after": {
+        "first_run_ms": 427.916642,
+        "height": 512,
+        "hot_median_ms": 232.414331,
+        "hot_samples_ms": [
+          231.698531,
+          232.05076,
+          232.414331,
+          237.59065700000002,
+          248.050544
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 768
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.2233473346627856
+    },
+    {
+      "sample": "action-suit",
+      "part": "left-upper-arm",
+      "source_sha256": "15cbfa1426b0122df0c9ae12bd0f4be4a4a4d6e227a24ecd87935c8e4add48a6",
+      "graph_sha256": "b61a9364b1bd567c6e2eefdba71339258c9888d45e3fc86921855612fd9a62ec",
+      "after": {
+        "first_run_ms": 449.35508699999997,
+        "height": 608,
+        "hot_median_ms": 264.68441199999995,
+        "hot_samples_ms": [
+          256.79913500000004,
+          258.399035,
+          264.68441199999995,
+          278.499973,
+          286.633844
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 768
+      },
+      "before": {
+        "first_run_ms": 1187.125042,
+        "height": 608,
+        "hot_median_ms": 1283.105221,
+        "hot_samples_ms": [
+          1170.755183,
+          1187.710362,
+          1283.105221,
+          1301.603505,
+          1371.421843
+        ],
+        "scope": "same-process graph parse, validation, edit and composite; excludes I/O/detection",
+        "width": 768
+      },
+      "different_channels": 0,
+      "hot_ratio": 0.20628426076679485
+    }
+  ]
+}

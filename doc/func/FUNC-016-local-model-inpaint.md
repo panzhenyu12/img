@@ -36,6 +36,8 @@
 
 `execution` 默认 `server`，允许 `client/server`。服务端 `maxSide` 默认 1024，范围 256–2048；客户端固定 512 模型，不能要求超过 512。`contextMode` 默认 `full`，显式 `crop` 才按目标包围盒加 `contextPadding`（64–1024）裁剪；`maskDilation` 默认 4，允许 0–32；它扩展模型推理洞，不扩展最终可修改区域。`seamBlend` 默认 `none`，服务端可显式选 `poisson`；客户端目前仅 `none`。
 
+MAT Places-512另以固定safetensors/CPU适配实跑三图，街景残留人形块、建筑错层与MAE回退，未替换两端LaMa。它和MI-GAN/PatchMatch均属于独立候选实验，来源、参数、哈希、失败图见[候选评审](../qa/inpaint-refinement-review.md)；没有新增公开Operation/MCP参数。
+
 `mask/protectMask/region/opacity/blendMode` 使用公共协议。Rust 将选区与保护区域光栅化为原分辨率二值 PNG；原图 alpha=0、任意非零冻结覆盖、禁用节点和 opacity=0 均不能进入实际目标。最终合成仍使用原始软蒙版与公共 opacity/blend，应用一次。
 
 ## 前端实现
@@ -104,3 +106,6 @@ make dev                 # Web + Go；已有 API 在代码更新后需重启
 ## 变更记录
 
 - 2026-10-13：接入原 LaMa 权重的独立本地 Worker、公共合成、Go 分段图和缓存；查明 Lanczos RGB/BOX mask footprint 不一致导致的假纹理并修复；保留旧失败证据；增加 client/server 显式执行约束。
+# 本轮候选质量复核
+
+2026-10-13：增加离线模型引导PatchMatch、MI-GAN29.5MB的真实对比，复现源码在 `experiments/inpaint/` 和 `scripts/review_migan.py`。两者未通过人群/建筑自然度要求，不加入本功能Operation或默认后处理，不修改正式LaMa双端合同。失败对照、哈希与采纳决策见[候选质量评审](../qa/inpaint-refinement-review.md)。复杂去人仍未达8分。

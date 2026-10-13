@@ -1,0 +1,201 @@
+{
+  "binary_sha256": "6cf3a2856570e8fc50c801f409e773393e097e53ed1387b3e826cb8540b96148",
+  "engine_binary_sha256": "e42c9f844260d9c266c1c5875c7cb06dbb0a8779e0ba9ed15823ae1c9d212831",
+  "model_initialization_ms": null,
+  "model_detection_ms": null,
+  "note": "No model invoked; machine had simultaneous compilation and Chrome CPU load; not controlled acceptance timing.",
+  "rows": [
+    {
+      "first_run_ms": 1283.9267510000002,
+      "height": 1024,
+      "hot_median_ms": 1126.080601,
+      "hot_samples_ms": [
+        864.019281,
+        1039.358044,
+        1126.080601,
+        1267.9016709999999,
+        1800.886702
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 820,
+      "sample": "fixture-portrait",
+      "case": "smooth-strong"
+    },
+    {
+      "first_run_ms": 734.5211019999999,
+      "height": 1024,
+      "hot_median_ms": 742.436712,
+      "hot_samples_ms": [
+        670.433272,
+        694.7047,
+        742.436712,
+        750.4636350000001,
+        825.217836
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 820,
+      "sample": "fixture-portrait",
+      "case": "whiten"
+    },
+    {
+      "first_run_ms": 1147.3917959999999,
+      "height": 1024,
+      "hot_median_ms": 1130.6238740000001,
+      "hot_samples_ms": [
+        953.130505,
+        1007.691039,
+        1130.6238740000001,
+        1131.843803,
+        1167.352521
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 683,
+      "sample": "portrait-dark",
+      "case": "smooth-strong"
+    },
+    {
+      "first_run_ms": 902.93516,
+      "height": 1024,
+      "hot_median_ms": 714.3870949999999,
+      "hot_samples_ms": [
+        648.108594,
+        707.334426,
+        714.3870949999999,
+        844.46393,
+        1017.609778
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 683,
+      "sample": "portrait-dark",
+      "case": "whiten"
+    },
+    {
+      "first_run_ms": 1419.054263,
+      "height": 1024,
+      "hot_median_ms": 1260.852567,
+      "hot_samples_ms": [
+        1090.554553,
+        1259.355085,
+        1260.852567,
+        1287.703761,
+        1398.776608
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 784,
+      "sample": "portrait-hair",
+      "case": "smooth-strong"
+    },
+    {
+      "first_run_ms": 909.153702,
+      "height": 1024,
+      "hot_median_ms": 904.223529,
+      "hot_samples_ms": [
+        836.395735,
+        867.9033579999999,
+        904.223529,
+        984.948974,
+        1272.901083
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 784,
+      "sample": "portrait-hair",
+      "case": "whiten"
+    },
+    {
+      "first_run_ms": 2172.654542,
+      "height": 902,
+      "hot_median_ms": 1962.9921970000003,
+      "hot_samples_ms": [
+        1598.384027,
+        1858.0760149999999,
+        1962.9921970000003,
+        1988.418978,
+        2289.9142650000003
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 1024,
+      "sample": "portrait-makeup",
+      "case": "smooth-strong"
+    },
+    {
+      "first_run_ms": 1895.065358,
+      "height": 902,
+      "hot_median_ms": 1380.370319,
+      "hot_samples_ms": [
+        1144.326977,
+        1292.2671930000001,
+        1380.370319,
+        1408.7622920000001,
+        1610.8742920000002
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 1024,
+      "sample": "portrait-makeup",
+      "case": "whiten"
+    },
+    {
+      "first_run_ms": 2057.204318,
+      "height": 961,
+      "hot_median_ms": 1885.467744,
+      "hot_samples_ms": [
+        1314.05809,
+        1456.037101,
+        1885.467744,
+        1988.13133,
+        2058.518175
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 1024,
+      "sample": "portrait-roll",
+      "case": "smooth-strong"
+    },
+    {
+      "first_run_ms": 1075.977504,
+      "height": 961,
+      "hot_median_ms": 1193.817307,
+      "hot_samples_ms": [
+        1063.4371549999998,
+        1146.0682339999998,
+        1193.817307,
+        1324.164299,
+        1527.371681
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 1024,
+      "sample": "portrait-roll",
+      "case": "whiten"
+    },
+    {
+      "first_run_ms": 1317.114546,
+      "height": 1024,
+      "hot_median_ms": 1204.676845,
+      "hot_samples_ms": [
+        978.9245450000001,
+        1161.433357,
+        1204.676845,
+        1208.546541,
+        1239.04442
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 683,
+      "sample": "portrait-woman",
+      "case": "smooth-strong"
+    },
+    {
+      "first_run_ms": 744.979961,
+      "height": 1024,
+      "hot_median_ms": 669.303901,
+      "hot_samples_ms": [
+        612.476164,
+        642.6685659999999,
+        669.303901,
+        796.930188,
+        859.4573330000001
+      ],
+      "scope": "same-process graph parse, validation, edit and final composite; excludes I/O and detection",
+      "width": 683,
+      "sample": "portrait-woman",
+      "case": "whiten"
+    }
+  ]
+}

@@ -176,18 +176,39 @@ impl Frame {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Anchor {
     center: Point,
     across: Point,
     down: Point,
     rx: f32,
     ry: f32,
+    polygon: Vec<Point>,
 }
 impl Anchor {
-    fn freeze(self, p: Point) -> f32 {
+    fn freeze(&self, p: Point) -> f32 {
         let delta = sub(p, self.center);
         let r = (dot(delta, self.across) / self.rx).hypot(dot(delta, self.down) / self.ry);
+        if !self.polygon.is_empty() {
+            if r > 1.8 {
+                return 0.0;
+            }
+            if inside(p, &self.polygon) {
+                return 1.0;
+            }
+            let distance = self
+                .polygon
+                .iter()
+                .enumerate()
+                .map(|(i, &a)| closest(p, a, self.polygon[(i + 1) % self.polygon.len()]).0)
+                .fold(f32::MAX, f32::min);
+            // The old expanded enclosing ellipses froze a wide wedge of
+            // cheek beside an eye: the contour stalled there and moved fully
+            // one row lower, creating a visible inward notch. Freeze the
+            // observed feature itself, with a two-pixel transition. MLS fixed
+            // handles distribute the surrounding skin motion continuously.
+            return 1.0 - smoothstep(0.0, 2.0, distance);
+        }
         1.0 - smoothstep(1.0, 1.7, r)
     }
 }
@@ -209,7 +230,7 @@ fn anchors(semantics: Option<&Value>, frame: Frame, w: f32, h: f32) -> Vec<Ancho
         };
         let Some(c) = center(&polygon) else { continue };
         let (mut rx, mut ry): (f32, f32) = (0.0, 0.0);
-        for p in polygon {
+        for &p in &polygon {
             rx = rx.max(dot(sub(p, c), frame.across).abs());
             ry = ry.max(dot(sub(p, c), frame.down).abs());
         }
@@ -221,6 +242,7 @@ fn anchors(semantics: Option<&Value>, frame: Frame, w: f32, h: f32) -> Vec<Ancho
             down: frame.down,
             rx: (rx * 1.45 + 1.0).max(1.0),
             ry: (ry * 1.45 + 1.0).max(1.0),
+            polygon,
         });
     }
     // A detector without a nose polygon still fixes the central nose bridge
@@ -235,6 +257,7 @@ fn anchors(semantics: Option<&Value>, frame: Frame, w: f32, h: f32) -> Vec<Ancho
             down: frame.down,
             rx: frame.width() * 0.105,
             ry: frame.height() * 0.15,
+            polygon: Vec::new(),
         });
     }
     result
@@ -386,7 +409,7 @@ fn reconstruct(
     subject: &[f32],
     frozen: &[bool],
     donor_excluded: &[bool],
-    underlayer_known: &[bool],
+    known_layer: &[u8],
     estimated_background: Option<&RgbaImage>,
 ) -> Result<RgbaImage, ImageError> {
     let w = source.width as usize;
@@ -402,21 +425,20 @@ fn reconstruct(
                 || (subject[i] > 0.0 && subject[i] < 1.0)
                 || (donor_excluded[i] && subject[i] <= 1e-6))
                 && !frozen[i]
-                && !underlayer_known[i]
+                && known_layer[i] == 0
         })
         .collect();
     let protected: Vec<bool> = (0..count)
         .map(|i| {
-            ((subject[i] > 0.0 || donor_excluded[i]) && !target[i] && !underlayer_known[i])
+            ((subject[i] > 0.0 || donor_excluded[i]) && !target[i] && known_layer[i] == 0)
                 || frozen[i]
         })
         .collect();
     // The lower jaw can uncover neck rather than scene background. Partition
-    // the hidden layer by the nearest accessible clean exterior donor. Neck
-    // and backdrop donors never mix or propagate through one another's layer.
-    let mut layer: Vec<u8> = (0..count)
-        .map(|i| if underlayer_known[i] { 1 } else { 0 })
-        .collect();
+    // the hidden layer by the nearest accessible clean exterior donor. Neck,
+    // visible hair and backdrop donors never mix across their layer join.
+    // `known_layer` is 0 for scene, 1 for neck and 2 for fixed visible hair.
+    let mut layer: Vec<u8> = known_layer.to_vec();
     let mut classified: Vec<bool> = target.iter().map(|t| !t).collect();
     let mut front = VecDeque::new();
     for i in 0..count {
@@ -586,6 +608,460 @@ fn sample(source: &RgbaImage, subject: &[f32], x: f32, y: f32) -> ([f32; 4], f32
         pixel[3] += a;
     }
     (pixel, membership.clamp(0.0, 1.0))
+}
+
+/// Move the observed neck illumination with the jaw for newly uncovered
+/// pixels. Harmonic fill has no boundary shadow and averages away neck detail.
+/// A corresponding clean neck donor retains that real surface and shading;
+/// unsupported/occluded donors keep the separate-layer reconstruction above.
+/// Existing neck output and scene pixels are never warped by this function.
+#[cfg(test)]
+fn restore_exposed_neck_legacy(
+    background: &mut RgbaImage,
+    crop: &RgbaImage,
+    holes: &[bool],
+    known_neck: &[bool],
+    field: &ContourField<'_>,
+    origin: Point,
+) {
+    if !known_neck.iter().any(|&v| v) {
+        return;
+    }
+    let clean: Vec<f32> = known_neck
+        .iter()
+        .map(|&v| if v { 1.0 } else { 0.0 })
+        .collect();
+    let w = crop.width as usize;
+    for (i, &hole) in holes.iter().enumerate() {
+        if !hole {
+            continue;
+        }
+        let p = (
+            origin.0 + (i % w) as f32 + 0.5,
+            origin.1 + (i / w) as f32 + 0.5,
+        );
+        if inside(p, field.target) {
+            continue;
+        }
+        let mut best = (f32::MAX, 0, 0.0);
+        for j in 0..field.target.len() {
+            let (distance, t) = closest(
+                p,
+                field.target[j],
+                field.target[(j + 1) % field.target.len()],
+            );
+            if distance < best.0 {
+                best = (distance, j, t);
+            }
+        }
+        let (distance, j, t) = best;
+        let next = (j + 1) % field.source.len();
+        let boundary = add(
+            scale(field.source[j], 1.0 - t),
+            scale(field.source[next], t),
+        );
+        let target_boundary = add(
+            scale(field.target[j], 1.0 - t),
+            scale(field.target[next], t),
+        );
+        let tangent = sub(field.source[next], field.source[j]);
+        let length = tangent.0.hypot(tangent.1);
+        if length < 1e-5 {
+            continue;
+        }
+        let mut normal = (-tangent.1 / length, tangent.0 / length);
+        if inside(add(boundary, scale(normal, 2.0)), field.source) {
+            normal = scale(normal, -1.0);
+        }
+        // The candidate must meet the unchanged observed neck at the old
+        // boundary. Direct donor copying makes a second hard jaw-shaped ring.
+        // Taper to the reconstructed layer across the actual exposed width.
+        let exposed_width = dot(sub(boundary, target_boundary), normal);
+        if exposed_width <= 1e-5 {
+            continue;
+        }
+        let weight = smoothstep(
+            0.0,
+            1.0,
+            ((exposed_width - distance) / exposed_width).clamp(0.0, 1.0),
+        );
+        if weight <= 1e-6 {
+            continue;
+        }
+        for offset in [0.0, 1.0, 2.0, 3.0, 4.0] {
+            let donor = add(boundary, scale(normal, distance + offset));
+            let (pixel, membership) = sample(
+                crop,
+                &clean,
+                donor.0 - origin.0 - 0.5,
+                donor.1 - origin.1 - 0.5,
+            );
+            if membership < 0.999 || pixel[3] <= 1e-6 {
+                continue;
+            }
+            for (c, &value) in pixel.iter().enumerate().take(3) {
+                background.pixels[i * 4 + c] = byte(
+                    background.pixels[i * 4 + c] as f32 * (1.0 - weight)
+                        + value / pixel[3] * weight,
+                );
+            }
+            background.pixels[i * 4 + 3] = byte(
+                background.pixels[i * 4 + 3] as f32 * (1.0 - weight) + pixel[3] * 255.0 * weight,
+            );
+            break;
+        }
+    }
+}
+
+/// Arc-distance tangent avoids treating a one-pixel marching-squares zigzag
+/// as an anatomical 90-degree jaw turn. Geometry still uses the exact curve;
+/// only the neck illumination correspondence uses this local normal.
+fn neck_normal(polygon: &[Point], edge: usize, t: f32, reach: f32) -> Point {
+    let n = polygon.len();
+    let boundary = add(
+        scale(polygon[edge], 1.0 - t),
+        scale(polygon[(edge + 1) % n], t),
+    );
+    let walk = |forward: bool| {
+        let mut current = boundary;
+        let mut distance = 0.0;
+        let mut j = if forward { (edge + 1) % n } else { edge };
+        for _ in 0..n {
+            let next = polygon[j];
+            let segment = sub(next, current);
+            let length = segment.0.hypot(segment.1);
+            if distance + length >= reach {
+                return add(
+                    current,
+                    scale(segment, (reach - distance) / length.max(1e-6)),
+                );
+            }
+            current = next;
+            distance += length;
+            j = if forward {
+                (j + 1) % n
+            } else {
+                (j + n - 1) % n
+            };
+        }
+        current
+    };
+    let tangent = sub(walk(true), walk(false));
+    let length = tangent.0.hypot(tangent.1);
+    if length < 1e-5 {
+        return (0.0, 0.0);
+    }
+    let mut normal = (-tangent.1 / length, tangent.0 / length);
+    if inside(add(boundary, scale(normal, 2.0)), polygon) {
+        normal = scale(normal, -1.0);
+    }
+    normal
+}
+
+/// Reposition only observed neck illumination after jaw contraction. Neck
+/// texture stays at its source coordinates: RGB_out = RGB_source + L(q)-L(p).
+/// Newly exposed neck receives its observed donor at the corresponding distance
+/// from the old jaw. Explicit protection excludes both output and donor pixels.
+fn restore_neck_lighting(
+    background: &mut RgbaImage,
+    crop: &RgbaImage,
+    holes: &[bool],
+    known_neck: &[bool],
+    frozen: &[bool],
+    field: &ContourField<'_>,
+    origin: Point,
+) -> Vec<bool> {
+    let (w, h) = (crop.width as usize, crop.height as usize);
+    let mut changed = vec![false; w * h];
+    let clean: Vec<f32> = known_neck
+        .iter()
+        .zip(frozen)
+        .map(|(&known, &fixed)| if known && !fixed { 1.0 } else { 0.0 })
+        .collect();
+    if !clean.iter().any(|&v| v > 0.0) {
+        return changed;
+    }
+    let extent = field.source.iter().map(|p| p.0).fold(f32::MIN, f32::max)
+        - field.source.iter().map(|p| p.0).fold(f32::MAX, f32::min);
+    let radius = (extent * 0.022).round().clamp(2.0, 8.0) as usize;
+    let stride = w + 1;
+    let mut integral = vec![[0.0_f64; 4]; (w + 1) * (h + 1)];
+    for y in 0..h {
+        let mut row = [0.0_f64; 4];
+        for x in 0..w {
+            let i = y * w + x;
+            row[3] += clean[i] as f64;
+            for (c, value) in row.iter_mut().enumerate().take(3) {
+                *value += crop.pixels[i * 4 + c] as f64 * clean[i] as f64;
+            }
+            for c in 0..4 {
+                integral[(y + 1) * stride + x + 1][c] = integral[y * stride + x + 1][c] + row[c];
+            }
+        }
+    }
+    let mut low = crop.clone();
+    let mut reliable = vec![0.0; w * h];
+    let mut seam = vec![None; w * h];
+    let mut bridge_valid = vec![0.0; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let (x0, y0, x1, y1) = (
+                x.saturating_sub(radius),
+                y.saturating_sub(radius),
+                (x + radius + 1).min(w),
+                (y + radius + 1).min(h),
+            );
+            let sum: [f64; 4] = std::array::from_fn(|c| {
+                integral[y1 * stride + x1][c]
+                    - integral[y0 * stride + x1][c]
+                    - integral[y1 * stride + x0][c]
+                    + integral[y0 * stride + x0][c]
+            });
+            if sum[3] < ((x1 - x0) * (y1 - y0)) as f64 * 0.15 {
+                continue;
+            }
+            let i = y * w + x;
+            reliable[i] = 1.0;
+            for c in 0..3 {
+                low.pixels[i * 4 + c] = byte((sum[c] / sum[3]) as f32);
+            }
+        }
+    }
+    for i in 0..w * h {
+        if frozen[i] || (!holes[i] && clean[i] <= 0.0) {
+            continue;
+        }
+        let p = (
+            origin.0 + (i % w) as f32 + 0.5,
+            origin.1 + (i / w) as f32 + 0.5,
+        );
+        if inside(p, field.target) {
+            continue;
+        }
+        let mut best = (f32::MAX, 0, 0.0);
+        for j in 0..field.target.len() {
+            let (d, t) = closest(
+                p,
+                field.target[j],
+                field.target[(j + 1) % field.target.len()],
+            );
+            if d < best.0 {
+                best = (d, j, t);
+            }
+        }
+        let (distance, j, t) = best;
+        let next = (j + 1) % field.source.len();
+        let old = add(
+            scale(field.source[j], 1.0 - t),
+            scale(field.source[next], t),
+        );
+        let new = add(
+            scale(field.target[j], 1.0 - t),
+            scale(field.target[next], t),
+        );
+        let normal = neck_normal(field.source, j, t, (radius as f32).max(3.0));
+        let movement = sub(old, new);
+        let exposed = dot(movement, normal);
+        if exposed <= 0.05 {
+            continue;
+        }
+        let old_distance = field
+            .source
+            .iter()
+            .enumerate()
+            .map(|(j, &a)| closest(p, a, field.source[(j + 1) % field.source.len()]).0)
+            .fold(f32::MAX, f32::min);
+        // A semantic class join is not stationary neck texture. Only a narrow
+        // old-contour band with space on both sides of the newly moved jaw can
+        // participate in the join correction below.
+        if old_distance < 3.0 && distance > 4.0 {
+            seam[i] = Some((normal, old_distance));
+        }
+        let falloff = 1.0
+            - smoothstep(
+                exposed + radius as f32,
+                exposed + (exposed * 2.0).max(radius as f32 * 4.0),
+                distance,
+            );
+        if falloff <= 1e-5 {
+            continue;
+        }
+        let mut donor = add(p, scale(movement, falloff));
+        let mut observed = None;
+        for offset in [0.0, 1.0, 2.0, 3.0, 4.0] {
+            let q = add(donor, scale(normal, offset));
+            let sample = sample(crop, &clean, q.0 - origin.0 - 0.5, q.1 - origin.1 - 0.5);
+            if sample.1 >= 0.999 && sample.0[3] > 0.999 {
+                donor = q;
+                observed = Some(sample.0);
+                break;
+            }
+        }
+        let Some(observed) = observed else {
+            continue;
+        };
+        bridge_valid[i] = 1.0;
+        if holes[i] {
+            // The target contour is the zero-width join. Taper the sampled
+            // neck donor from the target into the old neck boundary instead of
+            // writing a second opaque jaw arc into harmonic background.
+            let blend = smoothstep(0.0, exposed.max(1.0), distance);
+            for (c, &v) in observed.iter().take(3).enumerate() {
+                let donor = v / observed[3];
+                let current = background.pixels[i * 4 + c] as f32;
+                background.pixels[i * 4 + c] = byte(current * (1.0 - blend) + donor * blend);
+            }
+            background.pixels[i * 4 + 3] = crop.pixels[i * 4 + 3];
+        } else {
+            if reliable[i] <= 0.0 {
+                continue;
+            }
+            let (mapped, reliability) = sample(
+                &low,
+                &reliable,
+                donor.0 - origin.0 - 0.5,
+                donor.1 - origin.1 - 0.5,
+            );
+            if reliability < 0.999 || mapped[3] <= 1e-6 {
+                continue;
+            }
+            for (c, &v) in mapped.iter().take(3).enumerate() {
+                background.pixels[i * 4 + c] = byte(
+                    crop.pixels[i * 4 + c] as f32 + v / mapped[3] - low.pixels[i * 4 + c] as f32,
+                );
+            }
+        }
+        // The old subpixel jaw edge is a mixed face/neck observation, not
+        // stationary neck microtexture. Relighting its retained high frequency
+        // would retain bright fragments of the removed skin. Clean only the
+        // Confident parsing can put the physical mixed RGB edge a few pixels
+        // beyond its alpha .5 contour. A six-pixel taper removes that offset
+        // skin fragment; farther visible neck keeps its high frequency above.
+        if clean[i] > 0.0 && !holes[i] {
+            let demix = 1.0 - smoothstep(1.5, 6.0, old_distance);
+            if demix > 0.0 {
+                for (c, &v) in observed.iter().take(3).enumerate() {
+                    let current = background.pixels[i * 4 + c] as f32;
+                    let donor = v / observed[3];
+                    let delta = donor - current;
+                    // A skin/neck mixed pixel must be removed decisively when
+                    // it is brighter than the observed neck donor. Conversely,
+                    // a dark submental shadow mapped to a lighter donor cannot
+                    // be injected as a one-pixel white arc: cap only positive
+                    // relighting at the original contour and let the low-pass
+                    // field take over away from that edge.
+                    let bounded = if delta > 0.0 { delta.min(20.0) } else { delta };
+                    background.pixels[i * 4 + c] = byte(current + bounded * demix);
+                }
+            }
+        }
+        changed[i] = background.pixels[i * 4..i * 4 + 4] != crop.pixels[i * 4..i * 4 + 4];
+    }
+    // Couple the reconstructed strip and the relit observed neck across their
+    // semantic join. A one-dimensional harmonic bridge removes an old-jaw
+    // impulse without smoothing along the jaw or across the new face edge.
+    // Its endpoints must both already belong to this revealed/observed neck
+    // layer; protected pixels and scene samples are not allowed as donors.
+    let bridge_source = background.clone();
+    for (i, &join) in seam.iter().enumerate() {
+        let Some((normal, distance)) = join else {
+            continue;
+        };
+        if bridge_valid[i] <= 0.0 || !changed[i] {
+            continue;
+        }
+        let p = ((i % w) as f32, (i / w) as f32);
+        let (before, before_valid) = sample(
+            &bridge_source,
+            &bridge_valid,
+            p.0 - normal.0 * 3.0,
+            p.1 - normal.1 * 3.0,
+        );
+        let (after, after_valid) = sample(
+            &bridge_source,
+            &bridge_valid,
+            p.0 + normal.0 * 3.0,
+            p.1 + normal.1 * 3.0,
+        );
+        if before_valid < 0.999 || after_valid < 0.999 || before[3] <= 1e-6 || after[3] <= 1e-6 {
+            continue;
+        }
+        let weight = 1.0 - smoothstep(0.75, 3.0, distance);
+        for c in 0..3 {
+            let bridge = (before[c] / before[3] + after[c] / after[3]) * 0.5;
+            background.pixels[i * 4 + c] =
+                byte(bridge_source.pixels[i * 4 + c] as f32 * (1.0 - weight) + bridge * weight);
+        }
+        changed[i] = background.pixels[i * 4..i * 4 + 4] != crop.pixels[i * 4..i * 4 + 4];
+    }
+
+    // The parser's neck class is intentionally conservative: on a soft jaw
+    // edge it often marks every third or fourth pixel as a high-confidence
+    // neck texel.  The lighting correspondence above is then evaluated on
+    // those isolated texels and can leave a dotted bright/dark arc under a
+    // shortened chin.  Smooth only this old-contour join, along its tangent;
+    // the surrounding neck keeps its original high-frequency texture and the
+    // face, hair and scene are never sampled by this pass.  A robust median
+    // is used instead of a box blur so a necklace or a sharp shadow does not
+    // bleed across the join.
+    let seam_source = background.clone();
+    for (i, &join) in seam.iter().enumerate() {
+        let Some((normal, distance)) = join else {
+            continue;
+        };
+        if !changed[i] || frozen[i] {
+            continue;
+        }
+        let tangent = (-normal.1, normal.0);
+        let mut values: Vec<[f32; 3]> = Vec::new();
+        let px = (i % w) as f32;
+        let py = (i / w) as f32;
+        for step in -6..=6 {
+            if step == 0 {
+                continue;
+            }
+            let x = (px + tangent.0 * step as f32).round() as isize;
+            let y = (py + tangent.1 * step as f32).round() as isize;
+            if x < 0 || y < 0 || x >= w as isize || y >= h as isize {
+                continue;
+            }
+            let j = y as usize * w + x as usize;
+            // Include the corresponding join even if its local donor was not
+            // reliable enough to mark `changed`; its observed neck value is a
+            // better robust statistic than a sparse bright donor.  A bridge
+            // pixel is already known to belong to the same exposed layer.
+            if seam[j].is_none() && bridge_valid[j] <= 0.0 {
+                continue;
+            }
+            let alpha = seam_source.pixels[j * 4 + 3] as f32 / 255.0;
+            if alpha <= 1e-3 {
+                continue;
+            }
+            values.push([
+                seam_source.pixels[j * 4] as f32,
+                seam_source.pixels[j * 4 + 1] as f32,
+                seam_source.pixels[j * 4 + 2] as f32,
+            ]);
+        }
+        if values.len() < 2 {
+            continue;
+        }
+        let mut median = [0.0; 3];
+        for c in 0..3 {
+            let mut channel: Vec<f32> = values.iter().map(|v| v[c]).collect();
+            channel.sort_by(|a, b| a.total_cmp(b));
+            median[c] = channel[channel.len() / 2];
+        }
+        let weight = 0.62 * (1.0 - smoothstep(0.75, 3.0, distance));
+        if weight <= 1e-4 {
+            continue;
+        }
+        for (c, value) in median.into_iter().enumerate() {
+            let current = seam_source.pixels[i * 4 + c] as f32;
+            background.pixels[i * 4 + c] = byte(current * (1.0 - weight) + value * weight);
+        }
+    }
+    changed
 }
 
 /// A probability matte can cross .5 gradually. Requiring a .25/.75 jump in
@@ -797,6 +1273,17 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         ));
     }
     for anchor in &anchors {
+        if !anchor.polygon.is_empty() {
+            handles.push((anchor.center, anchor.center));
+            // Fix handles on the observed feature rather than its enclosing
+            // ellipse: an ellipse extreme can sit in editable cheek skin and
+            // become an identity island outside the requested target contour.
+            for k in 0..8 {
+                let p = anchor.polygon[k * anchor.polygon.len() / 8];
+                handles.push((p, p));
+            }
+            continue;
+        }
         for offset in [
             (0.0, 0.0),
             (-anchor.rx, 0.0),
@@ -888,6 +1375,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let person_mask = params.get("subjectMask").map(PreparedMask::new);
     let protect_mask = params.get("protectMask").map(PreparedMask::new);
     let neck_mask = semantics.and_then(|m| m.get("neck")).map(PreparedMask::new);
+    let hair_mask = semantics.and_then(|m| m.get("hair")).map(PreparedMask::new);
     let output_mask = support_params.get("mask").map(PreparedMask::new);
     let fixed_masks: Vec<_> = ["accessories", "ears", "hair"]
         .iter()
@@ -907,9 +1395,11 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let mut subject = Vec::with_capacity(count);
     let mut face_membership = Vec::with_capacity(count);
     let mut frozen = Vec::with_capacity(count);
+    let mut donor_frozen = Vec::with_capacity(count);
     let mut protection = Vec::with_capacity(count);
     let mut donor_excluded = Vec::with_capacity(count);
-    let mut underlayer_known = Vec::with_capacity(count);
+    let mut known_layer = Vec::with_capacity(count);
+    let mut neck_lighting_known = Vec::with_capacity(count);
     mark!("prepare");
     for y in top..bottom {
         for x in left..right {
@@ -933,12 +1423,6 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
                 .unwrap_or(0.0);
             donor_excluded.push(person_coverage > 1.0 / 255.0);
-            underlayer_known.push(
-                subject.last().copied().unwrap_or(1.0) <= 1e-6
-                    && neck_mask.as_ref().is_some_and(|m| {
-                        m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.8
-                    }),
-            );
             let protected = protect_mask
                 .as_ref()
                 .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
@@ -946,21 +1430,114 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             let accessory = fixed_masks
                 .iter()
                 .any(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            let hair = hair_mask
+                .as_ref()
+                .is_some_and(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            // Record the observed fixed lower layer independently of the
+            // semantic face confidence. The physical matte below decides
+            // which of these texels are foreground and must be reconstructed.
+            known_layer.push(
+                if neck_mask.as_ref().is_some_and(|m| {
+                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.8
+                }) {
+                    1
+                } else if hair {
+                    2
+                } else {
+                    0
+                },
+            );
             // A confidently classified non-neck person pixel is not a soft
             // facial fringe, even if approximate head alpha overlaps it.
             // Keep other people, clothing and undetected ears fixed.
             let other_person = person_coverage >= 0.8
-                && face_membership.last().copied().unwrap_or(1.0) < 0.5
+                // The face and neck probabilities can both fall below .5 in
+                // the one-pixel class transition. Freezing that uncertainty
+                // leaves dotted copies of the old chin after extension. Only
+                // a pixel wholly outside both facial supports is evidence of
+                // another person/clothing; hair/ears/accessories have their
+                // own authoritative protection masks above.
+                && subject.last().copied().unwrap_or(1.0) <= 1.0 / 255.0
+                && face_membership.last().copied().unwrap_or(1.0) <= 1.0 / 255.0
                 && !neck_mask.as_ref().is_some_and(|m| {
-                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.5
+                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 1.0 / 255.0
                 });
-            frozen.push(protected >= 1.0 - 1e-6 || accessory || other_person);
+            // Parsing sometimes assigns the antialias fringe to neither face
+            // nor neck. A newly covering face may occlude that narrow old
+            // boundary, while truly separate people farther away stay frozen.
+            // This does not override explicit hair/ear/accessory/user masks.
+            let covered_old_fringe = other_person
+                && !contraction_only
+                && inside(p, &target)
+                && polygon
+                    .iter()
+                    .enumerate()
+                    .any(|(j, &a)| closest(p, a, polygon[(j + 1) % polygon.len()]).0 <= 3.0);
+            frozen.push(
+                protected >= 1.0 - 1e-6 || accessory || (other_person && !covered_old_fringe),
+            );
+            // Existing hair remains fixed in the output, but its observed
+            // color is the visible underlying layer at a skin/hair boundary.
+            // Refusing it as a donor leaves a skin-colored band after a cheek
+            // contraction. User-frozen pixels, ears, adornments and another
+            // person's pixels remain forbidden donors.
+            donor_frozen.push(
+                protected >= 1.0 - 1e-6
+                    || (accessory && !hair)
+                    || (other_person && !covered_old_fringe),
+            );
             protection.push(protected);
+            neck_lighting_known.push(
+                person_coverage >= 0.8
+                    && face_membership.last().copied().unwrap_or(1.0) <= 1.0 / 255.0
+                    && neck_mask.as_ref().is_some_and(|m| {
+                        m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.8
+                    })
+                    && protected <= 1e-6
+                    && !frozen.last().copied().unwrap_or(true),
+            );
         }
     }
     let crop = RgbaImage::new(cw as u32, ch as u32, crop_pixels)?;
     mark!("crop masks");
-    let color_layers = crate::face_matting::estimate(&crop, &subject);
+    // A head alpha includes hair and ears. Using it to sample a facial
+    // deformation moves hair texels through the new skin edge and defeats the
+    // layer separation precisely where slimming is meant to alter silhouette.
+    // The actual moving foreground is the parsed facial class alpha. The head
+    // alpha remains the context/protection support above, while visible hair
+    // supplies a stationary underlayer for the newly exposed skin strip.
+    let moving_alpha = if contour_mask.is_some() {
+        &face_membership
+    } else {
+        &subject
+    };
+    let mut color_alpha = if face_matte.is_some() {
+        crate::face_matting::refine_portrait_alpha(&crop, moving_alpha)
+    } else {
+        moving_alpha.clone()
+    };
+    // An independently parsed head is stationary context support around the
+    // facial class, including hair/ears. Its confidently empty exterior remains
+    // fixed even when an ambiguous local color-line projection suggests skin.
+    // A single face tracing reused as head has no such independent evidence.
+    let independent_head = contour_matte.is_some() && face_matte != contour_matte;
+    if independent_head {
+        for (i, alpha) in color_alpha.iter_mut().enumerate() {
+            if subject[i] <= 1e-6 {
+                *alpha = 0.0;
+            }
+        }
+    }
+    // The refined matte represents physical foreground at the RGB edge.
+    // Use it consistently for old coverage, holes and donor eligibility. A
+    // binary class zero can still contain observed mixed skin: preserving it
+    // verbatim or using it as clean backdrop leaves the old silhouette.
+    for (i, layer) in known_layer.iter_mut().enumerate() {
+        if color_alpha[i] > 1e-6 {
+            *layer = 0;
+        }
+    }
+    let color_layers = crate::face_matting::estimate(&crop, &color_alpha);
     mark!("F/B estimate");
     let foreground = color_layers.as_ref().map(|(f, _)| f).unwrap_or(&crop);
     let mut samples = vec![([0.0; 4], 0.0); count];
@@ -984,7 +1561,12 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             // hair/ears/background outside the source face remain fixed unless
             // the target contour explicitly covers that previously exterior
             // region. Raster holes do not become an invented filled polygon.
-            if face_membership[i] < if contour_matte.is_some() { 1e-6 } else { 0.5 }
+            let old_coverage = if contour_matte.is_some() {
+                color_alpha[i]
+            } else {
+                face_membership[i]
+            };
+            if old_coverage < if contour_matte.is_some() { 1e-6 } else { 0.5 }
                 && (contraction_only
                     || !(p.0 >= target_bounds.0
                         && p.1 >= target_bounds.1
@@ -1001,33 +1583,47 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             }
             let sample = sample(
                 foreground,
-                &subject,
+                &color_alpha,
                 x as f32 + movement.0,
                 y as f32 + movement.1,
             );
             // Background with zero old and new foreground is always bit-exact.
-            if subject[i] <= 1e-6 && sample.1 <= 1e-6 {
+            if color_alpha[i] <= 1e-6 && sample.1 <= 1e-6 {
                 continue;
             }
             samples[i] = sample;
             changed[i] = true;
-            holes[i] = subject[i] > 1e-6 && sample.1 < 1.0 - 1e-6;
+            holes[i] = color_alpha[i] > 1e-6 && sample.1 < 1.0 - 1e-6;
         }
     }
     mark!("sample grid");
-    let background = if holes.iter().any(|&h| h) {
+    let mut background = if holes.iter().any(|&h| h) {
         reconstruct(
             &crop,
             &holes,
-            &subject,
-            &frozen,
+            &color_alpha,
+            &donor_frozen,
             &donor_excluded,
-            &underlayer_known,
+            &known_layer,
             color_layers.as_ref().map(|(_, b)| b),
         )?
     } else {
         crop.clone()
     };
+    let lighting_changed = restore_neck_lighting(
+        &mut background,
+        &crop,
+        &holes,
+        &neck_lighting_known,
+        &frozen,
+        &field,
+        (left as f32, top as f32),
+    );
+    for (i, &light_changed) in lighting_changed.iter().enumerate() {
+        if light_changed {
+            changed[i] = true;
+        }
+    }
     mark!("reconstruct");
     let mut rendered = input.clone();
     for i in 0..count {
@@ -1102,6 +1698,80 @@ mod tests {
             .filter(|&x| image.pixels[(y * image.width as usize + x) * 4] > 150)
             .collect();
         (*x.first().unwrap(), *x.last().unwrap())
+    }
+    #[test]
+    fn saturated_binary_parsing_removes_old_physical_fringe_with_correct_background() {
+        let (w, h) = (160_u32, 240_u32);
+        let outline: Vec<Point> = (0..64)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 64.0;
+                (80.0 + 38.4 * a.cos(), 120.0 + 88.8 * a.sin())
+            })
+            .collect();
+        let foreground = [220.0, 155.0, 100.0];
+        let background = [20.0, 40.0, 60.0];
+        let mut physical = Vec::new();
+        let mut confidence = Vec::new();
+        let mut pixels = Vec::new();
+        for y in 0..h {
+            for x in 0..w {
+                let p = (x as f32 + 0.5, y as f32 + 0.5);
+                let distance = outline
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &a)| closest(p, a, outline[(i + 1) % outline.len()]).0)
+                    .fold(f32::MAX, f32::min);
+                let signed = if inside(p, &outline) {
+                    distance
+                } else {
+                    -distance
+                };
+                let alpha = (0.5 + signed / 3.0).clamp(0.0, 1.0);
+                physical.push(alpha);
+                confidence.push(if alpha >= 0.5 { 255_u8 } else { 0 });
+                for c in 0..3 {
+                    pixels.push(byte(foreground[c] * alpha + background[c] * (1.0 - alpha)));
+                }
+                pixels.push(255);
+            }
+        }
+        let source = RgbaImage::new(w, h, pixels).unwrap();
+        let contour = json!({"shape":"polygon","points":outline.iter().map(|p|
+            json!({"x":p.0/w as f32,"y":p.1/h as f32})).collect::<Vec<_>>()});
+        let matte = json!({"shape":"raster","width":w,"height":h,"data":confidence});
+        let params = json!({"semanticMasks":{"face":matte,"faceOutline":contour,
+            "faceContourMask":matte,"faceContour":contour},"landmarks":contour["points"],
+            "adjustments":{"faceWidth":100}});
+        let output = adjust(&source, &params).unwrap();
+        let old_span = span(&source, 120);
+        let new_span = span(&output, 120);
+        assert!(
+            new_span.0 >= old_span.0 + 4 && new_span.1 <= old_span.1 - 4,
+            "inner physical contour must move: {old_span:?} -> {new_span:?}"
+        );
+        // Known F/B means the newly exposed strip has a numerical target,
+        // including old alpha=0 class texels whose real opacity was nonzero.
+        // Leave the three-pixel physical transition beside the new contour.
+        for x in 40..new_span.0.saturating_sub(3) {
+            let i = (120 * w as usize + x) * 4;
+            for (c, expected) in background.iter().enumerate() {
+                assert!(
+                    (output.pixels[i + c] as f32 - expected).abs() <= 3.0,
+                    "old edge/background contamination at {x}, channel {c}: {} != {expected}",
+                    output.pixels[i + c]
+                );
+            }
+        }
+        assert!(physical[120 * w as usize + 41] > 0.0 && physical[120 * w as usize + 41] < 0.5);
+        for (i, &alpha) in physical.iter().enumerate() {
+            if alpha == 0.0 {
+                assert_eq!(
+                    &output.pixels[i * 4..i * 4 + 4],
+                    &source.pixels[i * 4..i * 4 + 4],
+                    "pure observed background must stay exact at {i}"
+                );
+            }
+        }
     }
     #[test]
     fn actual_widest_contour_moves_inward_but_exterior_grid_does_not() {
@@ -1179,6 +1849,40 @@ mod tests {
             for x in 108..128 {
                 let i = (y * 160 + x) * 4;
                 assert_eq!(&output.pixels[i..i + 4], &source.pixels[i..i + 4]);
+            }
+        }
+    }
+    #[test]
+    fn eye_protection_does_not_freeze_the_adjacent_cheek_silhouette() {
+        let (mut source, mut params) = portrait(240, 360);
+        params["semanticMasks"]["leftEye"] = json!({"shape":"polygon","points":[
+            {"x":0.3125,"y":0.48},{"x":0.37,"y":0.48},
+            {"x":0.37,"y":0.52},{"x":0.3125,"y":0.52}
+        ]});
+        // This eye is close to the face edge, but still has room for the
+        // full requested cheek motion. A wide enclosing ellipse would stall
+        // the skin boundary even though none of the eye is being covered.
+        for y in 175..185 {
+            for x in 76..88 {
+                let i = (y * 240 + x) * 4;
+                source.pixels[i..i + 4].copy_from_slice(&[5, 15, 25, 255]);
+            }
+        }
+        let before = span(&source, 180);
+        let output = adjust(&source, &params).unwrap();
+        let after = span(&output, 180);
+        assert!(
+            after.0 >= before.0 + 6,
+            "eye-adjacent edge stalled: {before:?} -> {after:?}"
+        );
+        for y in 175..185 {
+            for x in 76..88 {
+                let i = (y * 240 + x) * 4;
+                assert_eq!(
+                    &output.pixels[i..i + 4],
+                    &source.pixels[i..i + 4],
+                    "observed eye at ({x}, {y})"
+                );
             }
         }
     }
@@ -1579,6 +2283,7 @@ mod tests {
             );
         }
     }
+
     #[test]
     fn jaw_reveals_neck_below_the_face_and_keeps_backdrop_donors_separate() {
         let (mut source, p) = portrait(160, 240);
@@ -1635,6 +2340,410 @@ mod tests {
         for y in 214..238 {
             let i = (y * 160 + 80) * 4;
             assert_eq!(&output.pixels[i..i + 4], &source.pixels[i..i + 4]);
+        }
+    }
+    #[test]
+    fn uncertain_face_neck_transition_does_not_freeze_the_old_chin_as_dark_dots() {
+        let (mut source, p) = portrait(160, 240);
+        let mut p = raster_params(&source, p);
+        p["semanticMasks"]["faceContour"] = p["semanticMasks"]["faceOutline"].clone();
+        p["semanticMasks"]["faceContourMask"] = p["semanticMasks"]["face"].clone();
+        let face: Vec<u8> = p["semanticMasks"]["face"]["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u8)
+            .collect();
+        let mut person = face.clone();
+        let mut neck = vec![0_u8; 160 * 240];
+        let mut uncertain_edge = Vec::new();
+        for y in 180..240 {
+            for x in 54..106 {
+                let i = y * 160 + x;
+                person[i] = 255;
+                if face[i] == 0 {
+                    source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[95, 55, 30, 255]);
+                    neck[i] = 255;
+                } else if face[i] < 128 {
+                    // Real semantic class transitions are not complementary
+                    // physical alphas. Both face and neck confidence can be
+                    // below .5 while the person mask remains confident.
+                    source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[160, 100, 65, 255]);
+                    neck[i] = 90;
+                    uncertain_edge.push(i);
+                }
+            }
+        }
+        assert!(!uncertain_edge.is_empty());
+        p["subjectMask"] = json!({"shape":"raster","width":160,"height":240,"data":person});
+        p["semanticMasks"]["neck"] = json!({"shape":"raster","width":160,"height":240,"data":neck});
+        p["adjustments"] = json!({"chin":100});
+        let output = adjust(&source, &p).unwrap();
+        for i in uncertain_edge {
+            assert!(
+                output.pixels[i * 4] > 195,
+                "old shadow at ({}, {}) stayed frozen: {:?}",
+                i % 160,
+                i / 160,
+                &output.pixels[i * 4..i * 4 + 4]
+            );
+        }
+    }
+    #[test]
+    fn uncovered_neck_uses_observed_shadow_detail_and_never_changes_existing_neck() {
+        let (w, h) = (64_usize, 64_usize);
+        let polygon: Vec<Point> = (0..64)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 64.0;
+                (32.0 + 18.0 * a.cos(), 24.0 + 20.0 * a.sin())
+            })
+            .collect();
+        let frame = Frame::new(&polygon, None, w as f32, h as f32);
+        let target = target_contour(&polygon, frame, &json!({"chin":-100}));
+        let field = ContourField {
+            source: &polygon,
+            target: &target,
+            anchors: &[],
+            support: 8.0,
+            mls: mls::RigidMls::new(vec![]),
+        };
+        let pixels: Vec<u8> = (0..w * h)
+            .flat_map(|i| {
+                let shadow = 80 + ((i / w).saturating_sub(45) * 5).min(120) as u8;
+                [shadow, shadow - 20, shadow - 35, 255]
+            })
+            .collect();
+        let crop = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
+        let known: Vec<bool> = (0..w * h)
+            .map(|i| i / w >= 45 && (25..39).contains(&(i % w)))
+            .collect();
+        let holes: Vec<bool> = (0..w * h)
+            .map(|i| (41..44).contains(&(i / w)) && (30..34).contains(&(i % w)))
+            .collect();
+        let mut background = crop.clone();
+        for (i, &hole) in holes.iter().enumerate() {
+            if hole {
+                background.pixels[i * 4..i * 4 + 4].copy_from_slice(&[200, 180, 165, 255]);
+            }
+        }
+        restore_exposed_neck_legacy(&mut background, &crop, &holes, &known, &field, (0.0, 0.0));
+        for (i, &hole) in holes.iter().enumerate() {
+            if hole {
+                if i / w == 41 {
+                    assert!(
+                        background.pixels[i * 4] < 120,
+                        "new neck lost the actual jaw shadow at {i}"
+                    );
+                } else {
+                    assert!(
+                        background.pixels[i * 4] < 200,
+                        "new neck never used its corresponding observed donor at {i}"
+                    );
+                }
+            } else {
+                assert_eq!(
+                    &background.pixels[i * 4..i * 4 + 4],
+                    &crop.pixels[i * 4..i * 4 + 4]
+                );
+            }
+        }
+    }
+    #[test]
+    fn contracted_jaw_repositions_neck_illumination_without_warping_texture_or_scene() {
+        let (w, h) = (64_usize, 64_usize);
+        let polygon: Vec<Point> = (0..64)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 64.0;
+                (32.0 + 18.0 * a.cos(), 24.0 + 20.0 * a.sin())
+            })
+            .collect();
+        let frame = Frame::new(&polygon, None, w as f32, h as f32);
+        let target = target_contour(&polygon, frame, &json!({"chin":-100}));
+        let field = ContourField {
+            source: &polygon,
+            target: &target,
+            anchors: &[],
+            support: 8.0,
+            mls: mls::RigidMls::new(vec![]),
+        };
+        let known: Vec<bool> = (0..w * h)
+            .map(|i| i / w >= 45 && (20..44).contains(&(i % w)))
+            .collect();
+        let pixels: Vec<u8> = (0..w * h)
+            .flat_map(|i| {
+                let light = 80 + ((i / w).saturating_sub(45) * 5).min(120) as u8;
+                let texture = if i % 2 == 0 { 16 } else { 0 };
+                [light + texture, light - 20, light - 35, 255]
+            })
+            .collect();
+        let crop = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
+        let mut result = crop.clone();
+        let holes = vec![false; w * h];
+        let mut frozen = vec![false; w * h];
+        frozen[48 * w + 32] = true;
+        let changed = restore_neck_lighting(
+            &mut result,
+            &crop,
+            &holes,
+            &known,
+            &frozen,
+            &field,
+            (0.0, 0.0),
+        );
+        let p = 48 * w + 31;
+        assert!(changed[p]);
+        assert!(
+            result.pixels[p * 4] > crop.pixels[p * 4] + 5,
+            "the old fixed shadow was not repositioned"
+        );
+        for i in 0..w * h {
+            if !known[i] || frozen[i] {
+                assert_eq!(
+                    &result.pixels[i * 4..i * 4 + 4],
+                    &crop.pixels[i * 4..i * 4 + 4],
+                    "scene/protection changed at {i}"
+                );
+            }
+        }
+        let left = 47 * w + 30;
+        let right = 47 * w + 31;
+        let before = crop.pixels[left * 4] as i16 - crop.pixels[right * 4] as i16;
+        let after = result.pixels[left * 4] as i16 - result.pixels[right * 4] as i16;
+        assert!(
+            (after - before).abs() <= 1,
+            "neck texture moved or disappeared: {before} -> {after}"
+        );
+    }
+
+    #[test]
+    fn old_jaw_mixed_pixels_are_not_preserved_as_stationary_neck_texture() {
+        let (w, h) = (64_usize, 64_usize);
+        let polygon: Vec<Point> = (0..64)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 64.0;
+                (32.0 + 18.0 * a.cos(), 24.0 + 20.0 * a.sin())
+            })
+            .collect();
+        let frame = Frame::new(&polygon, None, w as f32, h as f32);
+        let target = target_contour(&polygon, frame, &json!({"chin":-100}));
+        let field = ContourField {
+            source: &polygon,
+            target: &target,
+            anchors: &[],
+            support: 8.0,
+            mls: mls::RigidMls::new(vec![]),
+        };
+        let known: Vec<bool> = (0..w * h)
+            .map(|i| i / w >= 44 && (20..44).contains(&(i % w)))
+            .collect();
+        let pixels: Vec<u8> = (0..w * h)
+            .flat_map(|i| {
+                let light = 80 + ((i / w).saturating_sub(44) * 5).min(120) as u8;
+                [light, light - 20, light - 35, 255]
+            })
+            .collect();
+        let mut crop = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
+        let pixel = 44 * w + 32;
+        crop.pixels[pixel * 4..pixel * 4 + 4].copy_from_slice(&[190, 170, 155, 255]);
+        let mut result = crop.clone();
+        let holes = vec![false; w * h];
+        let frozen = vec![false; w * h];
+        let changed = restore_neck_lighting(
+            &mut result,
+            &crop,
+            &holes,
+            &known,
+            &frozen,
+            &field,
+            (0.0, 0.0),
+        );
+        assert!(changed[pixel]);
+        assert!(
+            result.pixels[pixel * 4] < 110,
+            "old mixed skin fragment survived: {:?}",
+            &result.pixels[pixel * 4..pixel * 4 + 4]
+        );
+    }
+
+    #[test]
+    fn rgb_edge_offset_from_the_class_contour_is_demixed_inside_the_neck_layer() {
+        let (w, h) = (64_usize, 64_usize);
+        let polygon: Vec<Point> = (0..64)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 64.0;
+                (32.0 + 18.0 * a.cos(), 24.0 + 20.0 * a.sin())
+            })
+            .collect();
+        let frame = Frame::new(&polygon, None, w as f32, h as f32);
+        let target = target_contour(&polygon, frame, &json!({"chin":-100}));
+        let field = ContourField {
+            source: &polygon,
+            target: &target,
+            anchors: &[],
+            support: 8.0,
+            mls: mls::RigidMls::new(vec![]),
+        };
+        let known: Vec<bool> = (0..w * h)
+            .map(|i| i / w >= 44 && (20..44).contains(&(i % w)))
+            .collect();
+        let mut crop = RgbaImage::new(
+            w as u32,
+            h as u32,
+            vec![[80, 60, 45, 255]; w * h]
+                .into_iter()
+                .flatten()
+                .collect(),
+        )
+        .unwrap();
+        let offset_pixel = 47 * w + 32;
+        crop.pixels[offset_pixel * 4..offset_pixel * 4 + 4].copy_from_slice(&[190, 170, 155, 255]);
+        let mut result = crop.clone();
+        let changed = restore_neck_lighting(
+            &mut result,
+            &crop,
+            &vec![false; w * h],
+            &known,
+            &vec![false; w * h],
+            &field,
+            (0.0, 0.0),
+        );
+        assert!(changed[offset_pixel]);
+        assert!(
+            result.pixels[offset_pixel * 4] < 150,
+            "offset mixed edge was kept as static texture: {:?}",
+            &result.pixels[offset_pixel * 4..offset_pixel * 4 + 4]
+        );
+        for (i, &known_pixel) in known.iter().enumerate() {
+            if !known_pixel {
+                assert_eq!(
+                    &result.pixels[i * 4..i * 4 + 4],
+                    &crop.pixels[i * 4..i * 4 + 4]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn old_neck_join_is_continuous_and_keeps_protection_and_distant_texture() {
+        let (w, h) = (96_usize, 96_usize);
+        let polygon: Vec<Point> = (0..96)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 96.0;
+                (48.0 + 27.0 * a.cos(), 36.0 + 30.0 * a.sin())
+            })
+            .collect();
+        let frame = Frame::new(&polygon, None, w as f32, h as f32);
+        let target = target_contour(&polygon, frame, &json!({"chin":-100}));
+        let field = ContourField {
+            source: &polygon,
+            target: &target,
+            anchors: &[],
+            support: 12.0,
+            mls: mls::RigidMls::new(vec![]),
+        };
+        let known: Vec<bool> = (0..w * h)
+            .map(|i| i / w >= 66 && (30..66).contains(&(i % w)))
+            .collect();
+        let pixels: Vec<u8> = (0..w * h)
+            .flat_map(|i| {
+                let light = 80 + ((i / w).saturating_sub(66) * 4).min(120) as u8;
+                [light, light - 20, light - 35, 255]
+            })
+            .collect();
+        let crop = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
+        let mut result = crop.clone();
+        let mut frozen = vec![false; w * h];
+        frozen[67 * w + 47] = true;
+        let changed = restore_neck_lighting(
+            &mut result,
+            &crop,
+            &vec![false; w * h],
+            &known,
+            &frozen,
+            &field,
+            (0.0, 0.0),
+        );
+        assert!(changed[66 * w + 48]);
+        let profile: Vec<_> = (66..74)
+            .map(|y| result.pixels[(y * w + 48) * 4] as i16)
+            .collect();
+        assert!(
+            profile
+                .windows(2)
+                .all(|pair| pair[1] - pair[0] >= 0 && pair[1] - pair[0] <= 7),
+            "old neck join introduced an impulse: {profile:?}"
+        );
+        for i in 0..w * h {
+            if !known[i] || frozen[i] || i / w >= 88 {
+                assert_eq!(
+                    &result.pixels[i * 4..i * 4 + 4],
+                    &crop.pixels[i * 4..i * 4 + 4],
+                    "join correction escaped neck/protection/falloff at {i}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn expanding_chin_covers_a_missed_two_pixel_fringe_without_unfreezing_other_people() {
+        let (mut source, p) = portrait(160, 240);
+        let mut p = raster_params(&source, p);
+        let polygon = points(&p["semanticMasks"]["faceOutline"], 160.0, 240.0);
+        p["semanticMasks"]["faceContour"] = p["semanticMasks"]["faceOutline"].clone();
+        p["semanticMasks"]["faceContourMask"] = p["semanticMasks"]["face"].clone();
+        let mut person: Vec<u8> = p["semanticMasks"]["face"]["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u8)
+            .collect();
+        let mut neck = vec![0_u8; 160 * 240];
+        let mut missed = Vec::new();
+        for y in 210..240 {
+            for x in 54..106 {
+                let i = y * 160 + x;
+                person[i] = 255;
+                source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[95, 55, 30, 255]);
+                let distance = polygon
+                    .iter()
+                    .enumerate()
+                    .map(|(j, &a)| {
+                        closest(
+                            (x as f32 + 0.5, y as f32 + 0.5),
+                            a,
+                            polygon[(j + 1) % polygon.len()],
+                        )
+                        .0
+                    })
+                    .fold(f32::MAX, f32::min);
+                if distance <= 2.5 && (70..90).contains(&x) {
+                    missed.push(i);
+                } else {
+                    neck[i] = 255;
+                }
+            }
+        }
+        // A genuinely separate confidently segmented person stays fixed.
+        for y in 100..124 {
+            for x in 10..28 {
+                let i = y * 160 + x;
+                person[i] = 255;
+                source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[180, 125, 65, 255]);
+            }
+        }
+        assert!(!missed.is_empty());
+        p["subjectMask"] = json!({"shape":"raster","width":160,"height":240,"data":person});
+        p["semanticMasks"]["neck"] = json!({"shape":"raster","width":160,"height":240,"data":neck});
+        p["adjustments"] = json!({"chin":100});
+        let output = adjust(&source, &p).unwrap();
+        for i in missed {
+            assert!(output.pixels[i * 4] > 195, "missed old fringe left at {i}");
+        }
+        for y in 100..124 {
+            for x in 10..28 {
+                let i = (y * 160 + x) * 4;
+                assert_eq!(&output.pixels[i..i + 4], &source.pixels[i..i + 4]);
+            }
         }
     }
     #[test]

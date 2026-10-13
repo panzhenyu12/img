@@ -25,3 +25,5 @@ Rust验证曲线/LUT identity、HSL和胶片alpha/确定性；Playwright真实�
 ## 当前限制与变更
 
 自定义风格不是富士官方算法。当前8-bit sRGB处理无ICC/16-bit/HDR；预设保存浏览器localStorage，不云同步。2026-10-12 用shared Rust engine取代早期JS/Go颜色路径，统一Web参数百分数；旧Rust `-1..1` API不作为共享协议。
+
+2026-10-14：新增六种富士风格响应（Provia/Astia/Velvia/Classic Negative/Eterna/Acros），共14种可选预设。`film.rs` 使用18%灰固定点的线性光单调反差、肩部压缩、分区色调和统一色度压缩；查表避免热循环反复幂计算。v2 为 Velvia 加连续暖色色度肩部，减轻人像偏橙，其他新预设输出逐字节保持。它是颜色范围处理，不是皮肤识别或富士标定。Web缩略图、Go/AI工具发现从同一registry生成。旧八预设保持兼容。六源照片42次hash核对、原尺寸裁切与时延见[胶片响应QA](../qa/film-response-v2/review.md)，视觉暂评7.7，尚未达到完整8分验收；`make quality-film` 可重现当前回放。

@@ -1,0 +1,172 @@
+[
+  {
+    "id": "fullbody-side-fashion",
+    "rendererSha256": "83e96b9a898ba1eb103056235a74366388b9296c40886ab5584c0520256ead07",
+    "sourceSha256": "ab877cef0c07de053a240a85cd21d453007bce41749c618b5d9230fb398d6b18",
+    "parserCacheSha256": "25a8f6f3ada475703c82f64eb8e1b1b811854b4d261ef990155deb25d2cdcdd8",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 1643,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 961,
+        "graphSha256": "d5a47d7445f472264c1463480088ba0a5954b7f5a2a38886c8a42aa42657439e",
+        "outputSha256": "8ba6dc9c974412f44515d43ee10dd53e06e8e0bdc9e221d97d149d9173f7b998",
+        "metrics": {
+          "changedPixels": 4267,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 215,
+          "top": 176,
+          "width": 248,
+          "height": 160
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 727,
+        "graphSha256": "518741b6e9ff532691f62f4a09253810979f04bb145991e339264d685a20559c",
+        "outputSha256": "e7ab0b4b7f2096b999ff48ae7b0b9ef014d4f28cb2e3e77fe738324524985ad4",
+        "metrics": {
+          "changedPixels": 1257,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 274,
+          "top": 125,
+          "width": 111,
+          "height": 118
+        }
+      }
+    ]
+  },
+  {
+    "id": "tilted-shirt",
+    "rendererSha256": "83e96b9a898ba1eb103056235a74366388b9296c40886ab5584c0520256ead07",
+    "sourceSha256": "c10d5c84643c857d1476d2954b026bb09eb6020122e94c90502c8c5ed78a2575",
+    "parserCacheSha256": "2f5cade761627a71077180a487fc43c616908f4292de0e6e3f10cad3e4577df6",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 792,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 797,
+        "graphSha256": "8c681aab2335a6a23ed27eeb46ba8b22c5ef6d858c322c28e253f2a4077cf093",
+        "outputSha256": "b9235243413b4aab389d662ced72687abdd0345f55d4e25e3adc2224a9d0441f",
+        "metrics": {
+          "changedPixels": 17478,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 32,
+          "top": 312,
+          "width": 363,
+          "height": 254
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 688,
+        "graphSha256": "6b5bff96d3cf12f06a76fd4e5d41b9825c734b072e7f8628f4e5b8b686b3de4a",
+        "outputSha256": "4f3bf512897d3179dcb8fc44ed03e869eb490da77adadb5071c642602d429faf",
+        "metrics": {
+          "changedPixels": 8196,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 194,
+          "top": 223,
+          "width": 229,
+          "height": 226
+        }
+      }
+    ]
+  },
+  {
+    "id": "action-suit",
+    "rendererSha256": "83e96b9a898ba1eb103056235a74366388b9296c40886ab5584c0520256ead07",
+    "sourceSha256": "15cbfa1426b0122df0c9ae12bd0f4be4a4a4d6e227a24ecd87935c8e4add48a6",
+    "parserCacheSha256": "e3d74b4bd2b5d455668e1194cafc7cb107e2cd65d26d33f9bcf62c424f4bba36",
+    "parserOrigin": "official Torch logits -> full-source bilinear -> softmax -> probability raster (cached); not the browser decoder",
+    "layerMs": 1318,
+    "checks": [
+      {
+        "part": "waist",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1429,
+        "graphSha256": "0378d407f868fac76194708517150de948df69c76884e8d8f4b4430e3db7fc5b",
+        "outputSha256": "1f0666da5ef511623196850fc35ccf4cd9ed7b59ab208095852579182cee10e2",
+        "metrics": {
+          "changedPixels": 7850,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 85,
+          "top": 309,
+          "width": 374,
+          "height": 228
+        }
+      },
+      {
+        "part": "left-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 2012,
+        "graphSha256": "ee3399ac555afe1364e408d4287ae7a7eff3c7810ff0e733ae8cf278a34bdb64",
+        "outputSha256": "94edc39c1768b7bd02a611118191c3017018b331627f589055b2462b71a1de77",
+        "metrics": {
+          "changedPixels": 2184,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 309,
+          "top": 220,
+          "width": 138,
+          "height": 138
+        }
+      },
+      {
+        "part": "right-upper-arm",
+        "status": "NEEDS-visual-review",
+        "elapsedMs": 1492,
+        "graphSha256": "23a8a0aae4fa08aa785cbaf79d6bfabf0860a88267444445ce5d65d87905066e",
+        "outputSha256": "1a6b7a91b089e43911eb77f4ee062057c218bb2e917c711a5804984eca87093e",
+        "metrics": {
+          "changedPixels": 4993,
+          "changedProtectedPixels": 0,
+          "changedNonTargetPixels": 0,
+          "changedKnownBackgroundPixels": 0,
+          "changedOutsideSupportPixels": 0
+        },
+        "crop": {
+          "left": 34,
+          "top": 195,
+          "width": 227,
+          "height": 224
+        }
+      }
+    ]
+  }
+]

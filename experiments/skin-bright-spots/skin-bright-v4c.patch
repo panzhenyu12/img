@@ -1,0 +1,286 @@
+--- a/core/image-core/src/color.rs
++++ b/core/image-core/src/color.rs
+@@ -1127,6 +1127,151 @@
+     blemish: Vec<([f32; 3], f32)>,
+ }
+
++/// A pale, raised spot needs a different test from a dark/red defect. Require
++/// a compact luminance bump *and* a loss of the surrounding skin's red-green
++/// chroma. An additive lighting highlight keeps that chroma and is excluded;
++/// large or near-white highlights are excluded as well. This conservative
++/// statistic is not a medical classifier and cannot identify every whitehead.
++fn skin_bright_spots(
++    source: &RgbaImage,
++    selection: &LocalSelection,
++    medium: &[[f32; 3]],
++    structure: &[f32],
++    face_width: f32,
++    blemish: &mut [([f32; 3], f32)],
++) {
++    let width = selection.width as usize;
++    let height = selection.height as usize;
++    let color = |i: usize| -> [f32; 3] {
++        let index = ((i / width + selection.y as usize) * source.width as usize
++            + i % width
++            + selection.x as usize)
++            * 4;
++        std::array::from_fn(|c| source.pixels[index + c] as f32)
++    };
++    let mut residual = vec![0.0; width * height];
++    let mut paleness = vec![0.0; width * height];
++    let mut candidates = vec![false; width * height];
++    for i in 0..candidates.len() {
++        if selection.weights[i].1 <= 0.5 || structure[i] <= 0.7 {
++            continue;
++        }
++        let rgb = color(i);
++        let light = luma(rgb[0], rgb[1], rgb[2]);
++        let baseline = luma(medium[i][0], medium[i][1], medium[i][2]);
++        let pale = (medium[i][0] - medium[i][1]) - (rgb[0] - rgb[1]);
++        residual[i] = light - baseline;
++        paleness[i] = pale;
++        candidates[i] = residual[i] > 14.0 && pale > 11.0 && light < 205.0;
++    }
++    let max_radius = (face_width * 0.016).clamp(3.0, 11.0);
++    let min_radius = (face_width * 0.0035).clamp(1.4, 2.4);
++    let min_area = (std::f32::consts::PI * min_radius.powi(2)).round() as usize;
++    let max_area = (std::f32::consts::PI * max_radius.powi(2)) as usize;
++    let padding = (face_width * 0.02).round().clamp(5.0, 14.0) as usize;
++    let mut visited = vec![false; candidates.len()];
++    for start in 0..candidates.len() {
++        if !candidates[start] || visited[start] {
++            continue;
++        }
++        visited[start] = true;
++        let mut component = vec![start];
++        let mut cursor = 0;
++        let mut bounds = [start % width, start / width, start % width, start / width];
++        let mut safe = true;
++        while cursor < component.len() {
++            let i = component[cursor];
++            cursor += 1;
++            let (x, y) = (i % width, i / width);
++            bounds[0] = bounds[0].min(x);
++            bounds[1] = bounds[1].min(y);
++            bounds[2] = bounds[2].max(x);
++            bounds[3] = bounds[3].max(y);
++            for ny in y.saturating_sub(1)..=(y + 1).min(height - 1) {
++                for nx in x.saturating_sub(1)..=(x + 1).min(width - 1) {
++                    let j = ny * width + nx;
++                    safe &= selection.weights[j].1 > 0.5;
++                    if candidates[j] && !visited[j] {
++                        visited[j] = true;
++                        component.push(j);
++                    }
++                }
++            }
++        }
++        let span_x = bounds[2] - bounds[0] + 1;
++        let span_y = bounds[3] - bounds[1] + 1;
++        let peak = component.iter().map(|&i| residual[i]).fold(0.0, f32::max);
++        if !safe
++            || component.len() < min_area
++            || component.len() > max_area
++            || peak < 18.0
++            || span_x.max(span_y) as f32 > span_x.min(span_y) as f32 * 2.4
++            || component.len() as f32 / ((span_x * span_y) as f32) < 0.35
++        {
++            continue;
++        }
++        let mut sum = [0.0; 3];
++        let mut count = 0.0;
++        for y in bounds[1].saturating_sub(padding)..=(bounds[3] + padding).min(height - 1) {
++            for x in bounds[0].saturating_sub(padding)..=(bounds[2] + padding).min(width - 1) {
++                let i = y * width + x;
++                if (x + 2 >= bounds[0]
++                    && x <= bounds[2] + 2
++                    && y + 2 >= bounds[1]
++                    && y <= bounds[3] + 2)
++                    || selection.weights[i].1 <= 0.5
++                    || candidates[i]
++                    || structure[i] < 0.8
++                {
++                    continue;
++                }
++                let rgb = color(i);
++                let difference =
++                    luma(rgb[0], rgb[1], rgb[2]) - luma(medium[i][0], medium[i][1], medium[i][2]);
++                // Only observed, unprotected skin with ordinary local detail
++                // donates. Nearby pale bumps and dark pores do not set tone.
++                if difference.abs() > 8.0 {
++                    continue;
++                }
++                let weight = selection.weights[i].1;
++                for c in 0..3 {
++                    sum[c] += rgb[c] * weight;
++                }
++                count += weight;
++            }
++        }
++        if count < 12.0 {
++            continue;
++        }
++        let tone = sum.map(|v| v / count);
++        let core: [f32; 3] = std::array::from_fn(|c| {
++            component.iter().map(|&i| color(i)[c]).sum::<f32>() / component.len() as f32
++        });
++        // A same-colored specular bump is lighting, not a pale blemish.
++        if (tone[0] - tone[1]) - (core[0] - core[1]) < 7.0
++            || luma(core[0], core[1], core[2]) - luma(tone[0], tone[1], tone[2]) < 18.0
++        {
++            continue;
++        }
++        // Classification chooses the spot, while continuous photometric
++        // weights choose the repair. A binary component boundary or a fully
++        // replaced core would leave a flat disk with a visible edge.
++        for y in bounds[1].saturating_sub(3)..=(bounds[3] + 3).min(height - 1) {
++            for x in bounds[0].saturating_sub(3)..=(bounds[2] + 3).min(width - 1) {
++                let i = y * width + x;
++                if selection.weights[i].1 <= 0.5 || structure[i] <= 0.7 {
++                    continue;
++                }
++                let amount =
++                    smoothstep(4.0, 50.0, residual[i]) * smoothstep(1.0, 12.0, paleness[i]);
++                if amount > blemish[i].1 {
++                    blemish[i] = (tone, amount);
++                }
++            }
++        }
++    }
++}
++
+ struct SkinChromaField {
+     width: usize,
+     height: usize,
+@@ -1397,6 +1542,14 @@
+             }
+         }
+     }
++    skin_bright_spots(
++        source,
++        selection,
++        &medium,
++        &structure,
++        face_width,
++        &mut blemish,
++    );
+     SkinDetailPlanes {
+         fine,
+         medium,
+@@ -2778,6 +2931,116 @@
+         );
+     }
+
++    fn pale_spot_fixture() -> RgbaImage {
++        RgbaImage::new(
++            192,
++            128,
++            (0..128)
++                .flat_map(|y| {
++                    (0..192).flat_map(move |x| {
++                        let bump = |cx: f32, cy: f32, spread: f32| {
++                            (-((x as f32 - cx).powi(2) + (y as f32 - cy).powi(2)) / spread).exp()
++                        };
++                        let pale = bump(136.0, 64.0, 14.0);
++                        let raised_shadow = bump(136.0, 64.0, 38.0);
++                        let highlight = bump(40.0, 64.0, 8.0);
++                        let pore = bump(80.0, 64.0, 2.0);
++                        [
++                            byte(
++                                170.0 - 30.0 * raised_shadow
++                                    + 35.0 * pale
++                                    + 35.0 * highlight
++                                    + 5.0 * pore,
++                            ),
++                            byte(
++                                130.0 - 30.0 * raised_shadow
++                                    + 75.0 * pale
++                                    + 35.0 * highlight
++                                    + 8.0 * pore,
++                            ),
++                            byte(
++                                110.0 - 30.0 * raised_shadow
++                                    + 65.0 * pale
++                                    + 35.0 * highlight
++                                    + 8.0 * pore,
++                            ),
++                            173,
++                        ]
++                    })
++                })
++                .collect(),
++        )
++        .unwrap()
++    }
++
++    #[test]
++    fn pale_compact_bump_is_repaired_without_erasing_same_chroma_highlight_or_small_pore() {
++        let source = pale_spot_fixture();
++        let selection = LocalSelection::skin(&source, &json!({}), None);
++        let detail = skin_detail_planes(&source, &selection, source.width as f32);
++        let center = 64 * source.width as usize + 136;
++        let highlight = 64 * source.width as usize + 40;
++        let pore = 64 * source.width as usize + 80;
++        assert!(
++            detail.blemish[center].1 > 0.2,
++            "pale raised bump must be a candidate"
++        );
++        assert_eq!(
++            detail.blemish[highlight].1, 0.0,
++            "same-chroma illumination must not be a blemish"
++        );
++        assert_eq!(
++            detail.blemish[pore].1, 0.0,
++            "low-contrast pore must not be a blemish"
++        );
++        let output = skin(&source, &json!({"smooth":100,"texture":100}));
++        let original_contrast = pixel_light(&source, center) - pixel_light(&source, center + 16);
++        let edited_contrast = pixel_light(&output, center) - pixel_light(&output, center + 16);
++        assert!(edited_contrast <= original_contrast * 0.65);
++        assert!((pixel_light(&output, highlight) - pixel_light(&source, highlight)).abs() < 4.0);
++        assert!((pixel_light(&output, pore) - pixel_light(&source, pore)).abs() < 3.0);
++        assert!(output.pixels.chunks_exact(4).all(|p| p[3] == 173));
++    }
++
++    #[test]
++    fn bright_spot_classifier_rejects_wide_specular_light_and_protected_donors() {
++        let mut source = pale_spot_fixture();
++        for y in 16usize..40 {
++            for x in 16usize..60 {
++                source.pixels[(y * 192 + x) * 4..(y * 192 + x) * 4 + 3]
++                    .copy_from_slice(&[245, 240, 235]);
++            }
++        }
++        let params = json!({"protectMask":{"shape":"rect","region":{
++            "x":0.65,"y":0.35,"width":0.15,"height":0.3}}});
++        let selection = LocalSelection::skin(&source, &params, None);
++        let detail = skin_detail_planes(&source, &selection, source.width as f32);
++        assert_eq!(
++            detail.blemish[64 * 192 + 136].1,
++            0.0,
++            "frozen bump must not be classified or donate"
++        );
++        assert_eq!(
++            detail.blemish[28 * 192 + 38].1,
++            0.0,
++            "wide near-white specular area is not a spot"
++        );
++        let output = crate::mask::composite(
++            &source,
++            &skin(
++                &source,
++                &json!({"smooth":100,"texture":0,"protectMask":params["protectMask"]}),
++            ),
++            &params,
++        );
++        for y in 45usize..80 {
++            for x in 126usize..149 {
++                let i = (y * 192 + x) * 4;
++                assert_eq!(&output.pixels[i..i + 4], &source.pixels[i..i + 4]);
++            }
++        }
++    }
++
+     #[test]
+     fn texture_preserved_skin_reduces_coherent_red_patch_without_erasing_low_contrast_pores() {
+         let source = RgbaImage::new(

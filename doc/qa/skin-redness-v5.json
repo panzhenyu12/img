@@ -1,0 +1,859 @@
+{
+  "binary_sha256": {
+    "before": "8aacc21470c2262fb9dfbe1f716bd1f30197fcfcc19c1cb8e569df8cd00751db",
+    "after": "44c90155019da6ffa191c07733e00721a9eb5b668f3d1c338307b704a4145caa"
+  },
+  "rows": [
+    {
+      "sample": "fixture-portrait",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "a4cb2a36611fa9db1a9b1cabd62947452d37ac3e6aca5a6424d5a0b6038bb496",
+      "graph_sha256": "1a6dbd836765966383c64fb87514e0c0c560fa6865f663cc9660ea43607f94f5",
+      "before_native_total_ms": 388.21190036833286,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "after_native_total_ms": 943.3056209236383,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "comparison": "test/results/skin-redness-v5/fixture-portrait-zero-comparison.png"
+    },
+    {
+      "sample": "fixture-portrait",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "a4cb2a36611fa9db1a9b1cabd62947452d37ac3e6aca5a6424d5a0b6038bb496",
+      "graph_sha256": "018b1ff13d028dd4c41676e460eebf4a2e362f4750bb94a325e5c42b6e2ca650",
+      "before_native_total_ms": 429.3517633341253,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 248.10163816437125,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/fixture-portrait-gentle-comparison.png"
+    },
+    {
+      "sample": "fixture-portrait",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "a4cb2a36611fa9db1a9b1cabd62947452d37ac3e6aca5a6424d5a0b6038bb496",
+      "graph_sha256": "35ad467e24488c643f5ccb29364bfd4bbd9b5c5304b76e9f158459d90d205568",
+      "before_native_total_ms": 478.01667638123035,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000346,
+      "after_native_total_ms": 257.39760091528296,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/fixture-portrait-strong-comparison.png"
+    },
+    {
+      "sample": "fixture-portrait",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "a4cb2a36611fa9db1a9b1cabd62947452d37ac3e6aca5a6424d5a0b6038bb496",
+      "graph_sha256": "e041ea5d5ff6689c45f75b3aa8daeefd7cd3aeeeee7cca39fed151abc6327bc4",
+      "before_native_total_ms": 444.11903666332364,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 215.8347307704389,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "comparison": "test/results/skin-redness-v5/fixture-portrait-red-comparison.png"
+    },
+    {
+      "sample": "portrait-dark",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "c1999306aa24f649f2aff3c078cbb5f33f060903f88b3326ab2365657336a548",
+      "graph_sha256": "9556aa418ea1b29bb82c2406f858d3d6259700ab3b00946665de3a850df13a04",
+      "before_native_total_ms": 398.6424710601568,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "after_native_total_ms": 197.7376169525087,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "comparison": "test/results/skin-redness-v5/portrait-dark-zero-comparison.png"
+    },
+    {
+      "sample": "portrait-dark",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "c1999306aa24f649f2aff3c078cbb5f33f060903f88b3326ab2365657336a548",
+      "graph_sha256": "d33e4bbb26b0af30f7beabb545e2ee383b969356a3938318f2e3f067cac05cd4",
+      "before_native_total_ms": 424.8189302161336,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 234.06326910480857,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/portrait-dark-gentle-comparison.png"
+    },
+    {
+      "sample": "portrait-dark",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "c1999306aa24f649f2aff3c078cbb5f33f060903f88b3326ab2365657336a548",
+      "graph_sha256": "f97d0e3481d0a7062691a9b3a0bdd5806ab783c937845eb643bc84ce1233acbc",
+      "before_native_total_ms": 423.28616697341204,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000346,
+      "after_native_total_ms": 227.79574804008007,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/portrait-dark-strong-comparison.png"
+    },
+    {
+      "sample": "portrait-dark",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "c1999306aa24f649f2aff3c078cbb5f33f060903f88b3326ab2365657336a548",
+      "graph_sha256": "e70a702d1bb95e23d37348ab87bc59dbb7822d88b39037d17cb7f33930944b56",
+      "before_native_total_ms": 396.53537701815367,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 216.95151692256331,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "comparison": "test/results/skin-redness-v5/portrait-dark-red-comparison.png"
+    },
+    {
+      "sample": "portrait-hair",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "9f19f2feb5dbfef8d6d8f3989639cc7329333f863072794c384c49331a66dc8c",
+      "graph_sha256": "6e360985581a11d44da5015262857d37ab12f51de7db5a8c0bfd2d6e68d64f91",
+      "before_native_total_ms": 438.034615945071,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "after_native_total_ms": 213.58597744256258,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "comparison": "test/results/skin-redness-v5/portrait-hair-zero-comparison.png"
+    },
+    {
+      "sample": "portrait-hair",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "9f19f2feb5dbfef8d6d8f3989639cc7329333f863072794c384c49331a66dc8c",
+      "graph_sha256": "07a5f347c6b37b9e3b1b86d3c53b5fe515a2f1d16a42b1b9f6dcdfc2fde86da6",
+      "before_native_total_ms": 464.48205690830946,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 266.8489068746567,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/portrait-hair-gentle-comparison.png"
+    },
+    {
+      "sample": "portrait-hair",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "9f19f2feb5dbfef8d6d8f3989639cc7329333f863072794c384c49331a66dc8c",
+      "graph_sha256": "f43a2a4703e7f2e3386bbcd900f0ddcc3175140641a185be5701896cdf6a66d0",
+      "before_native_total_ms": 480.55022582411766,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000346,
+      "after_native_total_ms": 262.04416807740927,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/portrait-hair-strong-comparison.png"
+    },
+    {
+      "sample": "portrait-hair",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "9f19f2feb5dbfef8d6d8f3989639cc7329333f863072794c384c49331a66dc8c",
+      "graph_sha256": "6a17a1600aa0ec9121cf17064743433f0f6d3e5671529ff571b67105b582af69",
+      "before_native_total_ms": 468.167875893414,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 216.15477977320552,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "comparison": "test/results/skin-redness-v5/portrait-hair-red-comparison.png"
+    },
+    {
+      "sample": "portrait-makeup",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "8c283f02e8c73d7cb7a52fccfb529db7560839f4b3fe8aaaa8b0a59018b2f79f",
+      "graph_sha256": "59210ad987aaafa7991ead913a440d18eedafecc1aade946b6ed98edf5c86609",
+      "before_native_total_ms": 486.78783094510436,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "after_native_total_ms": 252.45769089087844,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "comparison": "test/results/skin-redness-v5/portrait-makeup-zero-comparison.png"
+    },
+    {
+      "sample": "portrait-makeup",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "8c283f02e8c73d7cb7a52fccfb529db7560839f4b3fe8aaaa8b0a59018b2f79f",
+      "graph_sha256": "4ba36ef2124188df93565a65ae7a36f58876bfcf5c39b635ae82bc0cc2a68a75",
+      "before_native_total_ms": 572.2275730222464,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 310.16072584316134,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/portrait-makeup-gentle-comparison.png"
+    },
+    {
+      "sample": "portrait-makeup",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "8c283f02e8c73d7cb7a52fccfb529db7560839f4b3fe8aaaa8b0a59018b2f79f",
+      "graph_sha256": "45850c94ce5a0757369fc339807d4de6e6ad77b18f30586e37ff7176f461c6ee",
+      "before_native_total_ms": 649.7342609800398,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000346,
+      "after_native_total_ms": 309.28231915459037,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/portrait-makeup-strong-comparison.png"
+    },
+    {
+      "sample": "portrait-makeup",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "8c283f02e8c73d7cb7a52fccfb529db7560839f4b3fe8aaaa8b0a59018b2f79f",
+      "graph_sha256": "056833b05fa42b730fd22b2908285ac3921743f66f633258a0b1d2b846dacf55",
+      "before_native_total_ms": 515.5440042726696,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 278.3001558855176,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "comparison": "test/results/skin-redness-v5/portrait-makeup-red-comparison.png"
+    },
+    {
+      "sample": "portrait-woman",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "0dd2e17b2195062a8507978bf2e3c1f8b48f37c4cfabe3577aa4bc3efa0fbfd6",
+      "graph_sha256": "942c7fa1d5003da98bf8488bdf48ccb419a844b6f59e0bcce2a577d5db9b8fd0",
+      "before_native_total_ms": 423.4889396466315,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "after_native_total_ms": 204.79535963386297,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "comparison": "test/results/skin-redness-v5/portrait-woman-zero-comparison.png"
+    },
+    {
+      "sample": "portrait-woman",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "0dd2e17b2195062a8507978bf2e3c1f8b48f37c4cfabe3577aa4bc3efa0fbfd6",
+      "graph_sha256": "71eb0268b69341c0eba8a82667318b729f18261cf90cd3aa8170f31acee80ffa",
+      "before_native_total_ms": 415.82791693508625,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 231.80595692247152,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "comparison": "test/results/skin-redness-v5/portrait-woman-gentle-comparison.png"
+    },
+    {
+      "sample": "portrait-woman",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "0dd2e17b2195062a8507978bf2e3c1f8b48f37c4cfabe3577aa4bc3efa0fbfd6",
+      "graph_sha256": "9a020c19af40bd4b3eb8dee2e6670bfb75aa4d5591530ef1feb2a9d4ed2940f1",
+      "before_native_total_ms": 437.40581907331944,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000346,
+      "after_native_total_ms": 241.10981030389667,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4960000000000093,
+      "comparison": "test/results/skin-redness-v5/portrait-woman-strong-comparison.png"
+    },
+    {
+      "sample": "portrait-woman",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "0dd2e17b2195062a8507978bf2e3c1f8b48f37c4cfabe3577aa4bc3efa0fbfd6",
+      "graph_sha256": "2fceeeda8b163bbe24a3e87438af2f3696dbd9a0e2c8ea3fe2731010915aaa90",
+      "before_native_total_ms": 489.85821288079023,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "after_native_total_ms": 283.3579112775624,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "comparison": "test/results/skin-redness-v5/portrait-woman-red-comparison.png"
+    },
+    {
+      "sample": "acne-teen",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "7ffb6c57910fa906d39f1e1a60aee2b98440c4aa56b3cf0d01cb7e71d2d3f31e",
+      "before_native_total_ms": 126.18055986240506,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "before_lesions": {
+        "cheek-red-1": {
+          "red_excess": 13.565579918412233,
+          "light_contrast": 23.952600000000004
+        },
+        "cheek-red-2": {
+          "red_excess": 8.595534287231203,
+          "light_contrast": 19.4396
+        }
+      },
+      "after_native_total_ms": 108.68417797610164,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "after_lesions": {
+        "cheek-red-1": {
+          "red_excess": 13.565579918412233,
+          "light_contrast": 23.952600000000004
+        },
+        "cheek-red-2": {
+          "red_excess": 8.595534287231203,
+          "light_contrast": 19.4396
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-teen-zero-comparison.png"
+    },
+    {
+      "sample": "acne-teen",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "6d65dbece20ebdc644676b3b37af2664fb7a6260c66ad1a9fd7c2445b3e6a838",
+      "before_native_total_ms": 106.67154798284173,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "before_lesions": {
+        "cheek-red-1": {
+          "red_excess": 12.491670386227362,
+          "light_contrast": 23.952599999999975
+        },
+        "cheek-red-2": {
+          "red_excess": 8.151157193477264,
+          "light_contrast": 19.439600000000013
+        }
+      },
+      "after_native_total_ms": 143.3444730937481,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000062,
+      "after_lesions": {
+        "cheek-red-1": {
+          "red_excess": 7.8345948074311735,
+          "light_contrast": 23.65340000000002
+        },
+        "cheek-red-2": {
+          "red_excess": 5.565774214573597,
+          "light_contrast": 19.289999999999992
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-teen-gentle-comparison.png"
+    },
+    {
+      "sample": "acne-teen",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "24ba3c1ab00fd3fe5b394dc6543fd4ad43f5e733a2fc404aa7579c3d2787932d",
+      "before_native_total_ms": 105.8781729079783,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000346,
+      "before_lesions": {
+        "cheek-red-1": {
+          "red_excess": 10.856030311377696,
+          "light_contrast": 23.952600000000018
+        },
+        "cheek-red-2": {
+          "red_excess": 7.698176936594555,
+          "light_contrast": 19.4396
+        }
+      },
+      "after_native_total_ms": 123.12362901866436,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "after_lesions": {
+        "cheek-red-1": {
+          "red_excess": -0.030049906618092592,
+          "light_contrast": 23.417199999999994
+        },
+        "cheek-red-2": {
+          "red_excess": 0.6402258344382581,
+          "light_contrast": 19.2808
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-teen-strong-comparison.png"
+    },
+    {
+      "sample": "acne-teen",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "ea1dccb760291584f113925a91776a8153cf0eaaa0e189252b7db7804871c8a0",
+      "graph_sha256": "bb3409b25e5ba93e9f659499939ec413e1863215a86f926346798ea4b7addbaf",
+      "before_native_total_ms": 119.76698087528348,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "before_lesions": {
+        "cheek-red-1": {
+          "red_excess": 14.506674986004562,
+          "light_contrast": 23.952600000000018
+        },
+        "cheek-red-2": {
+          "red_excess": 9.182310104240724,
+          "light_contrast": 19.439600000000027
+        }
+      },
+      "after_native_total_ms": 100.39097396656871,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "after_lesions": {
+        "cheek-red-1": {
+          "red_excess": 14.506674986004562,
+          "light_contrast": 23.952600000000018
+        },
+        "cheek-red-2": {
+          "red_excess": 9.182310104240724,
+          "light_contrast": 19.439600000000027
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-teen-red-comparison.png"
+    },
+    {
+      "sample": "acne-oily",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "c396a021fd0359b9806c49fcd63d599345eaab456f5e1c59adea7985e5b92f48",
+      "before_native_total_ms": 150.8497530594468,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "before_lesions": {
+        "forehead-red": {
+          "red_excess": 7.760003586203041,
+          "light_contrast": 3.3700000000000045
+        },
+        "forehead-whitehead": {
+          "red_excess": -47.741904030693924,
+          "light_contrast": -54.345500000000015
+        }
+      },
+      "after_native_total_ms": 144.40738689154387,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "after_lesions": {
+        "forehead-red": {
+          "red_excess": 7.760003586203041,
+          "light_contrast": 3.3700000000000045
+        },
+        "forehead-whitehead": {
+          "red_excess": -47.741904030693924,
+          "light_contrast": -54.345500000000015
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-oily-zero-comparison.png"
+    },
+    {
+      "sample": "acne-oily",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "bde9ce82c2bff35547a30df9760199c335f602fec2967857d8409ad6e86d1eb1",
+      "before_native_total_ms": 145.97587008029222,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "before_lesions": {
+        "forehead-red": {
+          "red_excess": 7.766066225575656,
+          "light_contrast": 3.3700000000000188
+        },
+        "forehead-whitehead": {
+          "red_excess": -48.246362419173515,
+          "light_contrast": -53.92029999999999
+        }
+      },
+      "after_native_total_ms": 293.66619512438774,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000204,
+      "after_lesions": {
+        "forehead-red": {
+          "red_excess": 4.425693135841684,
+          "light_contrast": 3.005200000000002
+        },
+        "forehead-whitehead": {
+          "red_excess": -45.97237110823855,
+          "light_contrast": -54.2131
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-oily-gentle-comparison.png"
+    },
+    {
+      "sample": "acne-oily",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "8a84b8d1d9b456371b142ca67c2015a834bf64cdb373afaba80585ebcb3041af",
+      "before_native_total_ms": 174.39840221777558,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000204,
+      "before_lesions": {
+        "forehead-red": {
+          "red_excess": 8.063357041799122,
+          "light_contrast": 3.3699999999999903
+        },
+        "forehead-whitehead": {
+          "red_excess": -48.457354592597355,
+          "light_contrast": -54.282500000000006
+        }
+      },
+      "after_native_total_ms": 202.12613511830568,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "after_lesions": {
+        "forehead-red": {
+          "red_excess": -0.03328080170086878,
+          "light_contrast": 3.3490000000000038
+        },
+        "forehead-whitehead": {
+          "red_excess": -43.40138014470612,
+          "light_contrast": -54.060100000000006
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-oily-strong-comparison.png"
+    },
+    {
+      "sample": "acne-oily",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "9bf71dc36b81757715e27e81068b6e66c915f7de7e56e3acd6ea9b690d248d1d",
+      "graph_sha256": "ee18d0b9edcbd81b377db5f0af21fd6c9855b99237a1e80d2a16f3301fe23913",
+      "before_native_total_ms": 151.25102875754237,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "before_lesions": {
+        "forehead-red": {
+          "red_excess": 8.190412732382242,
+          "light_contrast": 3.3699999999999903
+        },
+        "forehead-whitehead": {
+          "red_excess": -47.6728829066063,
+          "light_contrast": -54.7707
+        }
+      },
+      "after_native_total_ms": 140.7773969694972,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "after_lesions": {
+        "forehead-red": {
+          "red_excess": 8.190412732382242,
+          "light_contrast": 3.3699999999999903
+        },
+        "forehead-whitehead": {
+          "red_excess": -47.6728829066063,
+          "light_contrast": -54.7707
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-oily-red-comparison.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "case": "zero",
+      "params": {
+        "smooth": 0,
+        "redness": 0
+      },
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "4343c21b82cfe2599f04c62e2d8f9083ae24a2f681b61c888615d7784a30e406",
+      "before_native_total_ms": 117.69243702292442,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.0,
+      "before_lesions": {
+        "cheek-red": {
+          "red_excess": 8.044858764662251,
+          "light_contrast": 5.447400000000016
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "after_native_total_ms": 88.65039888769388,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.0,
+      "after_lesions": {
+        "cheek-red": {
+          "red_excess": 8.044858764662251,
+          "light_contrast": 5.447400000000016
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-cystic-zero-comparison.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "case": "gentle",
+      "params": {
+        "smooth": 0,
+        "redness": -40
+      },
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "956fc21fbdc76fb9caf185f989efaceb9308ff9d20f92e4e0b6dda6f41fc1e37",
+      "before_native_total_ms": 89.12806306034327,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "before_lesions": {
+        "cheek-red": {
+          "red_excess": 7.892949952995224,
+          "light_contrast": 5.447400000000016
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "after_native_total_ms": 108.70111593976617,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000204,
+      "after_lesions": {
+        "cheek-red": {
+          "red_excess": 5.646274736504811,
+          "light_contrast": 5.344999999999999
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-cystic-gentle-comparison.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "case": "strong",
+      "params": {
+        "smooth": 0,
+        "redness": -100
+      },
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "576708230b8e9ad433e47cd3ec02467e1e3ba2147fe7e0dca7bd0c9c2e09e7b3",
+      "before_native_total_ms": 93.64142687991261,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.4882000000000346,
+      "before_lesions": {
+        "cheek-red": {
+          "red_excess": 7.882282749829336,
+          "light_contrast": 5.447399999999988
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "after_native_total_ms": 103.63383684307337,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.4882000000000346,
+      "after_lesions": {
+        "cheek-red": {
+          "red_excess": 3.6309263579063966,
+          "light_contrast": 5.069399999999973
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-cystic-strong-comparison.png"
+    },
+    {
+      "sample": "acne-cystic",
+      "case": "red",
+      "params": {
+        "smooth": 0,
+        "redness": 40
+      },
+      "source_sha256": "1a1c25ca0e919a0c7a0ab0e50d2fc1ef13f060b80c3ad9faa91f8481edbdcdd7",
+      "graph_sha256": "0616de03546afcfe1073b65485d718de292727d5b7e38699f3fc6629fa2d5cdc",
+      "before_native_total_ms": 98.12963614240289,
+      "before_outside_changes": 0,
+      "before_alpha_changes": 0,
+      "before_max_luma_shift": 0.425200000000018,
+      "before_lesions": {
+        "cheek-red": {
+          "red_excess": 8.138876879098184,
+          "light_contrast": 5.447399999999959
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "after_native_total_ms": 97.95795800164342,
+      "after_outside_changes": 0,
+      "after_alpha_changes": 0,
+      "after_max_luma_shift": 0.425200000000018,
+      "after_lesions": {
+        "cheek-red": {
+          "red_excess": 8.138876879098184,
+          "light_contrast": 5.447399999999959
+        },
+        "outside-selection-control": {
+          "red_excess": 29.467106012814305,
+          "light_contrast": 26.176999999999992
+        }
+      },
+      "comparison": "test/results/skin-redness-v5/acne-cystic-red-comparison.png"
+    }
+  ],
+  "independent_originals": 8,
+  "derived_roll_excluded": true,
+  "scope": "Local redness, no smoothing or AI. Native total includes I/O. Scores are visual."
+}

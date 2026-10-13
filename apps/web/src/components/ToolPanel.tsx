@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { FILM_PRESETS, TOOL_BY_ID, portraitParametersFor, type PortraitCapabilities, type ToolId } from '../core/registry';
-import { maskForRegion, WHOLE_IMAGE, type BrushStroke, type InlineMask, type Operation, type OperationType, type Point, type Region, type SelectionShape, type RasterMask } from '../core/operations';
+import { maskForRegion, WHOLE_IMAGE, type BrushStroke, type EditableMask, type InlineMask, type Operation, type OperationType, type Point, type Region, type SelectionShape, type RasterMask } from '../core/operations';
 import type { InteractionMode } from './CanvasStage';
 import { NumberField, ParameterGroups, Slider } from './Controls';
 export interface BrushSettings { radius: number; strength: number; liquidMode: 'push' | 'pinch' | 'bloat' | 'twirl' | 'reconstruct'; twirlDirection: 1 | -1; symmetric: boolean; repairMode: 'clone' | 'heal' }
@@ -22,7 +22,7 @@ export interface DetectedRegion {
   semanticMasks?: Record<string, { shape: 'polygon'; points: Point[]; feather?: number; invert?: boolean } | RasterMask>;
   subjectMask?: RasterMask;
   partMask?: InlineMask | RasterMask;
-  protectMask?: InlineMask;
+  protectMask?: EditableMask;
 }
 interface ToolPanelProps {
   tool: ToolId; operation?: Operation; imageSize: { width: number; height: number }; region: Region; regionShape: SelectionShape;
@@ -33,7 +33,7 @@ interface ToolPanelProps {
   onMode: (mode: InteractionMode) => void; onBrush: (settings: Partial<BrushSettings>) => void;
   onParam: (key: string, value: unknown) => void; onCreate: (type: OperationType, params: Record<string, unknown>, label?: string) => void;
   onReset: () => void; onRegion: (region: Region) => void; onDetect: () => void; onChooseRegion: (item: DetectedRegion) => void;
-  onMask: (key: 'mask' | 'protectMask', mask: InlineMask | null) => void;
+  onMask: (key: 'mask' | 'protectMask', mask: EditableMask | null) => void;
   paintColor: string; onPaintColor: (color: string) => void;
   onLUT: (file: File) => void; filmThumbnails: Record<string, string>;
 }
@@ -115,8 +115,8 @@ function GridPanel({ operation, mode, onMode, onCreate }: ToolPanelProps) {
   return <div className="panel-block"><h4>网格与四角透视</h4><div className="button-grid"><button className={mode === 'grid' ? 'active' : ''} onClick={makeGrid}>建立 3×3 网格</button><button className={mode === 'perspective' ? 'active' : ''} onClick={() => { onCreate('perspective', { corners: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] }, '四角透视'); onMode('perspective'); }}>四角透视</button></div><p className="panel-tip">拖动画布上的控制点改变网格或透视。使用“重置该项”恢复该操作。</p>{controls.length > 0 && <span className="small-note">{controls.length} 个可拖拽控制点</span>}</div>;
 }
 function MaskPanel({ operation, mode, brush, onMode, onBrush, onMask }: ToolPanelProps) {
-  const mask = operation?.params.mask as InlineMask | undefined;
-  const protect = operation?.params.protectMask as InlineMask | undefined;
+  const mask = operation?.params.mask as EditableMask | undefined;
+  const protect = operation?.params.protectMask as EditableMask | undefined;
   return <div className="panel-block"><h4>蒙版笔刷</h4><p className="panel-tip">先从左侧选择要限制的操作图层。绿色是生效区域，蓝色是冻结保护。</p><div className="button-grid"><button className={mode === 'linear' ? 'active' : ''} onClick={() => onMode('linear')}>线性渐变</button><button className={mode === 'radial' ? 'active' : ''} onClick={() => onMode('radial')}>径向渐变</button><button className={mode === 'brush' ? 'active' : ''} onClick={() => onMode('brush')}>涂抹蒙版</button><button className={mode === 'erase' ? 'active' : ''} onClick={() => onMode('erase')}>擦除蒙版</button><button className={mode === 'protect' ? 'active' : ''} onClick={() => onMode('protect')}>冻结保护</button><button className={mode === 'unprotect' ? 'active' : ''} onClick={() => onMode('unprotect')}>擦除保护</button></div><Slider label="笔刷大小 %" min={1} max={25} value={brush.radius * 100} onChange={(value) => onBrush({ radius: value / 100 })} /><Slider label="笔刷强度" min={1} max={100} value={brush.strength} onChange={(strength) => onBrush({ strength })} />{mask && <><Slider label="蒙版羽化" min={0} max={100} value={mask.feather ?? 0} onChange={(feather) => onMask('mask', { ...mask, feather })} /><button className="wide-button" onClick={() => onMask('mask', { ...mask, invert: !mask.invert })}>{mask.invert ? '取消蒙版反选' : '反选蒙版'}</button></>}<div className="button-grid"><button disabled={!mask} onClick={() => onMask('mask', null)}>清除蒙版</button><button disabled={!protect} onClick={() => onMask('protectMask', null)}>清除保护</button></div></div>;
 }
 function CurvesPanel({ params, onParam }: { params: Record<string, unknown>; onParam: (key: string, value: unknown) => void }) {
@@ -142,7 +142,7 @@ function FilmPanel({ operation, onParam, onCreate, onLUT, filmThumbnails }: Tool
   const file = (event: ChangeEvent<HTMLInputElement>) => { const selected = event.target.files?.[0]; if (selected) onLUT(selected); event.target.value = ''; };
   return <><div className="panel-block"><h4>胶片风格</h4><input className="search-field" aria-label="搜索滤镜" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索风格" /><div className="category-buttons">{['全部', ...new Set(FILM_PRESETS.map((preset) => preset.category))].map((value) => <button key={value} className={category === value ? 'active' : ''} onClick={() => setCategory(value)}>{value}</button>)}</div><div className="film-presets">{visible.map((preset) => <button key={preset.id} className={params.preset === preset.id ? 'active' : ''} onClick={() => onParam('preset', preset.id)}>{filmThumbnails[preset.id] ? <img className="preset-thumbnail" src={filmThumbnails[preset.id]} alt={`${preset.name}效果`} /> : <span className={`preset-swatch preset-${preset.id}`} />}<strong>{preset.name}</strong><small>{preset.description}</small></button>)}</div></div><ParameterGroups parameters={TOOL_BY_ID.film.parameters} values={params} onChange={onParam} /><div className="panel-block"><div className="button-grid"><button onClick={() => onCreate('filter.film', { ...params, intensity: params.intensity ?? 70, preset: params.preset ?? 'classic' }, '叠加胶片')}>叠加滤镜</button><button onClick={save} disabled={!operation}>保存预设</button><button onClick={() => { const next = [...custom, { name: `预设副本 ${custom.length + 1}`, params: structuredClone(params) }]; localStorage.setItem('img-film-presets', JSON.stringify(next)); setCustom(next); }} disabled={!operation}>复制预设</button><button onClick={() => inputRef.current?.click()}>导入 .cube LUT</button></div><input ref={inputRef} className="hidden-input" type="file" accept=".cube" onChange={file} />{custom.map((preset, index) => <div className="custom-preset" key={`${preset.name}-${index}`}><button onClick={() => onCreate('filter.film', preset.params, preset.name)}>{preset.name}</button><button aria-label="删除自定义预设" onClick={() => { const next = custom.filter((_, item) => item !== index); setCustom(next); localStorage.setItem('img-film-presets', JSON.stringify(next)); }}>×</button></div>)}</div></>;
 }
-function LayerPanel({ operation, onParam, onMask, region, shape }: { operation: Operation; onParam: (key: string, value: unknown) => void; onMask: (key: 'mask' | 'protectMask', mask: InlineMask | null) => void; region: Region; shape: SelectionShape }) {
-  const mask = operation.params.mask as InlineMask | undefined;
+function LayerPanel({ operation, onParam, onMask, region, shape }: { operation: Operation; onParam: (key: string, value: unknown) => void; onMask: (key: 'mask' | 'protectMask', mask: EditableMask | null) => void; region: Region; shape: SelectionShape }) {
+  const mask = operation.params.mask as EditableMask | undefined;
   return <div className="panel-block layer-panel"><h4>当前操作图层</h4><div className="small-note">{operation.label ?? operation.type}</div><Slider label="不透明度" min={0} max={100} value={Number(operation.params.opacity ?? 100)} onChange={(value) => onParam('opacity', value)} /><label className="select-field"><span>混合模式</span><select aria-label="混合模式" value={String(operation.params.blendMode ?? 'normal')} onChange={(event) => onParam('blendMode', event.target.value)}><option value="normal">正常</option><option value="multiply">正片叠底</option><option value="screen">滤色</option><option value="overlay">叠加</option><option value="soft-light">柔光</option></select></label><div className="button-grid"><button onClick={() => onMask('mask', { shape, region, invert: false, feather: 0 })}>选区转蒙版</button><button disabled={!mask} onClick={() => onMask('mask', mask ? { ...mask, invert: !mask.invert } : null)}>蒙版反选</button></div>{mask && <Slider label="蒙版羽化" min={0} max={100} value={mask.feather ?? 0} onChange={(feather) => onMask('mask', { ...mask, feather })} />}</div>;
 }

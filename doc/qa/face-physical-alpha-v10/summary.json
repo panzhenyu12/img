@@ -1,0 +1,10 @@
+{
+  "count": 72,
+  "passed": 72,
+  "medianBaselineMs": 533.01,
+  "medianCandidateMs": 486.27,
+  "maxCandidateMs": 1145.12,
+  "baselineSha256": "58013da0cc9840dd8d4525e9d49ee7a150ba1a02b7f225c26ad525aa21cbbeb1",
+  "candidateSha256": "3b36aaaa0f3b75521cc8f7726a4a3b605619b2e95c9b69818c3cac9af9d718f8",
+  "checkedPatchApplies": true
+}

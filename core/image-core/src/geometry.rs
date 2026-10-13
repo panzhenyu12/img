@@ -726,24 +726,6 @@ pub(crate) fn local_adjust_kind(
     } else {
         Vec::new()
     };
-    let stationary: Vec<bool> = if stationary_masks.is_empty() {
-        Vec::new()
-    } else {
-        (0..source.width as usize * source.height as usize)
-            .map(|i| {
-                let x = (i % source.width as usize) as f32 + 0.5;
-                let y = (i / source.width as usize) as f32 + 0.5;
-                stationary_masks.iter().any(|m| {
-                    m.coverage(
-                        x / source.width as f32,
-                        y / source.height as f32,
-                        source.width,
-                        source.height,
-                    ) >= 0.5
-                })
-            })
-            .collect()
-    };
     let mut symmetry_warps = if matches!(kind, "face.adjust" | "feature.adjust") {
         read_symmetry_warps(
             p,
@@ -1110,6 +1092,66 @@ pub(crate) fn local_adjust_kind(
         0.0,
     );
 
+    // Color-only edits do not need a full-image frozen raster or inverse
+    // sampling. Evaluate semantic protection only where local_color changed
+    // bytes; the graph still applies opacity/selection blending once.
+    if changes.is_empty() && symmetry_warps.is_empty() {
+        let mut output = crate::color::local_color(source, p, kind == "clothing.adjust");
+        if matches!(kind, "face.adjust" | "feature.adjust") {
+            let selection = p
+                .get("mask")
+                .filter(|v| v.is_object())
+                .map(PreparedMask::new);
+            let protection = p
+                .get("protectMask")
+                .filter(|v| v.is_object())
+                .map(PreparedMask::new);
+            for (i, (edited, original)) in output
+                .pixels
+                .chunks_exact_mut(4)
+                .zip(source.pixels.chunks_exact(4))
+                .enumerate()
+            {
+                if edited == original {
+                    continue;
+                }
+                let nx = ((i % source.width as usize) as f32 + 0.5) / source.width as f32;
+                let ny = ((i / source.width as usize) as f32 + 0.5) / source.height as f32;
+                let frozen = stationary_masks
+                    .iter()
+                    .any(|mask| mask.coverage(nx, ny, source.width, source.height) >= 0.5)
+                    || selection.as_ref().is_some_and(|mask| {
+                        mask.coverage(nx, ny, source.width, source.height) <= 0.0
+                    })
+                    || protection.as_ref().is_some_and(|mask| {
+                        mask.coverage(nx, ny, source.width, source.height) >= 1.0
+                    });
+                if frozen {
+                    edited.copy_from_slice(original);
+                }
+            }
+        }
+        return Ok(output);
+    }
+
+    let stationary: Vec<bool> = if stationary_masks.is_empty() {
+        Vec::new()
+    } else {
+        (0..source.width as usize * source.height as usize)
+            .map(|i| {
+                let x = (i % source.width as usize) as f32 + 0.5;
+                let y = (i / source.width as usize) as f32 + 0.5;
+                stationary_masks.iter().any(|m| {
+                    m.coverage(
+                        x / source.width as f32,
+                        y / source.height as f32,
+                        source.width,
+                        source.height,
+                    ) >= 0.5
+                })
+            })
+            .collect()
+    };
     // A polygon/ellipse selection is also part of the displacement field.
     // Applying it only in `mask::composite` leaves the hidden rectangular
     // render free to pull background texels into the face edge.  Scaling the
@@ -1253,121 +1295,474 @@ fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-fn clean_sample(source: &RgbaImage, x: f32, y: f32, radius: f32) -> (f32, f32) {
-    let mut boundary = [0.0; 3];
-    for i in 0..16 {
-        let a = i as f32 * std::f32::consts::TAU / 16.0;
-        let pixel = sample(
-            source,
-            x + a.cos() * radius * 1.1,
-            y + a.sin() * radius * 1.1,
-            true,
-        );
-        for c in 0..3 {
-            boundary[c] += pixel[c] as f32 / 16.0;
-        }
-    }
-    let mut best = (x - radius * 2.5, y);
-    let mut best_score = f32::MAX;
-    for i in 0..16 {
-        let angle = i as f32 * std::f32::consts::TAU / 16.0;
-        let sx = (x + angle.cos() * radius * 2.5).clamp(0.0, source.width as f32 - 1.0);
-        let sy = (y + angle.sin() * radius * 2.5).clamp(0.0, source.height as f32 - 1.0);
-        if (sx - x).hypot(sy - y) < radius * 1.6 {
-            continue;
-        }
-        let center = sample(source, sx, sy, true);
-        let mut score = 0.0;
-        for c in 0..3 {
-            score += (center[c] as f32 - boundary[c]).powi(2);
-        }
-        for j in 0..8 {
-            let a = j as f32 * std::f32::consts::TAU / 8.0;
-            let pixel = sample(
-                source,
-                sx + a.cos() * radius * 0.7,
-                sy + a.sin() * radius * 0.7,
-                true,
-            );
-            for c in 0..3 {
-                score += (pixel[c] as f32 - center[c] as f32).powi(2) * 0.35;
-            }
-        }
-        if score < best_score {
-            best_score = score;
-            best = (sx, sy);
-        }
-    }
-    best
+#[derive(Clone, Copy)]
+struct RepairStroke {
+    x: f32,
+    y: f32,
+    radius: f32,
+    strength: f32,
+    donor: Option<(f32, f32)>,
 }
 
-/// Traditional masked fill for the demo: propagate surrounding clean colors
-/// into selected pixels, then relax the fill at its boundary. This is a local
-/// non-generative algorithm, so it cannot invent a missing semantic object.
-pub(crate) fn repair(source: &RgbaImage, p: &Value, heal: bool) -> Result<RgbaImage, ImageError> {
-    let Some(strokes) = p.get("strokes").and_then(Value::as_array) else {
-        return Ok(source.clone());
-    };
-    let mut result = source.clone();
-    for stroke in strokes {
-        let x = number(stroke, "x", 0.5) * source.width as f32;
-        let y = number(stroke, "y", 0.5) * source.height as f32;
-        let radius = number(stroke, "radius", 0.04).clamp(0.001, 1.0)
-            * source.width.min(source.height) as f32;
-        let (sx, sy) =
-            if heal && (stroke.get("sourceX").is_none() || stroke.get("sourceY").is_none()) {
-                clean_sample(source, x, y, radius)
-            } else {
-                (
-                    number(stroke, "sourceX", 0.25) * source.width as f32,
-                    number(stroke, "sourceY", 0.25) * source.height as f32,
-                )
-            };
-        let strength = number(stroke, "strength", 100.0).clamp(0.0, 100.0) / 100.0;
-        let mut correction = [0.0; 3];
-        if heal {
-            let mut count = 0.0;
-            for i in 0..32 {
-                let angle = i as f32 * std::f32::consts::TAU / 32.0;
-                let (dx, dy) = (angle.cos() * radius * 0.85, angle.sin() * radius * 0.85);
-                let dest = sample(&result, x + dx, y + dy, true);
-                let src = sample(source, sx + dx, sy + dy, true);
-                for c in 0..3 {
-                    correction[c] += dest[c] as f32 - src[c] as f32;
-                }
-                count += 1.0;
+/// Source eligibility is separate from the output selection. A brush selection
+/// can describe only the defect; automatic donors must remain outside all
+/// marked defects and protected pixels. An explicitly chosen source may read
+/// protected pixels: protection still freezes the output in the compositor.
+/// No full-image eligibility raster is needed.
+struct RepairSources<'a> {
+    image: &'a RgbaImage,
+    protection: Option<PreparedMask<'a>>,
+    strokes: &'a [RepairStroke],
+}
+
+impl RepairSources<'_> {
+    fn visible_sample(&self, x: f32, y: f32) -> Option<[f32; 3]> {
+        if x < 0.0
+            || y < 0.0
+            || x > self.image.width as f32 - 1.0
+            || y > self.image.height as f32 - 1.0
+        {
+            return None;
+        }
+        let (x0, y0) = (x.floor() as u32, y.floor() as u32);
+        let (tx, ty) = (x - x.floor(), y - y.floor());
+        for (px, py, weight) in [
+            (x0, y0, (1.0 - tx) * (1.0 - ty)),
+            ((x0 + 1).min(self.image.width - 1), y0, tx * (1.0 - ty)),
+            (x0, (y0 + 1).min(self.image.height - 1), (1.0 - tx) * ty),
+            (
+                (x0 + 1).min(self.image.width - 1),
+                (y0 + 1).min(self.image.height - 1),
+                tx * ty,
+            ),
+        ] {
+            if weight <= 1e-6 {
+                continue;
             }
-            for value in &mut correction {
-                *value /= count;
+            let index = (py as usize * self.image.width as usize + px as usize) * 4;
+            if self.image.pixels[index + 3] == 0
+                || self.protection.as_ref().is_some_and(|mask| {
+                    mask.coverage(
+                        (px as f32 + 0.5) / self.image.width as f32,
+                        (py as f32 + 0.5) / self.image.height as f32,
+                        self.image.width,
+                        self.image.height,
+                    ) > 1e-6
+                })
+            {
+                return None;
             }
         }
-        let xmin = (x - radius).floor().max(0.0) as u32;
-        let xmax = (x + radius).ceil().min(source.width as f32) as u32;
-        let ymin = (y - radius).floor().max(0.0) as u32;
-        let ymax = (y + radius).ceil().min(source.height as f32) as u32;
+        let value = sample(self.image, x, y, false);
+        Some([value[0] as f32, value[1] as f32, value[2] as f32])
+    }
+
+    fn donor_sample(&self, x: f32, y: f32) -> Option<[f32; 3]> {
+        if self.strokes.iter().any(|stroke| {
+            stroke.strength > 0.0 && (x - stroke.x).hypot(y - stroke.y) < stroke.radius * 1.1 + 1.0
+        }) {
+            return None;
+        }
+        self.visible_sample(x, y)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct RepairContext {
+    dx: f32,
+    dy: f32,
+    rgb: [f32; 3],
+}
+
+/// Least-squares plane used only for ranking donors. Subtracting a lighting
+/// plane before comparing the surrounding rings avoids selecting a smooth,
+/// wrong-side-of-the-face patch just because its mean color happens to match.
+fn repair_plane(context: &[RepairContext], colors: &[[f32; 3]], radius: f32) -> [[f32; 3]; 3] {
+    let mut matrix = [[0.0; 3]; 3];
+    let mut rhs = [[0.0; 3]; 3];
+    for (point, color) in context.iter().zip(colors) {
+        let v = [1.0, point.dx / radius, point.dy / radius];
+        for i in 0..3 {
+            for j in 0..3 {
+                matrix[i][j] += v[i] * v[j];
+                rhs[i][j] += v[i] * color[j];
+            }
+        }
+    }
+    for (i, row) in matrix.iter_mut().enumerate() {
+        row[i] += 1e-4;
+    }
+    for i in 0..3 {
+        let pivot = (i..3)
+            .max_by(|a, b| matrix[*a][i].abs().total_cmp(&matrix[*b][i].abs()))
+            .unwrap();
+        matrix.swap(i, pivot);
+        rhs.swap(i, pivot);
+        let divisor = matrix[i][i];
+        for j in 0..3 {
+            matrix[i][j] /= divisor;
+            rhs[i][j] /= divisor;
+        }
+        for k in 0..3 {
+            if k == i {
+                continue;
+            }
+            let factor = matrix[k][i];
+            for j in 0..3 {
+                matrix[k][j] -= matrix[i][j] * factor;
+                rhs[k][j] -= rhs[i][j] * factor;
+            }
+        }
+    }
+    rhs
+}
+
+fn donor_score(
+    sources: &RepairSources<'_>,
+    context: &[RepairContext],
+    x: f32,
+    y: f32,
+    radius: f32,
+    origin: (f32, f32),
+) -> Option<f32> {
+    let mut colors = Vec::with_capacity(context.len());
+    let mut difference = Vec::with_capacity(context.len());
+    for point in context {
+        let rgb = sources.donor_sample(x + point.dx, y + point.dy)?;
+        difference.push(std::array::from_fn(|c| point.rgb[c] - rgb[c]));
+        colors.push(rgb);
+    }
+    let adjustment = repair_plane(context, &difference, radius);
+    let donor_plane = repair_plane(context, &colors, radius);
+    let mut error = 0.0;
+    for (point, difference) in context.iter().zip(&difference) {
+        for c in 0..3 {
+            let predicted = adjustment[0][c]
+                + adjustment[1][c] * point.dx / radius
+                + adjustment[2][c] * point.dy / radius;
+            // Limit a single specular pore's influence without suppressing its
+            // texture. Broad mismatch still raises the mean ring residual.
+            error += (difference[c] - predicted).powi(2).min(1600.0);
+        }
+    }
+    error /= context.len() as f32 * 3.0;
+    // A second blemish can match the ring while hiding at its center. Compare
+    // coarse inner-disk averages with the donor's own fitted lighting, rather
+    // than rewarding zero pixel variance (which would erase healthy pores).
+    for distance in [0.0, 0.35, 0.65] {
+        let count = if distance == 0.0 { 1 } else { 16 };
+        let mut coarse = [0.0; 3];
+        for i in 0..count {
+            let angle = i as f32 * std::f32::consts::TAU / count as f32;
+            let (dx, dy) = (
+                angle.cos() * radius * distance,
+                angle.sin() * radius * distance,
+            );
+            let rgb = sources.donor_sample(x + dx, y + dy)?;
+            for c in 0..3 {
+                coarse[c] += (rgb[c]
+                    - donor_plane[0][c]
+                    - donor_plane[1][c] * dx / radius
+                    - donor_plane[2][c] * dy / radius)
+                    / count as f32;
+            }
+        }
+        for value in coarse {
+            error +=
+                (value.abs() - 5.0).max(0.0).powi(2) * if distance == 0.0 { 0.05 } else { 0.25 };
+        }
+    }
+    for ((mean, dx), dy) in adjustment[0].iter().zip(&adjustment[1]).zip(&adjustment[2]) {
+        error += mean.powi(2) * 0.015 + (dx.powi(2) + dy.powi(2)) * 0.02;
+    }
+    // Small deterministic distance preference resolves equal texture matches.
+    error += ((x - origin.0).hypot(y - origin.1) / radius) * 0.02;
+    Some(error)
+}
+
+fn clean_sample(sources: &RepairSources<'_>, x: f32, y: f32, radius: f32) -> Option<(f32, f32)> {
+    let mut context = Vec::with_capacity(96);
+    for distance in [1.05, 1.3] {
+        for i in 0..48 {
+            let angle = i as f32 * std::f32::consts::TAU / 48.0;
+            let (dx, dy) = (
+                angle.cos() * radius * distance,
+                angle.sin() * radius * distance,
+            );
+            if let Some(rgb) = sources.visible_sample(x + dx, y + dy) {
+                context.push(RepairContext { dx, dy, rgb });
+            }
+        }
+    }
+    if context.len() < 24 {
+        return None;
+    }
+    let mut candidates = Vec::with_capacity(264);
+    // Search a bounded local neighborhood, not the full photograph on every
+    // pointer stamp. Integer offsets preserve source texture without repeated
+    // resampling. Four rings also avoid the old fixed-distance 16-way choice.
+    for ring in [2.6, 3.5, 4.6, 6.0] {
+        for i in 0..48 {
+            let angle = i as f32 * std::f32::consts::TAU / 48.0;
+            let sx = x + (angle.cos() * radius * ring).round();
+            let sy = y + (angle.sin() * radius * ring).round();
+            if let Some(score) = donor_score(sources, &context, sx, sy, radius, (x, y)) {
+                candidates.push((score, sx, sy));
+            }
+        }
+    }
+    candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let finalists: Vec<_> = candidates.iter().take(8).copied().collect();
+    let step = (radius * 0.3).round().max(1.0);
+    for (_, bx, by) in finalists {
+        for dy in [-step, 0.0, step] {
+            for dx in [-step, 0.0, step] {
+                let (sx, sy) = (bx + dx, by + dy);
+                if let Some(score) = donor_score(sources, &context, sx, sy, radius, (x, y)) {
+                    candidates.push((score, sx, sy));
+                }
+            }
+        }
+    }
+    candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let xmin = (x - radius).floor().max(0.0) as u32;
+    let xmax = (x + radius).ceil().min(sources.image.width as f32) as u32;
+    let ymin = (y - radius).floor().max(0.0) as u32;
+    let ymax = (y + radius).ceil().min(sources.image.height as f32) as u32;
+    // Sparse ranking is followed by exhaustive validation of the actual patch.
+    // A one-pixel alpha hole or marked neighboring blemish must not be copied
+    // through gaps in the search probes.
+    candidates.into_iter().find_map(|(_, sx, sy)| {
         for py in ymin..ymax {
             for px in xmin..xmax {
-                let dx = px as f32 - x;
-                let dy = py as f32 - y;
-                let d = (dx * dx + dy * dy).sqrt() / radius;
-                if d >= 1.0 {
+                let (dx, dy) = (px as f32 - x, py as f32 - y);
+                if dx.hypot(dy) < radius && sources.donor_sample(sx + dx, sy + dy).is_none() {
+                    return None;
+                }
+            }
+        }
+        Some((sx, sy))
+    })
+}
+
+/// On a circular patch, Poisson cloning is donor texture plus a harmonic
+/// correction whose boundary is destination minus donor. The Fourier solution
+/// is analytic: it preserves donor detail, transfers local lighting gradients
+/// and avoids an iterative full-image solver in the browser. Eight modes keep
+/// individual pores/specular points from becoming low-frequency color bands.
+struct HealLighting {
+    mean: [f32; 3],
+    cosine: [[f32; 3]; 8],
+    sine: [[f32; 3]; 8],
+    radius: f32,
+}
+impl HealLighting {
+    fn new(
+        sources: &RepairSources<'_>,
+        target: &RgbaImage,
+        stroke: RepairStroke,
+        donor: (f32, f32),
+    ) -> Option<Self> {
+        let mut lighting = Self {
+            mean: [0.0; 3],
+            cosine: [[0.0; 3]; 8],
+            sine: [[0.0; 3]; 8],
+            radius: stroke.radius * 1.05,
+        };
+        let mut context = Vec::with_capacity(64);
+        let mut difference = Vec::with_capacity(64);
+        for i in 0..64 {
+            let angle = i as f32 * std::f32::consts::TAU / 64.0;
+            let (dx, dy) = (angle.cos() * lighting.radius, angle.sin() * lighting.radius);
+            if sources
+                .visible_sample(stroke.x + dx, stroke.y + dy)
+                .is_none()
+            {
+                continue;
+            }
+            let rgb = sources.visible_sample(donor.0 + dx, donor.1 + dy)?;
+            let dest = sample(target, stroke.x + dx, stroke.y + dy, false);
+            context.push(RepairContext {
+                dx,
+                dy,
+                rgb: std::array::from_fn(|c| dest[c] as f32),
+            });
+            difference.push(std::array::from_fn(|c| dest[c] as f32 - rgb[c]));
+        }
+        if context.len() < 24 {
+            return None;
+        }
+        if context.len() != 64 {
+            // Cropped image edges/protection interrupt the circle: a fitted
+            // plane is stable here; uneven samples are not a Fourier basis.
+            let plane = repair_plane(&context, &difference, lighting.radius);
+            lighting.mean = plane[0];
+            lighting.cosine[0] = plane[1];
+            lighting.sine[0] = plane[2];
+            return Some(lighting);
+        }
+        for (i, values) in difference.iter().enumerate() {
+            let angle = i as f32 * std::f32::consts::TAU / 64.0;
+            for (c, value) in values.iter().enumerate() {
+                lighting.mean[c] += value / 64.0;
+                for mode in 0..8 {
+                    let a = angle * (mode + 1) as f32;
+                    lighting.cosine[mode][c] += value * a.cos() / 32.0;
+                    lighting.sine[mode][c] += value * a.sin() / 32.0;
+                }
+            }
+        }
+        Some(lighting)
+    }
+    fn correction(&self, dx: f32, dy: f32) -> [f32; 3] {
+        let (x, y) = (dx / self.radius, dy / self.radius);
+        let (mut real, mut imaginary) = (1.0, 0.0);
+        let mut value = self.mean;
+        for mode in 0..8 {
+            (real, imaginary) = (real * x - imaginary * y, real * y + imaginary * x);
+            for (c, value) in value.iter_mut().enumerate() {
+                *value += self.cosine[mode][c] * real + self.sine[mode][c] * imaginary;
+            }
+        }
+        value
+    }
+}
+
+/// Local texture repair with optional manual source. Automatic healing ranks
+/// clean surrounding patches and transfers donor gradients into the selected
+/// defect. Alpha and hidden RGB stay byte-identical; output masks are applied
+/// by the shared graph compositor exactly once.
+pub(crate) fn repair(source: &RgbaImage, p: &Value, heal: bool) -> Result<RgbaImage, ImageError> {
+    if number(p, "opacity", 100.0).clamp(0.0, 100.0) / 100.0 < 1e-8 {
+        return Ok(source.clone());
+    }
+    let Some(values) = p.get("strokes").and_then(Value::as_array) else {
+        return Ok(source.clone());
+    };
+    let strokes: Vec<RepairStroke> = values
+        .iter()
+        .map(|stroke| RepairStroke {
+            x: number(stroke, "x", 0.5) * source.width as f32,
+            y: number(stroke, "y", 0.5) * source.height as f32,
+            radius: number(stroke, "radius", 0.04).clamp(0.001, 1.0)
+                * source.width.min(source.height) as f32,
+            strength: number(stroke, "strength", 100.0).clamp(0.0, 100.0) / 100.0,
+            donor: if stroke.get("sourceX").is_some() && stroke.get("sourceY").is_some() {
+                Some((
+                    number(stroke, "sourceX", 0.25) * source.width as f32,
+                    number(stroke, "sourceY", 0.25) * source.height as f32,
+                ))
+            } else {
+                None
+            },
+        })
+        .collect();
+    let sources = RepairSources {
+        image: source,
+        protection: p
+            .get("protectMask")
+            .filter(|v| v.is_object())
+            .map(PreparedMask::new),
+        strokes: &strokes,
+    };
+    let manual_sources = RepairSources {
+        image: source,
+        protection: None,
+        strokes: &strokes,
+    };
+    let selection = p
+        .get("mask")
+        .filter(|v| v.is_object())
+        .map(PreparedMask::new);
+    let region = Region::read(p.get("region"));
+    let constrained =
+        selection.is_some() || sources.protection.is_some() || p.get("region").is_some();
+    let mut result = source.clone();
+    for stroke in &strokes {
+        if stroke.strength <= 0.0 {
+            continue;
+        }
+        let xmin = (stroke.x - stroke.radius).floor().max(0.0) as u32;
+        let xmax = (stroke.x + stroke.radius).ceil().min(source.width as f32) as u32;
+        let ymin = (stroke.y - stroke.radius).floor().max(0.0) as u32;
+        let ymax = (stroke.y + stroke.radius).ceil().min(source.height as f32) as u32;
+        // An empty selection or a completely frozen brush is a no-op, even
+        // when there is no usable donor. Decide before patch search so the
+        // invisible layer cannot block later edits in the same graph.
+        if constrained
+            && !(ymin..ymax).any(|py| {
+                (xmin..xmax).any(|px| {
+                    if (px as f32 - stroke.x).hypot(py as f32 - stroke.y) >= stroke.radius {
+                        return false;
+                    }
+                    if source.pixels[(py as usize * source.width as usize + px as usize) * 4 + 3]
+                        == 0
+                    {
+                        return false;
+                    }
+                    let nx = (px as f32 + 0.5) / source.width as f32;
+                    let ny = (py as f32 + 0.5) / source.height as f32;
+                    let selected = selection.as_ref().map_or(1.0, |mask| {
+                        mask.coverage(nx, ny, source.width, source.height)
+                    });
+                    let frozen = sources.protection.as_ref().map_or(0.0, |mask| {
+                        mask.coverage(nx, ny, source.width, source.height)
+                    });
+                    region.contains(nx, ny) && selected * (1.0 - frozen) > 1e-8
+                })
+            })
+        {
+            continue;
+        }
+        let donor = match stroke.donor {
+            Some(donor) => donor,
+            None if heal => {
+                clean_sample(&sources, stroke.x, stroke.y, stroke.radius).ok_or_else(|| {
+                    invalid(
+                        "healing has no valid nearby donor; use a smaller brush or choose a source",
+                    )
+                })?
+            }
+            None => (source.width as f32 * 0.25, source.height as f32 * 0.25),
+        };
+        // The selected source is an explicit instruction to copy this texture.
+        // Keep automatic blemish search exclusions, but permit manual copying
+        // from a frozen area without modifying that area. Both paths still
+        // reject transparent/out-of-bounds source texels.
+        let patch_sources = if stroke.donor.is_some() {
+            &manual_sources
+        } else {
+            &sources
+        };
+        let lighting = if heal {
+            Some(HealLighting::new(patch_sources, &result, *stroke, donor)
+            .ok_or_else(|| invalid("healing source or surrounding context is transparent/protected; choose another source"))?)
+        } else {
+            None
+        };
+        for py in ymin..ymax {
+            for px in xmin..xmax {
+                let (dx, dy) = (px as f32 - stroke.x, py as f32 - stroke.y);
+                let d = dx.hypot(dy) / stroke.radius;
+                let index = (py as usize * source.width as usize + px as usize) * 4;
+                if d >= 1.0 || source.pixels[index + 3] == 0 {
                     continue;
                 }
-                let falloff = if d < 0.65 {
-                    1.0
-                } else {
-                    let t = (1.0 - d) / 0.35;
-                    t * t * (3.0 - 2.0 * t)
+                let Some(cloned) = patch_sources.visible_sample(donor.0 + dx, donor.1 + dy) else {
+                    continue;
                 };
-                let weight = falloff * strength;
-                let cloned = sample(source, sx + dx, sy + dy, true);
-                let index = (py as usize * source.width as usize + px as usize) * 4;
+                let correction = lighting
+                    .as_ref()
+                    .map(|v| v.correction(dx, dy))
+                    .unwrap_or([0.0; 3]);
+                let weight =
+                    (1.0 - smoothstep(if heal { 0.8 } else { 0.65 }, 1.0, d)) * stroke.strength;
                 for c in 0..3 {
-                    let target = cloned[c] as f32 + correction[c];
-                    result.pixels[index + c] =
-                        byte(result.pixels[index + c] as f32 * (1.0 - weight) + target * weight);
+                    result.pixels[index + c] = byte(
+                        result.pixels[index + c] as f32 * (1.0 - weight)
+                            + (cloned[c] + correction[c]) * weight,
+                    );
                 }
-                // Repairing color does not change the original transparency.
             }
         }
     }
@@ -1439,6 +1834,354 @@ mod tests {
             &[200, 50, 20, 77]
         );
         assert_eq!(&out.pixels[..4], &image.pixels[..4]);
+    }
+
+    #[test]
+    fn color_only_feature_path_respects_semantic_freezing_and_graph_masks() {
+        let mut pixels = Vec::new();
+        for y in 0..32 {
+            for x in 0..64 {
+                pixels.extend_from_slice(&[110, 85, 75, if (x + y) % 19 == 0 { 0 } else { 123 }]);
+            }
+        }
+        let source = RgbaImage::new(64, 32, pixels).unwrap();
+        let p = json!({"adjustments":{"browColor":100},
+        "mask":{"shape":"rect","region":{"x":0.0625,"y":0,"width":0.875,"height":1}},
+        "protectMask":{"shape":"rect","region":{"x":0.5,"y":0,"width":0.0625,"height":1}},
+        "semanticMasks":{
+            "leftBrow":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}},
+            "hair":{"shape":"rect","region":{"x":0.125,"y":0,"width":0.125,"height":1}},
+            "ears":{"shape":"rect","region":{"x":0.25,"y":0,"width":0.0625,"height":1}},
+            "accessories":{"shape":"rect","region":{"x":0.375,"y":0,"width":0.0625,"height":1}}
+        }});
+        let processed = local_adjust_kind(&source, &p, "feature.adjust").unwrap();
+        let output = crate::mask::composite(&source, &processed, &p);
+        let color = crate::color::local_color(&source, &p, false);
+        let mut changed = 0;
+        for y in 0..32 {
+            for x in 0..64 {
+                let i = (y * 64 + x) * 4;
+                let frozen = !(4..60).contains(&x)
+                    || (8..20).contains(&x)
+                    || (24..28).contains(&x)
+                    || (32..36).contains(&x);
+                if frozen {
+                    assert_eq!(&output.pixels[i..i + 4], &source.pixels[i..i + 4]);
+                } else {
+                    assert_eq!(&output.pixels[i..i + 4], &color.pixels[i..i + 4]);
+                    changed += usize::from(output.pixels[i..i + 4] != source.pixels[i..i + 4]);
+                }
+                assert_eq!(output.pixels[i + 3], source.pixels[i + 3]);
+            }
+        }
+        assert!(
+            changed > 100,
+            "valid brow pixels must remain editable in the fast path"
+        );
+    }
+
+    fn heal_texture_fixture() -> RgbaImage {
+        let mut pixels = Vec::with_capacity(128 * 128 * 4);
+        for y in 0..128 {
+            for x in 0..128 {
+                let dx = x as f32 - 64.0;
+                let dy = y as f32 - 64.0;
+                // A harmonic lighting field gives a known clean reference.
+                // The donor's illumination slope differs from the target's.
+                let light = 0.03 * (dx * dx - dy * dy);
+                let pore = if (x + y * 3) % 8 < 2 { -5.0 } else { 2.0 };
+                pixels.extend_from_slice(&[
+                    byte(140.0 + light + pore),
+                    byte(116.0 + light + pore),
+                    byte(103.0 + light + pore),
+                    77 + ((x + y) % 7) as u8,
+                ]);
+            }
+        }
+        RgbaImage::new(128, 128, pixels).unwrap()
+    }
+
+    fn add_heal_blemish(image: &mut RgbaImage) {
+        for y in 60..69 {
+            for x in 60..69 {
+                if (x as f32 - 64.0).hypot(y as f32 - 64.0) <= 4.0 {
+                    let i = (y * 128 + x) * 4;
+                    image.pixels[i..i + 3].copy_from_slice(&[245, 38, 29]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn heal_poisson_recovers_reference_lighting_and_keeps_donor_pores() {
+        let clean = heal_texture_fixture();
+        let mut damaged = clean.clone();
+        add_heal_blemish(&mut damaged);
+        let params = json!({"strokes":[{"x":0.5,"y":0.5,"sourceX":0.25,"sourceY":0.5,
+            "radius":0.078125,"strength":100}]});
+        let out = repair(&damaged, &params, true).unwrap();
+        let mut error = 0.0;
+        let mut count = 0;
+        for y in 0..128 {
+            for x in 0..128 {
+                let i = (y * 128 + x) * 4;
+                let d = (x as f32 - 64.0).hypot(y as f32 - 64.0);
+                assert_eq!(out.pixels[i + 3], damaged.pixels[i + 3]);
+                if d >= 10.0 {
+                    assert_eq!(&out.pixels[i..i + 4], &damaged.pixels[i..i + 4]);
+                }
+                if d <= 7.0 {
+                    for c in 0..3 {
+                        error += (out.pixels[i + c] as f32 - clean.pixels[i + c] as f32).powi(2);
+                        count += 1;
+                    }
+                }
+            }
+        }
+        let mse = error / count as f32;
+        assert!(
+            mse < 1.8,
+            "clean-reference MSE {mse}; the old flat correction loses the lighting gradient"
+        );
+        // Two adjacent known pore phases retain their original contrast.
+        let a = (64 * 128 + 64) * 4;
+        let b = (64 * 128 + 66) * 4;
+        assert_eq!(
+            out.pixels[b] as i16 - out.pixels[a] as i16,
+            clean.pixels[b] as i16 - clean.pixels[a] as i16
+        );
+    }
+
+    #[test]
+    fn automatic_heal_removes_defect_without_flattening_clean_texture() {
+        let clean = heal_texture_fixture();
+        let mut damaged = clean.clone();
+        add_heal_blemish(&mut damaged);
+        let out = repair(
+            &damaged,
+            &json!({"strokes":[{"x":0.5,"y":0.5,
+            "radius":0.078125,"strength":100}]}),
+            true,
+        )
+        .unwrap();
+        let mut error = 0.0;
+        let mut count = 0;
+        let mut residuals = Vec::new();
+        for y in 59..70 {
+            for x in 59..70 {
+                if (x as f32 - 64.0).hypot(y as f32 - 64.0) > 5.0 {
+                    continue;
+                }
+                let i = (y * 128 + x) * 4;
+                for c in 0..3 {
+                    error += (out.pixels[i + c] as f32 - clean.pixels[i + c] as f32).powi(2);
+                    count += 1;
+                }
+                residuals.push(
+                    out.pixels[i] as f32
+                        - 140.0
+                        - 0.03 * ((x as f32 - 64.0).powi(2) - (y as f32 - 64.0).powi(2)),
+                );
+            }
+        }
+        let mse = error / count as f32;
+        assert!(
+            mse < 16.0,
+            "automatic heal must restore known normal skin, MSE {mse}"
+        );
+        let mean = residuals.iter().sum::<f32>() / residuals.len() as f32;
+        let variance =
+            residuals.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / residuals.len() as f32;
+        assert!(
+            variance > 5.0,
+            "donor pore variance {variance}; a flat fill is not texture repair"
+        );
+    }
+
+    #[test]
+    fn automatic_heal_ignores_hidden_rgb_and_preserves_transparent_destination() {
+        let mut a = heal_texture_fixture();
+        add_heal_blemish(&mut a);
+        for y in 0..128 {
+            for x in 0..128 {
+                if x > 77 || (x == 64 && y == 64) {
+                    let i = (y * 128 + x) * 4;
+                    a.pixels[i..i + 4].copy_from_slice(&[255, 0, 220, 0]);
+                }
+            }
+        }
+        let mut b = a.clone();
+        for pixel in b.pixels.chunks_exact_mut(4) {
+            if pixel[3] == 0 {
+                pixel[..3].copy_from_slice(&[0, 255, 0]);
+            }
+        }
+        let params = json!({"strokes":[{"x":0.5,"y":0.5,"radius":0.078125,"strength":100}]});
+        let oa = repair(&a, &params, true).unwrap();
+        let ob = repair(&b, &params, true).unwrap();
+        for i in (0..a.pixels.len()).step_by(4) {
+            assert_eq!(oa.pixels[i + 3], a.pixels[i + 3]);
+            assert_eq!(ob.pixels[i + 3], b.pixels[i + 3]);
+            if a.pixels[i + 3] == 0 {
+                assert_eq!(&oa.pixels[i..i + 4], &a.pixels[i..i + 4]);
+                assert_eq!(&ob.pixels[i..i + 4], &b.pixels[i..i + 4]);
+            } else {
+                assert_eq!(&oa.pixels[i..i + 4], &ob.pixels[i..i + 4]);
+            }
+        }
+        let i = (64 * 128 + 65) * 4;
+        assert!(
+            oa.pixels[i + 1] > 95,
+            "visible neighboring blemish should still be healed"
+        );
+    }
+
+    #[test]
+    fn automatic_heal_excludes_protected_source_texels() {
+        let mut a = heal_texture_fixture();
+        add_heal_blemish(&mut a);
+        let mut b = a.clone();
+        for y in 0..128 {
+            for x in 0..49 {
+                let i = (y * 128 + x) * 4;
+                b.pixels[i..i + 3].copy_from_slice(&[0, 255, 0]);
+            }
+        }
+        let params = json!({"protectMask":{"shape":"rect","region":{"x":0.0,"y":0.0,"width":0.38,"height":1.0}},
+            "strokes":[{"x":0.5,"y":0.5,"radius":0.078125,"strength":100}]});
+        let oa = repair(&a, &params, true).unwrap();
+        let ob = repair(&b, &params, true).unwrap();
+        for y in 0..128 {
+            for x in 49..128 {
+                let i = (y * 128 + x) * 4;
+                assert_eq!(
+                    &oa.pixels[i..i + 4],
+                    &ob.pixels[i..i + 4],
+                    "protected source contamination at {x},{y}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn manual_repair_reads_selected_frozen_source_without_writing_to_it() {
+        let mut image = heal_texture_fixture();
+        add_heal_blemish(&mut image);
+        let center = (64 * 128 + 64) * 4;
+        for kind in ["repair.clone", "repair.heal"] {
+            let graph = json!({"operations":[{"type":kind,"params":{
+                "protectMask":{"shape":"rect","region":{"x":0,"y":0,"width":0.4,"height":1}},
+                "strokes":[{"x":0.5,"y":0.5,"sourceX":0.25,"sourceY":0.5,"radius":0.078125,"strength":100}]
+            }}]});
+            let output = crate::apply_graph_json(&image, &graph.to_string()).unwrap();
+            assert_ne!(
+                &output.pixels[center..center + 3],
+                &image.pixels[center..center + 3],
+                "{kind} must apply selected source"
+            );
+            for y in 0..128 {
+                for x in 0..51 {
+                    let i = (y * 128 + x) * 4;
+                    assert_eq!(
+                        &output.pixels[i..i + 4],
+                        &image.pixels[i..i + 4],
+                        "{kind}: frozen {x},{y}"
+                    );
+                }
+            }
+            for (before, after) in image
+                .pixels
+                .chunks_exact(4)
+                .zip(output.pixels.chunks_exact(4))
+            {
+                assert_eq!(before[3], after[3]);
+            }
+        }
+    }
+
+    #[test]
+    fn invisible_heal_cannot_fail_or_block_a_later_visible_edit() {
+        let image = RgbaImage::new(32, 32, [90, 80, 70, 255].repeat(32 * 32)).unwrap();
+        let bad_source =
+            json!({"strokes":[{"x":0.5,"y":0.5,"sourceX":0.01,"sourceY":0.01,"radius":0.2}]});
+        let expected = crate::apply_graph_json(
+            &image,
+            r#"{"operations":[{"type":"color.basic","params":{"exposure":30}}]}"#,
+        )
+        .unwrap();
+        let restrictions = [
+            json!({"opacity":0}),
+            json!({"protectMask":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}}}),
+            json!({"mask":{"shape":"raster","width":1,"height":1,"data":[0]}}),
+            json!({"region":{"x":0,"y":0,"width":0.1,"height":0.1}}),
+        ];
+        for restriction in restrictions {
+            let mut params = bad_source.clone();
+            params
+                .as_object_mut()
+                .unwrap()
+                .extend(restriction.as_object().unwrap().clone());
+            let noop = json!({"operations":[{"type":"repair.heal","params":params.clone()}]});
+            assert_eq!(
+                crate::apply_graph_json(&image, &noop.to_string()).unwrap(),
+                image
+            );
+            let chain = json!({"operations":[{"type":"repair.heal","params":params},{"type":"color.basic","params":{"exposure":30}}]});
+            assert_eq!(
+                crate::apply_graph_json(&image, &chain.to_string()).unwrap(),
+                expected
+            );
+        }
+        let visible = json!({"operations":[{"type":"repair.heal","params":bad_source}]});
+        assert!(
+            crate::apply_graph_json(&image, &visible.to_string()).is_err(),
+            "visible invalid donor still needs an error"
+        );
+    }
+
+    #[test]
+    fn heal_reports_missing_donor_instead_of_painting_transparent_black() {
+        let image = RgbaImage::new(32, 32, [200, 100, 50, 0].repeat(32 * 32)).unwrap();
+        assert!(repair(
+            &image,
+            &json!({"strokes":[{"x":0.5,"y":0.5,"radius":0.1}]}),
+            true
+        )
+        .is_err());
+        assert_eq!(
+            repair(
+                &image,
+                &json!({"strokes":[{"x":0.5,"y":0.5,"radius":0.1,"strength":0}]}),
+                true
+            )
+            .unwrap(),
+            image
+        );
+    }
+
+    #[test]
+    fn clone_does_not_import_hidden_rgb_or_change_hidden_destination() {
+        let mut image = heal_texture_fixture();
+        let donor = (64 * 128 + 32) * 4;
+        image.pixels[donor..donor + 4].copy_from_slice(&[255, 0, 255, 0]);
+        let hidden_target = (64 * 128 + 66) * 4;
+        image.pixels[hidden_target..hidden_target + 4].copy_from_slice(&[77, 88, 99, 0]);
+        let out = repair(
+            &image,
+            &json!({"strokes":[{"x":0.5,"y":0.5,"sourceX":0.25,"sourceY":0.5,
+            "radius":0.078125,"strength":100}]}),
+            false,
+        )
+        .unwrap();
+        let center = (64 * 128 + 64) * 4;
+        assert_eq!(
+            &out.pixels[center..center + 4],
+            &image.pixels[center..center + 4]
+        );
+        assert_eq!(
+            &out.pixels[hidden_target..hidden_target + 4],
+            &image.pixels[hidden_target..hidden_target + 4]
+        );
     }
 
     fn feature_fixture() -> RgbaImage {

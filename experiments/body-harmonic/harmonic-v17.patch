@@ -1,0 +1,246 @@
+--- a/core/image-core/src/body.rs
++++ b/core/image-core/src/body.rs
+@@ -800,6 +800,19 @@
+         }
+     }
+     let mut result = source.clone();
++    let mut field: Vec<[f32; 4]> = source
++        .pixels
++        .chunks_exact(4)
++        .map(|p| {
++            let alpha = p[3] as f32 / 255.0;
++            [
++                p[0] as f32 * alpha,
++                p[1] as f32 * alpha,
++                p[2] as f32 * alpha,
++                p[3] as f32,
++            ]
++        })
++        .collect();
+     while let Some(i) = queue.pop_front() {
+         if known[i] {
+             continue;
+@@ -811,11 +824,7 @@
+             continue;
+         }
+         for c in 0..4 {
+-            result.pixels[i * 4 + c] = (donors
+-                .iter()
+-                .map(|&n| result.pixels[n * 4 + c] as u32)
+-                .sum::<u32>()
+-                / donors.len() as u32) as u8;
++            field[i][c] = donors.iter().map(|&n| field[n][c]).sum::<f32>() / donors.len() as f32;
+         }
+         known[i] = true;
+         for n in neighbors(i, width, height) {
+@@ -851,33 +860,66 @@
+         for i in 0..targets.len() {
+             if !known[i] {
+                 let donor = nearest[i];
+-                result.pixels[i * 4..i * 4 + 4]
+-                    .copy_from_slice(&source.pixels[donor * 4..donor * 4 + 4]);
++                field[i] = field[donor];
+                 known[i] = true;
+             }
+         }
+     }
+-    for _ in 0..8 {
+-        let previous = result.pixels.clone();
+-        for (i, &target) in targets.iter().enumerate() {
+-            if !target {
+-                continue;
+-            }
+-            let donors: Vec<usize> = neighbors(i, width, height)
+-                .filter(|&n| !protected[n])
+-                .collect();
+-            if donors.is_empty() {
+-                continue;
+-            }
+-            for c in 0..3 {
+-                let mean = donors
+-                    .iter()
+-                    .map(|&n| previous[n * 4 + c] as u32)
+-                    .sum::<u32>() as f32
+-                    / donors.len() as f32;
+-                result.pixels[i * 4 + c] = byte(previous[i * 4 + c] as f32 * 0.25 + mean * 0.75);
+-            }
+-        }
++    // Quantizing every diffusion step caused dark plateaus and stopped well
++    // before a 10-pixel strip could continue a simple lighting gradient.
++    // Solve a float Dirichlet harmonic field with fixed observed donors;
++    // transparent RGB contributes only after multiplication by its alpha.
++    // Red/black SOR needs no previous full crop clone and accelerates narrow
++    // strips. The residual cap is measured in final 8-bit channel units.
++    let active: Vec<(usize, Vec<usize>)> = targets
++        .iter()
++        .enumerate()
++        .filter(|(_, target)| **target)
++        .map(|(i, _)| {
++            (
++                i,
++                neighbors(i, width, height)
++                    .filter(|&n| !protected[n])
++                    .collect::<Vec<usize>>(),
++            )
++        })
++        .filter(|(_, donors)| !donors.is_empty())
++        .collect();
++    for _ in 0..384 {
++        let mut max_update = 0.0_f32;
++        for parity in 0..2 {
++            for (i, donors) in &active {
++                if (i % width + i / width) % 2 != parity {
++                    continue;
++                }
++                let mean: [f32; 4] = std::array::from_fn(|c| {
++                    donors.iter().map(|&n| field[n][c]).sum::<f32>() / donors.len() as f32
++                });
++                for (c, &value) in mean.iter().enumerate() {
++                    let previous = field[*i][c];
++                    let next = (previous + (value - previous) * 1.65).clamp(0.0, 255.0);
++                    field[*i][c] = next;
++                    max_update = max_update.max((next - previous).abs());
++                }
++            }
++        }
++        if max_update < 0.025 {
++            break;
++        }
++    }
++    for (i, &target) in targets.iter().enumerate() {
++        if !target {
++            continue;
++        }
++        let alpha = field[i][3] / 255.0;
++        for c in 0..3 {
++            result.pixels[i * 4 + c] = if alpha > 1e-6 {
++                byte(field[i][c] / alpha)
++            } else {
++                0
++            };
++        }
++        result.pixels[i * 4 + 3] = byte(field[i][3]);
+     }
+     Ok(result)
+ }
+@@ -924,40 +966,10 @@
+     }
+     check_background_donors(&targets, &protection, crop_width, crop_height)?;
+     let crop = RgbaImage::new(crop_width as u32, crop_height as u32, pixels)?;
+-    let mut filled = reconstruct_narrow_strip(&crop, &targets, &protection)?;
+-    // Inpaint preserves source alpha for object-removal operations. A body
+-    // contour instead reveals a different layer, so its alpha must also
+-    // come from clean background donors (e.g. a transparent PNG backdrop).
+-    use std::collections::VecDeque;
+-    let mut known: Vec<bool> = targets.iter().map(|v| !v).collect();
+-    let mut queue = VecDeque::new();
+-    for (i, &target) in targets.iter().enumerate() {
+-        if target && neighbors(i, crop_width, crop_height).any(|n| known[n] && !protection[n]) {
+-            queue.push_back(i);
+-        }
+-    }
+-    while let Some(i) = queue.pop_front() {
+-        if known[i] {
+-            continue;
+-        }
+-        let donors: Vec<usize> = neighbors(i, crop_width, crop_height)
+-            .filter(|&n| known[n] && !protection[n])
+-            .collect();
+-        if donors.is_empty() {
+-            continue;
+-        }
+-        filled.pixels[i * 4 + 3] = (donors
+-            .iter()
+-            .map(|&n| filled.pixels[n * 4 + 3] as u32)
+-            .sum::<u32>()
+-            / donors.len() as u32) as u8;
+-        known[i] = true;
+-        for n in neighbors(i, crop_width, crop_height) {
+-            if !known[n] {
+-                queue.push_back(n);
+-            }
+-        }
+-    }
++    // Unlike object removal, a revealed body-contour strip exposes a layer
++    // with its own alpha. The harmonic solver reconstructs premultiplied RGB
++    // and alpha together from the same clean background boundaries.
++    let filled = reconstruct_narrow_strip(&crop, &targets, &protection)?;
+     let mut result = source.clone();
+     for (i, &target) in targets.iter().enumerate() {
+         if target {
+@@ -1577,6 +1589,75 @@
+     }
+
+     #[test]
++    fn narrow_strip_recovers_affine_background_without_quantization_drift() {
++        let (w, h) = (64usize, 48usize);
++        let mut pixels = Vec::new();
++        let mut targets = vec![false; w * h];
++        for y in 0..h {
++            for x in 0..w {
++                targets[y * w + x] = (20..30).contains(&x) && (5..43).contains(&y);
++                pixels.extend_from_slice(&[
++                    40 + x as u8 * 2 + y as u8,
++                    60 + x as u8 + y as u8 * 2,
++                    100 + x as u8,
++                    255,
++                ]);
++            }
++        }
++        let truth = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
++        let mut source = truth.clone();
++        for (i, &target) in targets.iter().enumerate() {
++            if target {
++                source.pixels[i * 4..i * 4 + 3].copy_from_slice(&[20, 30, 40]);
++            }
++        }
++        let filled = reconstruct_narrow_strip(&source, &targets, &vec![false; w * h]).unwrap();
++        let mut max_error = 0;
++        for (i, &target) in targets.iter().enumerate() {
++            if target {
++                for c in 0..3 {
++                    max_error =
++                        max_error.max(filled.pixels[i * 4 + c].abs_diff(truth.pixels[i * 4 + c]));
++                }
++            } else {
++                assert_eq!(
++                    &filled.pixels[i * 4..i * 4 + 4],
++                    &source.pixels[i * 4..i * 4 + 4]
++                );
++            }
++        }
++        assert!(
++            max_error <= 1,
++            "quantized diffusion lost affine continuation: max error {max_error}"
++        );
++    }
++    #[test]
++    fn harmonic_strip_does_not_import_hidden_rgb_from_transparent_donors() {
++        let (w, h) = (24, 20);
++        let targets: Vec<bool> = (0..w * h).map(|i| (8..16).contains(&(i % w))).collect();
++        let mut first =
++            RgbaImage::new(w as u32, h as u32, [220, 55, 40, 255].repeat(w * h)).unwrap();
++        let mut second = first.clone();
++        for i in 0..w * h {
++            if i % w < 8 {
++                first.pixels[i * 4..i * 4 + 4].copy_from_slice(&[0, 250, 0, 0]);
++                second.pixels[i * 4..i * 4 + 4].copy_from_slice(&[250, 0, 250, 0]);
++            }
++        }
++        let protection = vec![false; w * h];
++        let a = reconstruct_narrow_strip(&first, &targets, &protection).unwrap();
++        let b = reconstruct_narrow_strip(&second, &targets, &protection).unwrap();
++        for (i, &target) in targets.iter().enumerate() {
++            if target {
++                assert_eq!(&a.pixels[i * 4..i * 4 + 4], &b.pixels[i * 4..i * 4 + 4]);
++                assert!(a.pixels[i * 4 + 3] > 0 && a.pixels[i * 4 + 3] < 255);
++                assert!(a.pixels[i * 4].abs_diff(220) <= 1);
++                assert!(a.pixels[i * 4 + 1].abs_diff(55) <= 1);
++            }
++        }
++    }
++
++    #[test]
+     fn freezing_an_occluding_sleeve_does_not_tear_the_adjacent_fabric() {
+         let (width, height) = (160usize, 200usize);
+         let mut pixels = vec![0u8; width * height * 4];
