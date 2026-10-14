@@ -3,3 +3,49 @@
 .proposal-preview-banner{display:flex;align-items:center;justify-content:space-between;padding:7px 18px;background:#343020;color:#eac775;font-size:11px}.proposal-preview-banner button{border:1px solid #8a7140;border-radius:4px;padding:3px 7px;color:#eac775;background:#51432a;font-size:10px}
 .preset-thumbnail{display:block;width:100%;height:57px;object-fit:cover}
 .color-field{display:flex;align-items:center;justify-content:space-between;color:#b3c0d4;font-size:11px}.color-field input{width:46px;height:27px;border:1px solid #4a5770;border-radius:4px;padding:2px;background:#202b3d}.brush-draft{fill:#ecc56425;stroke:none}@media(max-width:780px){.statusbar>div{gap:6px}.statusbar button{font-size:8px}.statusbar>div button:nth-child(3),.statusbar>div button:nth-child(4){display:none}.zoom-controls button{font-size:8px}}
+
+/* Functional layout: keep the editing workflow legible as the tool set grows. */
+.workspace{grid-template-columns:224px minmax(300px,1fr) 360px}
+.left-panel{padding:16px 12px}
+.tool-list{gap:14px}
+.tool-group{display:grid;gap:4px}
+.tool-group-label{margin:0;padding:0 8px;color:#68758a;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.tool-group-items{display:grid;gap:2px}
+.tool-group+.tool-group{padding-top:1px}
+.right-panel{padding:0 16px 20px}
+.image-info{position:sticky;top:0;z-index:3;margin:0 -16px 14px;padding:16px 19px 12px;background:#161a22}
+.inspector-heading{position:sticky;top:69px;z-index:2;margin:0 -3px 12px;padding:9px 3px;background:#161a22}
+.panel-block,.parameter-group{padding:14px;margin-bottom:10px}
+.panel-block h4{display:flex;align-items:center;gap:7px;margin-bottom:11px;padding-bottom:8px;border-bottom:1px solid #303a49;color:#c0cada}
+.button-grid button,.wide-button,.segmented button,.category-buttons button,.detected-list button{min-height:31px}
+.tool-inspector>.panel-tip{padding:0 3px}
+.repair-step h4{border-bottom:0;padding-bottom:0}.step-index{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;color:#151a22;background:#e8b85c;font-size:10px;font-weight:800}
+
+@media(min-width:1600px){.workspace{grid-template-columns:240px minmax(360px,1fr) 390px}.right-panel{padding-left:18px;padding-right:18px}.image-info{margin-left:-18px;margin-right:-18px;padding-left:21px;padding-right:21px}}
+@media(max-width:1050px) and (min-width:781px){.workspace{grid-template-columns:176px minmax(220px,1fr) 320px}.right-panel{padding-left:11px;padding-right:11px}.image-info{margin-left:-11px;margin-right:-11px;padding-left:14px;padding-right:14px}.inspector-heading{top:66px}}
+@media(max-width:780px){
+  .workspace{display:flex;flex-direction:column;overflow:auto;min-height:0}
+  .left-panel{width:100%;flex:0 0 auto;padding:6px 8px;border-right:0;border-bottom:1px solid #303a49;overflow:hidden}
+  .left-panel>.panel-title,.left-panel .panel-divider,.history-heading,.operation-list{display:none}
+  .tool-list{display:flex;align-items:stretch;gap:8px;overflow-x:auto;overflow-y:hidden;padding:1px 0 3px;scrollbar-width:none}
+  .tool-list::-webkit-scrollbar{display:none}
+  .tool-group{display:flex;align-items:center;gap:5px;flex:0 0 auto;padding-right:8px;border-right:1px solid #303a49}
+  .tool-group:last-child{border-right:0}
+  .tool-group-label{display:none}
+  .tool-group-items{display:flex;gap:4px}
+  .tool-item{width:auto;min-height:34px;flex:0 0 auto;padding:7px 8px;gap:5px}
+  .canvas-stage{width:100%;height:370px;min-height:370px;flex:0 0 370px}
+  .canvas-viewport{min-height:300px}
+  .right-panel{width:100%;flex:0 0 auto;overflow:visible;padding:0 12px 28px;border-top:1px solid #303a49;border-left:0}
+  .image-info{position:static;margin:0 -12px 12px;padding:12px 15px 10px}
+  .inspector-heading{position:static;margin:0 0 10px;padding:0 2px;background:transparent}
+  .panel-block,.parameter-group{padding:12px;margin-bottom:10px}
+  .ai-panel{margin-bottom:4px}
+}
+@media(max-width:470px){
+  .canvas-stage{height:330px;min-height:330px;flex-basis:330px}
+  .canvas-viewport{min-height:260px}
+  .right-panel{padding-left:10px;padding-right:10px}
+  .image-info{margin-left:-10px;margin-right:-10px;padding-left:13px;padding-right:13px}
+  .panel-block,.parameter-group{padding:11px}
+}
