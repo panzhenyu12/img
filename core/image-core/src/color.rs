@@ -35,6 +35,26 @@ fn brighten_luma(rgb: [f32; 3], delta: f32) -> [f32; 3] {
     luma_chroma_rgb(light + delta, rgb.map(|value| value - light))
 }
 
+/// A skin temperature slider should mostly adjust yellow/blue, independently
+/// of the red/pink pigment control. Equal fixed R/B offsets make low-yellow
+/// skin cross into purple at the cold end. Derive the cold range from the
+/// observed yellow chroma, retaining at least 35% of it; the warm end has a
+/// bounded response instead of amplifying an already orange complexion.
+/// This is an sRGB chroma approximation, not an illuminant estimator.
+fn skin_temperature_tint(rgb: [f32; 3], warmth: f32) -> [f32; 3] {
+    let yellow = (rgb[1] - rgb[2]).max(0.0);
+    let yellow_shift = if warmth < 0.0 {
+        warmth * (yellow * 0.65).min(18.0)
+    } else {
+        warmth * (12.0 + yellow.min(40.0) * 0.12)
+    };
+    // A small red response follows the temperature change; red/pink pigment
+    // is adjusted separately by redness. The caller removes this vector's
+    // luminance and applies selection, shadow and highlight coverage once.
+    let red_coupling = if warmth < 0.0 { 0.25 } else { 0.5 };
+    [yellow_shift * red_coupling, 0.0, -yellow_shift]
+}
+
 fn srgb_to_linear(value: f32) -> f32 {
     let normalized = (value / 255.0).clamp(0.0, 1.0);
     if normalized <= 0.04045 {
@@ -1551,10 +1571,11 @@ pub(crate) fn skin(source: &RgbaImage, p: &Value) -> RgbaImage {
         } else {
             (0.0, 0.0)
         };
+        let temperature_tint = skin_temperature_tint(rgb, warmth);
         let tint = [
-            (warmth * 12.0 + redness_lift * 10.0) * chroma_strength - neutralization,
+            (temperature_tint[0] + redness_lift * 10.0) * chroma_strength - neutralization,
             -redness_lift * 3.0 * chroma_strength,
-            (-warmth * 12.0 - redness_lift * 3.0) * chroma_strength - yellow_recovery,
+            (temperature_tint[2] - redness_lift * 3.0) * chroma_strength - yellow_recovery,
         ];
         let tint_light = luma(tint[0], tint[1], tint[2]);
         let chroma = std::array::from_fn(|c| rgb[c] - light + tint[c] - tint_light);
@@ -2112,12 +2133,23 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
                     (rgb[c] - light) * (1.0 + lip_saturation * lip_weight * diffuse)
                         + (tint[c] - tint_light) * lip * lip_weight * diffuse
                 });
-                let lift = if lip_brightness >= 0.0 {
-                    (255.0 - light) * lip_brightness * 0.32
-                } else {
-                    light * lip_brightness * 0.32
-                };
-                rgb = luma_chroma_rgb(light + lift * lip_weight, chroma);
+                rgb = luma_chroma_rgb(light, chroma);
+                if lip_brightness.abs() > 1e-6 && source.pixels[index + 3] > 0 {
+                    // Scale in linear light so dark creases are not painted
+                    // gray and the pigment retains its channel proportions.
+                    // The positive shoulder avoids gamut clipping. Dimming
+                    // needs no shoulder: a saturated red channel is still
+                    // editable pigment, not a white specular reflection.
+                    let linear = rgb.map(srgb_to_linear);
+                    let scale = if lip_brightness > 0.0 {
+                        let maximum = linear.into_iter().fold(0.0, f32::max);
+                        let gain = libm::exp2f(lip_brightness * lip_weight);
+                        gain / (1.0 + maximum * (gain - 1.0))
+                    } else {
+                        libm::exp2f(lip_brightness * lip_weight * diffuse)
+                    };
+                    rgb = linear.map(|value| linear_to_srgb(value * scale));
+                }
             }
             // This pass also works when the host provides only a teeth mask.
             // Gate from immutable input color so a lipstick pass cannot turn a
@@ -4229,6 +4261,83 @@ mod tests {
         assert!(adjusted.pixels[..3].iter().all(|value| *value < 255));
         assert_eq!(&adjusted.pixels[4..], &highlights.pixels[4..]);
         assert!(adjusted.pixels.chunks_exact(4).all(|pixel| pixel[3] == 19));
+    }
+
+    #[test]
+    fn skin_warmth_does_not_invert_low_yellow_skin_into_purple() {
+        let colors = [
+            [118, 105, 99, 83],
+            [100, 75, 68, 83],
+            [184, 160, 155, 83],
+            [175, 135, 100, 83],
+        ];
+        let source = RgbaImage::new(4, 1, colors.concat()).unwrap();
+        for amount in [-100, -40, 40, 100] {
+            let output = skin(&source, &json!({"warmth":amount}));
+            for (index, (before, after)) in source
+                .pixels
+                .chunks_exact(4)
+                .zip(output.pixels.chunks_exact(4))
+                .enumerate()
+            {
+                assert!(
+                    after[1] >= after[2],
+                    "cooling ordinary skin must not cross into blue/purple at {index}: {after:?}"
+                );
+                assert!(
+                    (pixel_light(&output, index) - pixel_light(&source, index)).abs() < 0.8,
+                    "warmth must preserve shading at {index}"
+                );
+                assert_eq!(after[3], before[3]);
+                let before_yellow = before[1] as i16 - before[2] as i16;
+                let after_yellow = after[1] as i16 - after[2] as i16;
+                if amount < 0 {
+                    assert!(after_yellow < before_yellow);
+                } else {
+                    assert!(after_yellow > before_yellow);
+                }
+                // The temperature axis primarily adjusts yellowness, leaving
+                // the independent red/pink pigment axis comparatively stable.
+                let red_shift = ((after[0] as i16 - after[1] as i16)
+                    - (before[0] as i16 - before[1] as i16))
+                    .abs();
+                let yellow_shift = (after_yellow - before_yellow).abs();
+                assert!(red_shift <= yellow_shift / 2 + 1);
+            }
+        }
+        assert_eq!(skin(&source, &json!({"warmth":0})), source);
+    }
+
+    #[test]
+    fn skin_warmth_preserves_light_texture_and_protected_colors() {
+        let source = RgbaImage::new(
+            12,
+            1,
+            (0..12)
+                .flat_map(|i| {
+                    let texture = if i % 2 == 0 { 3 } else { -3 };
+                    [
+                        (168 + texture) as u8,
+                        (143 + texture) as u8,
+                        (126 + texture) as u8,
+                        95,
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        let params = json!({"warmth":-100,"smooth":0,
+        "semanticMasks":{
+            "skin":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}},
+            "lips":{"shape":"rect","region":{"x":0.0,"y":0,"width":0.25,"height":1}},
+            "skinProtection":{"shape":"rect","region":{"x":0.75,"y":0,"width":0.25,"height":1}}
+        }});
+        let output = skin(&source, &params);
+        assert_eq!(&output.pixels[..12], &source.pixels[..12]);
+        assert_eq!(&output.pixels[36..], &source.pixels[36..]);
+        assert!((pixel_light(&output, 4) - pixel_light(&output, 5) - 6.0).abs() < 1.0);
+        assert_eq!(output.pixels[19], 95);
+        assert_ne!(&output.pixels[16..19], &source.pixels[16..19]);
     }
 
     #[test]

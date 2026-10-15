@@ -16,6 +16,31 @@ import { normalizeProject } from './core/project';
 const TOOL_TYPES = new Map(TOOLS.filter((tool) => tool.type).map((tool) => [tool.type!, tool.id]));
 const MODES: Partial<Record<ToolId, InteractionMode>> = { browse: 'pan', face: 'rect', feature: 'rect', skin: 'rect', body: 'rect', clothing: 'rect', liquify: 'liquify', repair: 'heal', grid: 'grid', mask: 'brush' };
 const GRID: ControlPoint[] = Array.from({ length: 9 }, (_, index) => { const x = (index % 3) / 2; const y = Math.floor(index / 3) / 2; return { x, y, inX: x, inY: y, outX: x, outY: y }; });
+const PORTRAIT_TYPES = new Set<OperationType>(['face.adjust', 'feature.adjust', 'skin.retouch', 'body.adjust', 'clothing.adjust']);
+const FEATURE_COLOR_KEYS = new Set(['browColor', 'lipColor', 'lipBrightness', 'lipSaturation', 'teethWhiten', 'darkCircle']);
+/** Detector coordinates depend on preceding geometry, including its masks.
+ * Zero portrait layers and color-only edits do not change those coordinates.
+ * Value-based signatures survive history's deep clones and undo/redo. */
+function portraitInputSignature(value: EditGraph, beforeId?: string) {
+  const index = beforeId ? value.operations.findIndex(item => item.id === beforeId) : -1;
+  const input = index >= 0 ? value.operations.slice(0, index) : value.operations;
+  const geometry = input.flatMap(item => {
+    if (!item.enabled || Number(item.params.opacity ?? 100) === 0) return [];
+    let params = item.params;
+    if (['face.adjust', 'feature.adjust', 'body.adjust'].includes(item.type)) {
+      const adjustments = Object.fromEntries(Object.entries(params.adjustments as Record<string, unknown> ?? {}).filter(([key, amount]) =>
+        typeof amount === 'number' && amount !== 0 && (item.type !== 'feature.adjust' || !FEATURE_COLOR_KEYS.has(key))).sort(([a], [b]) => a.localeCompare(b)));
+      if (!Object.keys(adjustments).length) return [];
+      params = { ...params, adjustments };
+    } else if (item.type === 'rotate') { if (Number(params.degrees ?? 0) % 360 === 0) return []; }
+    else if (item.type === 'warp.liquify') { if (!(params.strokes as BrushStroke[] | undefined)?.length) return []; }
+    else if (item.type === 'warp.grid') {
+      if (!item.controlPoints.some(point => (point.outX ?? point.x) !== (point.inX ?? point.x) || (point.outY ?? point.y) !== (point.inY ?? point.y))) return [];
+    } else if (!['crop', 'flip', 'resize', 'perspective'].includes(item.type)) return [];
+    return [{ id: item.id, type: item.type, params, controlPoints: item.controlPoints }];
+  });
+  return JSON.stringify({ width: value.source?.width, height: value.source?.height, geometry });
+}
 
 function App() {
   const history = useHistory(); const { graph, commit, reset, replace, undo, redo, canUndo, canRedo } = history;
@@ -37,14 +62,48 @@ function App() {
   const [sessionId, setSessionId] = useState<string | null>(null); const [exporting, setExporting] = useState(false);
   const sourceFile = useRef<File | null>(null);
   const fileInput = useRef<HTMLInputElement>(null); const graphInput = useRef<HTMLInputElement>(null); const request = useRef(0); const projectRequest = useRef(0); const sourceToken = useRef(''); const graphRef = useRef(graph); graphRef.current = graph;
+  const portraitInputs = useRef(new Map<string, string>());
+  const regionInput = useRef<string | null>(null); const detectedInput = useRef<string | null>(null);
   const selected = graph.operations.find((operation) => operation.id === selectedId);
   const definition = TOOL_BY_ID[tool];
   const currentOperation = selected && (selected.type === definition.type || (selected.type === 'paint.brush' && ['skin', 'feature'].includes(tool)) || ['mask', 'browse', 'transform', 'grid', 'repair', 'film'].includes(tool)) ? selected : [...graph.operations].reverse().find((operation) => operation.type === definition.type);
   const operation = currentOperation;
-  const activeFaceMasks = (operation?.params.semanticMasks as Record<string, SemanticMask> | undefined) ?? regionSemanticMasks;
+  const operationContextCurrent = !operation || !PORTRAIT_TYPES.has(operation.type) || portraitInputs.current.get(operation.id) === portraitInputSignature(graph, operation.id);
+  const regionContextCurrent = regionInput.current === portraitInputSignature(graph, operation?.id);
+  const activeFaceMasks = operationContextCurrent ? (operation?.params.semanticMasks as Record<string, SemanticMask> | undefined) ?? (regionContextCurrent ? regionSemanticMasks : {}) : {};
   const hasFaceSemantics = ['leftEye', 'rightEye', 'leftBrow', 'rightBrow', 'lips'].every(name => !!activeFaceMasks[name]);
   const effectiveRegion = (['face', 'feature', 'skin', 'body', 'clothing'].includes(tool) ? operation?.params.region as Region | undefined : undefined) ?? regions[tool] ?? region;
-  const portraitCapabilities: PortraitCapabilities = { region: effectiveRegion, shape: (operation?.params.mask as InlineMask | undefined)?.shape ?? regionShape, points: (operation?.params.mask as InlineMask | undefined)?.points ?? selectionPoints, semanticMasks: activeFaceMasks, bodyPart: typeof operation?.params.bodyPart === 'string' ? operation.params.bodyPart : regionPart ?? undefined, subjectMask: (operation?.params.subjectMask as RasterMask | undefined) ?? regionSubjectMask };
+  const portraitContextCurrent = operation ? operationContextCurrent : regionContextCurrent;
+  const portraitCapabilities: PortraitCapabilities = portraitContextCurrent ? { region: effectiveRegion, shape: (operation?.params.mask as InlineMask | undefined)?.shape ?? regionShape, points: (operation?.params.mask as InlineMask | undefined)?.points ?? selectionPoints, semanticMasks: activeFaceMasks, bodyPart: typeof operation?.params.bodyPart === 'string' ? operation.params.bodyPart : regionPart ?? undefined, subjectMask: (operation?.params.subjectMask as RasterMask | undefined) ?? regionSubjectMask } : { region: WHOLE_IMAGE, shape: 'rect', semanticMasks: {} };
+
+  // A detector result belongs to the input of the operation it was captured
+  // on. Keep the context when the user changes portrait tools, but invalidate
+  // it after an earlier geometric layer has changed that input. Reusing an
+  // old face mask after a face/body warp is worse than asking for detection:
+  // the sliders then edit a stale location while appearing to work.
+  const clearPortraitContext = () => {
+    regionInput.current = null;
+    setRegionLandmarks([]); setRegionPart(null); setRegionSemanticMasks({}); setRegionSubjectMask(undefined); setRegionPartMask(undefined); setRegionProtection(undefined);
+  };
+  const restorePortraitContext = (item: Operation, sourceGraph = graph, forNewLayer = false) => {
+    const input = portraitInputSignature(sourceGraph, forNewLayer ? undefined : item.id);
+    if (PORTRAIT_TYPES.has(item.type) && portraitInputs.current.get(item.id) !== input) {
+      clearPortraitContext(); setRegionShape('rect'); setSelectionPoints([]);
+      setNotice('上游几何已变化，请重新检测当前人脸或身体区域'); return false;
+    }
+    regionInput.current = input;
+    if (item.params.region) setRegion(item.params.region as Region);
+    setRegionLandmarks(Array.isArray(item.params.landmarks) ? (item.params.landmarks as Point[]) : []);
+    setRegionSemanticMasks((item.params.semanticMasks as Record<string, SemanticMask> | undefined) ?? {});
+    setRegionSubjectMask(item.params.subjectMask as RasterMask | undefined);
+    setRegionPartMask(item.params.partMask as InlineMask | RasterMask | undefined);
+    setRegionProtection(item.params.protectMask as EditableMask | undefined);
+    setRegionPart(typeof item.params.bodyPart === 'string' ? item.params.bodyPart : null);
+    const itemMask = item.params.mask as InlineMask | undefined;
+    if (itemMask) { setRegionShape(itemMask.shape); setSelectionPoints(itemMask.points ?? []); }
+    else { setRegionShape('rect'); setSelectionPoints([]); }
+    return true;
+  };
 
   useEffect(() => {
     if (!source) return;
@@ -66,6 +125,7 @@ function App() {
       const image = await decodeImage(file); if (sourceToken.current !== token) return;
       sourceFile.current = file;
       setSource(image); setPreview(image); setFilmThumbnails({}); setFilename(file.name); setSessionId(null); setSelectedId(null); setTool('browse'); setMode('pan'); setRegion(WHOLE_IMAGE); setRegions({}); setRegionLandmarks([]); setRegionPart(null); setRegionSemanticMasks({}); setRegionSubjectMask(undefined); setRegionPartMask(undefined); setRegionProtection(undefined); setSample(null); setDetected([]); setZoom(1); setCompare(false); setCompareSplit(false); setProposalPreview([]);
+      portraitInputs.current.clear(); regionInput.current = null; detectedInput.current = null;
       const next: EditGraph = { version: '1.0', sourceAssetId: `local-${token}`, source: { name: file.name, width: image.width, height: image.height }, operations: [] };
       reset(next); setNotice(`已导入 ${image.width} × ${image.height} · 本地修图模式`);
     } catch (error) { setNotice(error instanceof Error ? error.message : '导入失败'); }
@@ -81,23 +141,27 @@ function App() {
   };
   const selectTool = (id: ToolId) => {
     const family = (value: ToolId) => ['face', 'feature', 'skin'].includes(value) ? 'face' : value === 'body' ? 'body' : value === 'clothing' ? 'clothing' : 'other';
-    if (family(id) !== family(tool)) { setRegionLandmarks([]); setRegionPart(null); setRegionSemanticMasks({}); setRegionSubjectMask(undefined); setRegionPartMask(undefined); setRegionProtection(undefined); setRegion(regions[id] ?? WHOLE_IMAGE); setRegionShape('rect'); setSelectionPoints([]); }
+    const portraitTool = ['face', 'feature', 'skin'].includes(id);
+    const targetType = TOOL_BY_ID[id].type;
+    const existing = targetType ? [...graph.operations].reverse().find((item) => item.type === targetType) : undefined;
+    // When a family is entered without its own layer, inherit the newest
+    // detector-backed portrait layer as the source of the shared face masks.
+    const anchor = portraitTool ? (existing ?? [...graph.operations].reverse().find(item => ['face.adjust', 'feature.adjust', 'skin.retouch'].includes(item.type))) : undefined;
+    if (family(id) !== family(tool)) { clearPortraitContext(); setRegion(regions[id] ?? WHOLE_IMAGE); setRegionShape('rect'); setSelectionPoints([]); }
+    if (portraitTool) {
+      if (anchor) restorePortraitContext(anchor, graph, !existing);
+      else if (regionInput.current !== portraitInputSignature(graph)) clearPortraitContext();
+      setSelectedId(existing?.id ?? null);
+    } else if (existing && PORTRAIT_TYPES.has(existing.type)) restorePortraitContext(existing);
     setTool(id); setMode(MODES[id] ?? 'pan');
-    if (!['mask', 'browse'].includes(id)) { const existing = [...graph.operations].reverse().find((item) => item.type === TOOL_BY_ID[id].type); setSelectedId(existing?.id ?? null); }
+    if (!['mask', 'browse'].includes(id) && !portraitTool) { setSelectedId(existing?.id ?? null); }
     if (regions[id]) setRegion(regions[id]!);
   };
-  const selectOperation = (item: Operation) => {
+  const selectOperation = (item: Operation, sourceGraph = graph) => {
     setSelectedId(item.id); const id = TOOL_TYPES.get(item.type) ?? (['crop', 'rotate', 'flip', 'resize'].includes(item.type) ? 'transform' : item.type === 'paint.brush' ? 'feature' : item.type === 'filter.lut' ? 'film' : item.type === 'repair.clone' || item.type === 'repair.inpaint' ? 'repair' : 'browse');
     setTool(id); setMode(MODES[id] ?? 'pan'); if (item.type === 'perspective') { setTool('grid'); setMode('perspective'); }
     if (item.type === 'repair.clone') { setTool('repair'); setMode('clone'); }
-    if (item.params.region) setRegion(item.params.region as Region);
-    setRegionLandmarks(Array.isArray(item.params.landmarks) ? (item.params.landmarks as Point[]) : []);
-    setRegionSemanticMasks((item.params.semanticMasks as Record<string, SemanticMask> | undefined) ?? {});
-    setRegionSubjectMask(item.params.subjectMask as RasterMask | undefined);
-    setRegionPartMask(item.params.partMask as InlineMask | RasterMask | undefined);
-    setRegionProtection(item.params.protectMask as EditableMask | undefined);
-    setRegionPart(typeof item.params.bodyPart === 'string' ? item.params.bodyPart : null);
-    const itemMask = item.params.mask as InlineMask | undefined; if (itemMask) { setRegionShape(itemMask.shape); setSelectionPoints(itemMask.points ?? []); } else { setRegionShape('rect'); setSelectionPoints([]); }
+    restorePortraitContext(item, sourceGraph);
   };
   const append = (type: OperationType, params: Record<string, unknown>, label?: string) => {
     if (!source) { setNotice('请先导入图片'); return null; }
@@ -106,6 +170,18 @@ function App() {
     if ((params.mask as InlineMask | undefined)?.shape === 'polygon' && !(params.mask as InlineMask).points?.length) params = { ...params, mask: { ...(params.mask as InlineMask), points: selectionPoints } };
     if (type === 'warp.liquify' && operation?.type === 'warp.liquify') { const inherited: Record<string, unknown> = {}; for (const key of ['mask', 'protectMask'] as const) if (operation.params[key]) inherited[key] = structuredClone(operation.params[key]); params = { ...inherited, ...params }; }
     const localType = ['face.adjust', 'feature.adjust', 'skin.retouch', 'body.adjust', 'clothing.adjust'].includes(type);
+    if (localType && (regionInput.current !== null || operation && PORTRAIT_TYPES.has(operation.type)) && regionInput.current !== portraitInputSignature(graphRef.current)) {
+      // A new layer needs detection on the output of all existing layers.
+      // Create a neutral placeholder first so Detect can target that input;
+      // detecting the previous layer again would still exclude its own warp.
+      const pending = createOperation(type, type === 'skin.retouch'
+        ? { region: WHOLE_IMAGE, smooth: 0, texture: 50, whiten: 0, warmth: 0, redness: 0 }
+        : { region: WHOLE_IMAGE, adjustments: {} }, label ?? definition.label);
+      portraitInputs.current.set(pending.id, portraitInputSignature(graphRef.current));
+      commit(current => ({ ...current, operations: [...current.operations, pending] }));
+      clearPortraitContext(); setRegion(WHOLE_IMAGE); setRegionShape('rect'); setSelectionPoints([]); setSelectedId(pending.id);
+      setNotice('已新增待定位图层，请重新检测或标记这个图层的输入区域'); return pending;
+    }
     const landmarkType = ['face.adjust', 'feature.adjust', 'body.adjust', 'clothing.adjust'].includes(type);
     const semanticParams = ['face.adjust', 'feature.adjust', 'skin.retouch'].includes(type) && Object.keys(regionSemanticMasks).length ? { semanticMasks: structuredClone(regionSemanticMasks) } : {};
     const subjectParams = ['face.adjust', 'body.adjust'].includes(type) && regionSubjectMask ? { subjectMask: structuredClone(regionSubjectMask) } : {};
@@ -122,6 +198,7 @@ function App() {
       if (!portraitParametersFor(targetTool, capabilities).length) { setNotice(targetTool === 'face' ? '请先检测人脸，或用套索 / 多边形标记真实脸部轮廓' : targetTool === 'body' ? '请先检测身体并选择部位；手工塑形可使用液化画笔' : '请先检测对应五官或标记皮肤 / 衣物局部区域'); return null; }
     }
     const item = createOperation(type, prepared, label ?? definition.label);
+    if (localType) portraitInputs.current.set(item.id, portraitInputSignature(graphRef.current));
     if (type === 'warp.grid') item.controlPoints = structuredClone(GRID);
     commit((current) => ({ ...current, operations: [...current.operations, item] })); setSelectedId(item.id); setNotice(`已添加${item.label}`); return item;
   };
@@ -140,6 +217,9 @@ function App() {
     const common = ['opacity', 'blendMode', 'mask', 'protectMask'].includes(key); const matchesType = target?.type === definition.type || (target?.type === 'filter.lut' && key === 'amount') || (target?.type === 'repair.inpaint' && ['method', 'execution'].includes(key));
     if (!target || (!common && !matchesType)) {
       if (!definition.type) return;
+      if (PORTRAIT_TYPES.has(definition.type) && regionInput.current !== portraitInputSignature(graphRef.current)) {
+        clearPortraitContext(); setNotice('调整层输入已变化，请重新检测或重新标记区域'); return;
+      }
       if (graphRef.current.operations.length >= 256) { setNotice('工程最多支持 256 个操作，请删除不需要的图层'); return; }
       const defaults = defaultsFor(definition, effectiveRegion);
       const selectionMask = definition.region && regionShape !== 'rect'
@@ -151,6 +231,7 @@ function App() {
       const bodyPart = definition.type === 'body.adjust' && regionPart ? { bodyPart: regionPart } : {};
       const subjectMask = ['face.adjust', 'body.adjust'].includes(definition.type ?? '') && regionSubjectMask ? { subjectMask: structuredClone(regionSubjectMask) } : {};
       target = createOperation(definition.type, { ...defaults, [key]: value, ...selectionMask, ...landmarks, ...semanticMasks, ...bodyPart, ...subjectMask, ...(definition.type === 'body.adjust' && regionPartMask ? { partMask: structuredClone(regionPartMask) } : {}), ...(definition.type === 'body.adjust' && regionProtection ? { protectMask: structuredClone(regionProtection) } : {}) }, definition.label);
+      if (PORTRAIT_TYPES.has(definition.type)) portraitInputs.current.set(target.id, portraitInputSignature(graphRef.current));
       commit((current) => ({ ...current, operations: [...current.operations, target!] }), `${target.id}:${key}`); setSelectedId(target.id);
     } else patchOperation(target.id, (item) => {
       const params = { ...item.params, [key]: value };
@@ -160,10 +241,18 @@ function App() {
     }, `${target.id}:${key}`);
   };
   const setTargetRegion = (next: Region, shape: SelectionShape = regionShape, points = selectionPoints, landmarks?: Point[], part?: string, semanticMasks?: Record<string, SemanticMask>, subjectMask?: RasterMask, protectMask?: EditableMask, partMask?: InlineMask | RasterMask) => {
+    const input = portraitInputSignature(graphRef.current, operation?.id); regionInput.current = input;
+    if (operation && PORTRAIT_TYPES.has(operation.type)) portraitInputs.current.set(operation.id, input);
     setRegion(next); setRegionShape(shape); setSelectionPoints(points); setRegionLandmarks(landmarks ?? []); setRegionPart(part ?? null); setRegionSemanticMasks(semanticMasks ?? {}); setRegionSubjectMask(subjectMask); setRegionProtection(protectMask); setRegionPartMask(partMask); setRegions((current) => ({ ...current, [tool]: next }));
     if (operation && ['face', 'feature', 'skin', 'body', 'clothing'].includes(tool)) {
       patchOperation(operation.id, (item) => { const params: Record<string, unknown> = { ...item.params, region: next }; if (landmarks?.length) params.landmarks = landmarks.map(({ x, y }) => ({ x, y })); else delete params.landmarks; if (semanticMasks && Object.keys(semanticMasks).length) params.semanticMasks = structuredClone(semanticMasks); else delete params.semanticMasks; if (tool === 'body' && protectMask) params.protectMask = structuredClone(protectMask); if (tool === 'body' && partMask) params.partMask = structuredClone(partMask); else delete params.partMask; if (['face', 'body'].includes(tool) && subjectMask) params.subjectMask = structuredClone(subjectMask); else delete params.subjectMask; if (tool === 'body' && part) params.bodyPart = part; else if (tool === 'body') delete params.bodyPart; if (shape !== 'rect') Object.assign(params, { mask: { ...maskForRegion(next, shape, points), feather: shape === 'polygon' ? 8 : 0 } }); else delete params.mask; return { ...item, params }; });
     }
+  };
+  const chooseDetectedRegion = (item: DetectedRegion) => {
+    if (detectedInput.current !== portraitInputSignature(graphRef.current, operation?.id)) {
+      clearPortraitContext(); setNotice('检测结果的输入已变化，请重新检测当前图层'); return;
+    }
+    setTargetRegion(item.region, item.points && item.points.length >= 3 ? 'polygon' : 'rect', item.points ?? [], item.landmarks, item.part, item.semanticMasks, item.subjectMask, item.protectMask, item.partMask);
   };
   const setMask = (key: 'mask' | 'protectMask', mask: EditableMask | null) => {
     if (!operation) { setNotice('请先选择一个操作图层'); return; }
@@ -222,7 +311,11 @@ function App() {
       const image = await renderImage(source, candidate, { kind: 'export' });
       if (id !== projectRequest.current || token !== sourceToken.current) return;
       if (graphRef.current !== base) { setNotice('校验期间已有新的编辑，请重新载入工程'); return; }
-      commit(candidate); setPreview(image); setEngineError(''); setSelectedId(candidate.operations.at(-1)?.id ?? null); setNotice('操作工程已载入，可撤销');
+      for (const item of candidate.operations) if (PORTRAIT_TYPES.has(item.type)) portraitInputs.current.set(item.id, portraitInputSignature(candidate, item.id));
+      commit(candidate); setPreview(image); setEngineError('');
+      const last = candidate.operations.at(-1);
+      if (last) selectOperation(last, candidate); else { clearPortraitContext(); setSelectedId(null); }
+      setNotice('操作工程已载入，可撤销');
     } catch (error) { if (id === projectRequest.current && token === sourceToken.current) setNotice(error instanceof Error ? error.message : '工程载入失败'); }
   };
   const exportImage = async () => {
@@ -275,6 +368,7 @@ function App() {
         }));
       });
       setDetected(detectedRegions);
+      detectedInput.current = portraitInputSignature(inputGraph);
       if (detectedRegions[0]) setTargetRegion(detectedRegions[0].region, detectedRegions[0].points && detectedRegions[0].points.length >= 3 ? 'polygon' : 'rect', detectedRegions[0].points ?? [], detectedRegions[0].landmarks, detectedRegions[0].part, detectedRegions[0].semanticMasks, detectedRegions[0].subjectMask, detectedRegions[0].protectMask, detectedRegions[0].partMask);
       const unavailable = results.flatMap(person => person.unavailableParts ?? []);
       setNotice(detectedRegions.length ? `检测到 ${detectedRegions.length} 个语义区域，可切换${unavailable.length ? `；${unavailable.length} 个被遮挡部位轮廓不可见，未开放调整` : ''}` : '未检测到可编辑目标，可以手动标记');
@@ -306,7 +400,7 @@ function App() {
     <div className="statusbar"><span className={engineError ? 'status-error' : ''}>{engineError ? `图像核心：${engineError}` : notice}</span><div><button disabled={!source} onClick={saveGraph}>保存工程</button><button disabled={!source} onClick={() => { void navigator.clipboard.writeText(JSON.stringify(graph, null, 2)).then(() => setNotice('操作参数已复制')).catch(() => setNotice('复制失败，请保存工程文件')); }}>复制参数</button><button disabled={!source} onClick={() => { const text = window.prompt('粘贴操作工程 JSON'); if (text) void importGraph(new File([text], 'paste.edit.json', { type: 'application/json' })); }}>粘贴参数</button><button disabled={!source} onClick={() => graphInput.current?.click()}>载入工程</button><button disabled={!graph.operations.length} onClick={() => { commit({ ...graph, operations: [] }); setSelectedId(null); setNotice('操作已清空，原图保持不变'); }}>清空操作</button></div></div>
     {proposalPreview.length > 0 && <div className="proposal-preview-banner"><span>AI 提案预览 · 尚未应用到操作历史</span><button onClick={() => setProposalPreview([])}>取消预览</button></div>}<main className="workspace"><Sidebar tool={tool} onTool={selectTool} operations={graph.operations} selectedId={selectedId} onSelect={selectOperation} onToggle={(id) => patchOperation(id, (item) => ({ ...item, enabled: !item.enabled }))} onDelete={remove} onMove={move} />
       <CanvasStage image={preview} original={source} compare={compare} compareSplit={compareSplit} onCompareSplit={setCompareSplit} busy={busy} zoom={zoom} onZoom={setZoom} mode={mode} region={['browse', 'face', 'feature', 'skin', 'body', 'clothing', 'repair'].includes(tool) ? effectiveRegion : null} mask={operation?.params.mask as InlineMask | undefined} protectMask={operation?.params.protectMask as EditableMask | undefined} controls={controlPoints} sample={sample} radius={brush.radius} onGesture={gesture} onSample={(point) => { setSample(point); setNotice('取样点已设置'); }} onControl={moveControl} onChoose={() => fileInput.current?.click()} />
-      <aside className="right-panel">{source ? <><div className="image-info"><strong title={filename}>{filename}</strong><span>{source.width} × {source.height} · {graph.operations.length} 项编辑</span></div><div className="mobile-layer-select"><select aria-label="选择操作图层" value={selectedId ?? ''} onChange={(event) => { const item = graph.operations.find((entry) => entry.id === event.target.value); if (item) selectOperation(item); }}><option value="">选择操作图层</option>{graph.operations.map((item) => <option key={item.id} value={item.id}>{item.label ?? item.type}</option>)}</select>{selected && <div className="button-grid"><button onClick={() => patchOperation(selected.id, { enabled: !selected.enabled })}>{selected.enabled ? '关闭图层' : '启用图层'}</button><button onClick={() => remove(selected.id)}>删除图层</button></div>}</div><ToolPanel key={`${tool}-${selectedId ?? 'new'}`} tool={tool} operation={operation} hasFaceSemantics={hasFaceSemantics} portraitCapabilities={portraitCapabilities} bodyPart={typeof operation?.params.bodyPart === 'string' ? operation.params.bodyPart : regionPart ?? undefined} imageSize={{ width: preview?.width ?? source.width, height: preview?.height ?? source.height }} region={effectiveRegion} regionShape={regionShape} mode={mode} brush={brush} sample={sample} detected={detected} detecting={detecting} onMode={setMode} onBrush={(settings) => setBrush((current) => ({ ...current, ...settings }))} onParam={changeParam} onCreate={append} onReset={resetOperation} onRegion={(next) => setTargetRegion(next, regionShape, selectionPoints, regionLandmarks, regionPart ?? undefined, regionSemanticMasks, regionSubjectMask, (operation?.params.protectMask as EditableMask | undefined) ?? regionProtection, (operation?.params.partMask as InlineMask | RasterMask | undefined) ?? regionPartMask)} onDetect={detect} onChooseRegion={(item) => setTargetRegion(item.region, item.points && item.points.length >= 3 ? 'polygon' : 'rect', item.points ?? [], item.landmarks, item.part, item.semanticMasks, item.subjectMask, item.protectMask, item.partMask)} onMask={setMask} paintColor={paintColor} onPaintColor={(color) => { setPaintColor(color); if (selected?.type === 'paint.brush') patchOperation(selected.id, (item) => ({ ...item, params: { ...item.params, color: [1, 3, 5].map((index) => parseInt(color.slice(index, index + 2), 16)) } })); }} onLUT={importLUT} filmThumbnails={filmThumbnails} /><AIPanel sessionId={sessionId} graph={graph} onConnect={connectAI} onNotice={setNotice} onPreview={setProposalPreview} onApply={(next) => { commit(next); setSelectedId(next.operations.at(-1)?.id ?? null); }} /></> : <div className="right-empty">照片导入后<br />在这里调整参数<br /><small>手工功能可离线运行</small></div>}</aside>
+      <aside className="right-panel">{source ? <><div className="image-info"><strong title={filename}>{filename}</strong><span>{source.width} × {source.height} · {graph.operations.length} 项编辑</span></div><div className="mobile-layer-select"><select aria-label="选择操作图层" value={selectedId ?? ''} onChange={(event) => { const item = graph.operations.find((entry) => entry.id === event.target.value); if (item) selectOperation(item); }}><option value="">选择操作图层</option>{graph.operations.map((item) => <option key={item.id} value={item.id}>{item.label ?? item.type}</option>)}</select>{selected && <div className="button-grid"><button onClick={() => patchOperation(selected.id, { enabled: !selected.enabled })}>{selected.enabled ? '关闭图层' : '启用图层'}</button><button onClick={() => remove(selected.id)}>删除图层</button></div>}</div><ToolPanel key={`${tool}-${selectedId ?? 'new'}`} tool={tool} operation={operation} hasFaceSemantics={hasFaceSemantics} portraitCapabilities={portraitCapabilities} bodyPart={typeof operation?.params.bodyPart === 'string' ? operation.params.bodyPart : regionPart ?? undefined} imageSize={{ width: preview?.width ?? source.width, height: preview?.height ?? source.height }} region={effectiveRegion} regionShape={regionShape} mode={mode} brush={brush} sample={sample} detected={detected} detecting={detecting} onMode={setMode} onBrush={(settings) => setBrush((current) => ({ ...current, ...settings }))} onParam={changeParam} onCreate={append} onReset={resetOperation} onRegion={(next) => setTargetRegion(next, regionShape, selectionPoints, regionLandmarks, regionPart ?? undefined, regionSemanticMasks, regionSubjectMask, (operation?.params.protectMask as EditableMask | undefined) ?? regionProtection, (operation?.params.partMask as InlineMask | RasterMask | undefined) ?? regionPartMask)} onDetect={detect} onChooseRegion={chooseDetectedRegion} onMask={setMask} paintColor={paintColor} onPaintColor={(color) => { setPaintColor(color); if (selected?.type === 'paint.brush') patchOperation(selected.id, (item) => ({ ...item, params: { ...item.params, color: [1, 3, 5].map((index) => parseInt(color.slice(index, index + 2), 16)) } })); }} onLUT={importLUT} filmThumbnails={filmThumbnails} /><AIPanel sessionId={sessionId} graph={graph} onConnect={connectAI} onNotice={setNotice} onPreview={setProposalPreview} onApply={(next) => { commit(next); setSelectedId(next.operations.at(-1)?.id ?? null); }} /></> : <div className="right-empty">照片导入后<br />在这里调整参数<br /><small>手工功能可离线运行</small></div>}</aside>
     </main><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden-input" onChange={imageChange} /><input ref={graphInput} type="file" accept=".json" className="hidden-input" onChange={graphChange} />
   </div>;
 }

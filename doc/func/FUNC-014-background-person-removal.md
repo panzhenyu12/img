@@ -62,6 +62,8 @@ Rust `inpaint.rs` 使用确定性的exemplar纹理补全：
 
 这是一期 Demo 级传统算法；结构规则的棋盘/条纹已验证，真实街景仍有接缝，不能据此宣称路人去除自然度普遍达标。大面积遮挡、复杂建筑、头发和目标与主体相交时，需单独检查结果。可选 LaMa 模型已另行接入，见 [FUNC-016](FUNC-016-local-model-inpaint.md)；传统入口保持 `method=exemplar`（省略 method 也使用传统算法），不依赖模型、LLM 或联网服务。
 
+2026-10-14等价加速：预编译蒙版、有序frontier、每步复用目标上下文与SSD非负下界剪枝，保留旧raster/tie及f32计算顺序和inline蒙版默认rect语义。新增reference胜者/浮点同分及默认保护范围回归；四个固定案例完整RGBA、选区外、冻结和alpha差异均为0。native同进程热中位数在最终512px案例由248–337ms降至63–88ms，768px polygon街景本次736→71ms、前一次562→65ms；机器波动保留，不作固定加速承诺。未改变自然度评分，未测浏览器、大图或LaMa速度。首次/热重复、哈希、边界和复现见 [加速验收](../qa/inpaint-efficiency-v1-review.md)。
+
 ## 对账位置
 
 - Web 入口与选区交互：`apps/web/src/components/ToolPanel.tsx`、`apps/web/src/App.tsx`
@@ -98,3 +100,4 @@ Rust `inpaint.rs` 使用确定性的exemplar纹理补全：
 
 - 2026-10-13：新增一期背景人物/杂物去除入口、保护主体流程和 polygon/protectMask 回归测试。
 - 2026-10-13：明确传统 exemplar 与可选 LaMa 的实现、证据和质量边界；撤销过于宽泛的自然度完成标记。
+- 2026-10-14：传统exemplar精确加速与四例RGBA等价回放；保留复杂背景自然度未通过状态。

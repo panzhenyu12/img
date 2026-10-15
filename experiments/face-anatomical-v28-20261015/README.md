@@ -1,0 +1,1 @@
+# face anatomical v28\n\n联合流场分层采样实验：face 与 neck 使用独立 alpha 采样，按 face-over-neck 合成，不叠加旧 bridge 修复。\n

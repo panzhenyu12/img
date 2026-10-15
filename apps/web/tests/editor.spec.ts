@@ -300,7 +300,7 @@ test('手动修复可读取冻结源，空选区和零透明度不会阻塞后�
   } finally { await request.delete(`http://127.0.0.1:8080/api/v1/sessions/${session.id}`); }
 });
 
-test('真实人像本地 MediaPipe 检测以及参数编辑截图', async ({ page }) => {
+test('真实人像本地 MediaPipe 检测以及参数编辑截图', async ({ page, request }) => {
   await page.goto('/');
   await page.locator('input[type=file][accept="image/jpeg,image/png,image/webp"]').setInputFiles(path.join(import.meta.dirname, 'fixtures/portrait.jpg'));
   await ready(page); await page.getByRole('button', { name: '脸型', exact: true }).click();
@@ -333,6 +333,49 @@ test('真实人像本地 MediaPipe 检测以及参数编辑截图', async ({ pag
     return canvas.toDataURL('image/png').split(',')[1];
   },{encoded:buffer.toString('base64'),graph,region:face.params.region});
   await fs.writeFile(path.resolve(import.meta.dirname,'../../../doc/qa/portrait-face-comparison.png'),Buffer.from(comparison,'base64'));
+  // Reuse the actual parsed matte, observed neck and feature protection. This
+  // exercises the jaw-edge clipping path which a landmark-only synthetic face
+  // cannot cover, and checks contraction/expansion against the native core.
+  // Browser and native JPEG decoders have different chroma rounding. Give
+  // both cores the same decoded pixels via a lossless canonical PNG, while
+  // retaining JPEG import and real detection above.
+  const canonicalSource = await page.evaluate(async encoded => {
+    const { decodeImage, pixelsToCanvas } = await import('/src/core/engine.ts');
+    const file = new File([Uint8Array.from(atob(encoded), c => c.charCodeAt(0))], 'portrait.jpg', { type: 'image/jpeg' });
+    return pixelsToCanvas(await decodeImage(file)).toDataURL('image/png').split(',')[1];
+  }, buffer.toString('base64'));
+  const created = await request.post('http://127.0.0.1:8080/api/v1/sessions');
+  expect(created.ok()).toBeTruthy(); const session = await created.json();
+  try {
+    const uploaded = await request.post(`http://127.0.0.1:8080/api/v1/sessions/${session.id}/assets`, {
+      multipart: { file: { name: 'portrait-canonical.png', mimeType: 'image/png', buffer: Buffer.from(canonicalSource, 'base64') } },
+    });
+    expect(uploaded.ok()).toBeTruthy(); const asset = await uploaded.json();
+    for (const chin of [-100, 100]) {
+      const replay = { ...graph, sourceAssetId: asset.id, operations: [{ ...face, params: { ...face.params, adjustments: { chin } } }] };
+      const native = await request.post(`http://127.0.0.1:8080/api/v1/sessions/${session.id}/render`, { data: { editGraph: replay, format: 'png' } });
+      expect(native.status(), await native.text()).toBe(200);
+      const check = await page.evaluate(async ({ source, native, graph }) => {
+        const { decodeImage, renderImage } = await import('/src/core/engine.ts');
+        const file = (encoded: string, mime: string) => new File([Uint8Array.from(atob(encoded), c => c.charCodeAt(0))], 'portrait', { type: mime });
+        const input = await decodeImage(file(source, 'image/png'));
+        const expected = await decodeImage(file(native, 'image/png'));
+        const actual = await renderImage(input, graph, { kind: 'export' });
+        let differences = 0, alphaChanges = 0, changedPixels = 0;
+        for (let i = 0; i < actual.pixels.length; i++) {
+          differences += Number(actual.pixels[i] !== expected.pixels[i]);
+          if (i % 4 === 3) alphaChanges += Number(actual.pixels[i] !== input.pixels[i]);
+        }
+        for (let i = 0; i < actual.pixels.length; i += 4) {
+          if ([0, 1, 2].some(c => actual.pixels[i + c] !== input.pixels[i + c])) changedPixels++;
+        }
+        return { differences, alphaChanges, changedPixels };
+      }, { source: canonicalSource, native: (await native.body()).toString('base64'), graph: replay });
+      expect(check.differences, `chin=${chin}`).toBe(0);
+      expect(check.alphaChanges).toBe(0);
+      expect(check.changedPixels).toBeGreaterThan(100);
+    }
+  } finally { await request.delete(`http://127.0.0.1:8080/api/v1/sessions/${session.id}`); }
 });
 
 test('真实人像 Pose 语义部位使用独立 polygon mask', async ({ page }) => {

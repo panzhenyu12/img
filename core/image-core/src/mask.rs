@@ -230,6 +230,17 @@ impl<'a> PreparedMask<'a> {
         } else {
             Cow::Borrowed(value)
         };
+        Self::prepare(value)
+    }
+
+    /// Inline operation masks follow `coverage`: an omitted shape is a rect,
+    /// even when unused points are present. Semantic masks may use compact
+    /// polygon forms via `new`, but must not change legacy selection defaults.
+    pub fn inline(value: &'a Value) -> Self {
+        Self::prepare(Cow::Borrowed(value))
+    }
+
+    fn prepare(value: Cow<'a, Value>) -> Self {
         let feather = number(&value, "feather", 0.0).clamp(0.0, 100.0) / 100.0 * 0.2;
         let shape = match value
             .get("shape")

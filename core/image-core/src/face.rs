@@ -11,6 +11,8 @@ use serde_json::{json, Value};
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
+#[path = "face_flow.rs"]
+mod flow;
 #[path = "face_mls.rs"]
 mod mls;
 
@@ -263,6 +265,13 @@ fn anchors(semantics: Option<&Value>, frame: Frame, w: f32, h: f32) -> Vec<Ancho
     result
 }
 
+fn vertical_contour_offset(frame: Frame, p: Point, values: &Value) -> f32 {
+    let y = (frame.coordinates(p).1 - frame.top) / frame.height().max(1.0);
+    frame.height()
+        * (percent(values, "chin") * 0.075 * smoothstep(0.74, 1.0, y)
+            - percent(values, "forehead") * 0.060 * (1.0 - smoothstep(0.0, 0.30, y)))
+}
+
 fn target_contour(polygon: &[Point], frame: Frame, values: &Value) -> Vec<Point> {
     polygon
         .iter()
@@ -283,9 +292,7 @@ fn target_contour(polygon: &[Point], frame: Frame, values: &Value) -> Vec<Point>
             inward -= percent(values, "chinWidth") * 0.050 * profile(y, 0.69, 0.89, 1.04);
             inward += percent(values, "chinPoint") * 0.055 * profile(y, 0.72, 0.93, 1.02);
             let du = -side * frame.width() * inward.clamp(-0.11, 0.11) * lateral;
-            let dv = frame.height()
-                * (percent(values, "chin") * 0.075 * smoothstep(0.74, 1.0, y)
-                    - percent(values, "forehead") * 0.060 * (1.0 - smoothstep(0.0, 0.30, y)));
+            let dv = vertical_contour_offset(frame, p, values);
             frame.position(u + du, v + dv)
         })
         .collect()
@@ -756,6 +763,67 @@ fn neck_normal(polygon: &[Point], edge: usize, t: f32, reach: f32) -> Point {
         normal = scale(normal, -1.0);
     }
     normal
+}
+
+/// A confidently parsed mixed source edge can have fully opaque lobes outside
+/// its .5 contour. Inverse sampling moves those lobes below the requested jaw.
+/// Use the requested contour as an opacity upper bound only on a contracting
+/// lower jaw with nearby observed neck. The physical source colors, neck
+/// illumination and all hair/scene/ear edges retain their existing paths.
+fn clip_supported_jaw_opacity(
+    sampled: &mut ([f32; 4], f32),
+    p: Point,
+    crop: &RgbaImage,
+    neck_support: &[f32],
+    field: &ContourField<'_>,
+    frame: Frame,
+    origin: Point,
+) {
+    if sampled.1 <= 1e-6 || frame.coordinates(p).1 <= frame.top + frame.height() * 0.76 {
+        return;
+    }
+    let mut best = (f32::MAX, 0, 0.0);
+    for j in 0..field.target.len() {
+        let (d, t) = closest(
+            p,
+            field.target[j],
+            field.target[(j + 1) % field.target.len()],
+        );
+        if d < best.0 {
+            best = (d, j, t);
+        }
+    }
+    let (distance, j, t) = best;
+    if distance >= 8.0 {
+        return;
+    }
+    let next = (j + 1) % field.source.len();
+    let old = add(
+        scale(field.source[j], 1.0 - t),
+        scale(field.source[next], t),
+    );
+    let new = add(
+        scale(field.target[j], 1.0 - t),
+        scale(field.target[next], t),
+    );
+    let normal = neck_normal(field.source, j, t, 6.0);
+    if dot(sub(old, new), normal) <= 1.0 {
+        return;
+    }
+    let q = add(old, scale(normal, 6.0));
+    let (_, support) = sample(
+        crop,
+        neck_support,
+        q.0 - origin.0 - 0.5,
+        q.1 - origin.1 - 0.5,
+    );
+    if support < 0.999 {
+        return;
+    }
+    let limited = sampled.1.min(alpha(p, field.target));
+    let ratio = limited / sampled.1;
+    sampled.0 = sampled.0.map(|c| c * ratio);
+    sampled.1 = limited;
 }
 
 /// Reposition only observed neck illumination after jaw contraction. Neck
@@ -1369,13 +1437,39 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         .min(h) as usize;
     let (cw, ch) = (right - left, bottom - top);
     let count = cw * ch;
-    let mut grid = ContourGrid::new((left as f32 + 0.5, top as f32 + 0.5), cw, ch);
     let source_matte = face_matte.map(PreparedMask::new);
     let contour_mask = contour_matte.map(PreparedMask::new);
     let person_mask = params.get("subjectMask").map(PreparedMask::new);
     let protect_mask = params.get("protectMask").map(PreparedMask::new);
     let neck_mask = semantics.and_then(|m| m.get("neck")).map(PreparedMask::new);
     let hair_mask = semantics.and_then(|m| m.get("hair")).map(PreparedMask::new);
+    // Current parser projects can transport the connected face/upper-neck
+    // foreground together. Older projects and manual tracings keep their
+    // established face-only path when this observed raster evidence is absent.
+    let observed_raster = |value: &Value| {
+        let width = value.get("width").and_then(Value::as_u64).unwrap_or(0);
+        let height = value.get("height").and_then(Value::as_u64).unwrap_or(0);
+        value.get("shape").and_then(Value::as_str) == Some("raster")
+            && width > 0
+            && height > 0
+            && width.checked_mul(height).is_some_and(|count| {
+                value
+                    .get("data")
+                    .and_then(Value::as_array)
+                    .is_some_and(|data| data.len() as u64 == count)
+            })
+    };
+    let joint_skin = semantics
+        .and_then(|m| m.get("skin"))
+        .filter(|m| observed_raster(m))
+        .map(PreparedMask::new);
+    let mut joint_neck = face_contour.is_some()
+        && face_matte.is_some()
+        && contour_matte.is_some()
+        && joint_skin.is_some()
+        && semantics
+            .and_then(|m| m.get("neck"))
+            .is_some_and(observed_raster);
     let output_mask = support_params.get("mask").map(PreparedMask::new);
     let fixed_masks: Vec<_> = ["accessories", "ears", "hair"]
         .iter()
@@ -1396,6 +1490,8 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let mut face_membership = Vec::with_capacity(count);
     let mut frozen = Vec::with_capacity(count);
     let mut donor_frozen = Vec::with_capacity(count);
+    let mut inferred_person_fixed = Vec::with_capacity(count);
+    let mut attachment_fixed = Vec::with_capacity(count);
     let mut protection = Vec::with_capacity(count);
     let mut donor_excluded = Vec::with_capacity(count);
     let mut known_layer = Vec::with_capacity(count);
@@ -1430,6 +1526,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             let accessory = fixed_masks
                 .iter()
                 .any(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            attachment_fixed.push(accessory);
             let hair = hair_mask
                 .as_ref()
                 .is_some_and(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
@@ -1473,6 +1570,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                     .iter()
                     .enumerate()
                     .any(|(j, &a)| closest(p, a, polygon[(j + 1) % polygon.len()]).0 <= 3.0);
+            inferred_person_fixed.push(other_person && !covered_old_fringe);
             frozen.push(
                 protected >= 1.0 - 1e-6 || accessory || (other_person && !covered_old_fringe),
             );
@@ -1506,7 +1604,100 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     // The actual moving foreground is the parsed facial class alpha. The head
     // alpha remains the context/protection support above, while visible hair
     // supplies a stationary underlayer for the newly exposed skin strip.
-    let moving_alpha = if contour_mask.is_some() {
+    // A finite observed seed from parser face and skin-group(1,10,14).
+    // This is not a union of raw class probabilities or an invented envelope.
+    let mut joint_alpha = face_membership.clone();
+    let mut joint_owned = vec![false; count];
+    if joint_neck {
+        let skin = joint_skin.as_ref().expect("raster evidence checked");
+        for (i, alpha) in joint_alpha.iter_mut().enumerate() {
+            let p = (
+                left as f32 + (i % cw) as f32 + 0.5,
+                top as f32 + (i / cw) as f32 + 0.5,
+            );
+            *alpha = (*alpha).max(skin.coverage(p.0 / w, p.1 / h, source.width, source.height));
+        }
+        let mut queue = VecDeque::new();
+        for i in 0..count {
+            let p = (
+                left as f32 + (i % cw) as f32 + 0.5,
+                top as f32 + (i / cw) as f32 + 0.5,
+            );
+            if !attachment_fixed[i]
+                && protection[i] < 1.0 - 1e-6
+                && face_membership[i] > 0.5
+                && inside(p, &polygon)
+            {
+                joint_owned[i] = true;
+                queue.push_back(i);
+            }
+        }
+        while let Some(i) = queue.pop_front() {
+            for n in neighbors(i, cw, ch) {
+                if !joint_owned[n]
+                    && !attachment_fixed[n]
+                    && protection[n] < 1.0 - 1e-6
+                    && joint_alpha[n] > 0.5
+                {
+                    joint_owned[n] = true;
+                    queue.push_back(n);
+                }
+            }
+        }
+        if !joint_owned.iter().enumerate().any(|(i, &owned)| {
+            let p = (
+                left as f32 + (i % cw) as f32 + 0.5,
+                top as f32 + (i / cw) as f32 + 0.5,
+            );
+            owned
+                && face_membership[i] <= 0.5
+                && skin.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.5
+                && neck_mask.as_ref().unwrap().coverage(
+                    p.0 / w,
+                    p.1 / h,
+                    source.width,
+                    source.height,
+                ) > 0.8
+        }) {
+            joint_neck = false;
+        }
+        // Preserve only the physical trimap next to the observed connected
+        // component. Disconnected skin islands cannot become moving people.
+        if joint_neck {
+            let raster = semantics.and_then(|m| m.get("skin")).unwrap();
+            let mw = raster.get("width").and_then(Value::as_u64).unwrap() as f32;
+            let mh = raster.get("height").and_then(Value::as_u64).unwrap() as f32;
+            let fringe = (2.0 + 1.5 * (w / mw).max(h / mh).max(1.0)).ceil() as u16;
+            let mut distance = vec![u16::MAX; count];
+            let mut queue = VecDeque::new();
+            for (i, &owned) in joint_owned.iter().enumerate() {
+                if owned {
+                    distance[i] = 0;
+                    queue.push_back(i);
+                }
+            }
+            while let Some(i) = queue.pop_front() {
+                let d = distance[i].saturating_add(1);
+                if d > fringe {
+                    continue;
+                }
+                for n in neighbors(i, cw, ch) {
+                    if d < distance[n] {
+                        distance[n] = d;
+                        queue.push_back(n);
+                    }
+                }
+            }
+            for i in 0..count {
+                if !joint_owned[i] && (distance[i] > fringe || joint_alpha[i] > 0.5) {
+                    joint_alpha[i] = 0.0;
+                }
+            }
+        }
+    }
+    let moving_alpha = if joint_neck {
+        &joint_alpha
+    } else if contour_mask.is_some() {
         &face_membership
     } else {
         &subject
@@ -1523,9 +1714,98 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let independent_head = contour_matte.is_some() && face_matte != contour_matte;
     if independent_head {
         for (i, alpha) in color_alpha.iter_mut().enumerate() {
-            if subject[i] <= 1e-6 {
+            if subject[i] <= 1e-6 && (!joint_neck || joint_alpha[i] <= 1e-6) {
                 *alpha = 0.0;
             }
+        }
+    }
+    // Recover only physical alpha omitted by semantic zero at the connected
+    // face/neck edge. This does not alter owned components or frozen geometry.
+    if joint_neck && independent_head {
+        let raster = semantics.and_then(|m| m.get("skin")).unwrap();
+        let mw = raster.get("width").and_then(Value::as_u64).unwrap() as f32;
+        let mh = raster.get("height").and_then(Value::as_u64).unwrap() as f32;
+        let fringe = (2.0 + 1.5 * (w / mw).max(h / mh).max(1.0)).ceil() as usize;
+        let mut person = Vec::with_capacity(count);
+        let mut forbidden = Vec::with_capacity(count);
+        let mut semantic_edge = Vec::with_capacity(count);
+        let skin_mask = semantics.and_then(|m| m.get("skin")).map(PreparedMask::new);
+        for i in 0..count {
+            let nx = (left as f32 + (i % cw) as f32 + 0.5) / w;
+            let ny = (top as f32 + (i / cw) as f32 + 0.5) / h;
+            person.push(
+                person_mask
+                    .as_ref()
+                    .map(|m| m.coverage(nx, ny, source.width, source.height))
+                    .unwrap_or(0.0),
+            );
+            let skin_value = skin_mask
+                .as_ref()
+                .map(|m| m.coverage(nx, ny, source.width, source.height))
+                .unwrap_or(0.0);
+            let neck_value = neck_mask
+                .as_ref()
+                .map(|m| m.coverage(nx, ny, source.width, source.height))
+                .unwrap_or(0.0);
+            semantic_edge.push(skin_value.max(neck_value));
+            forbidden.push(
+                frozen[i]
+                    || inferred_person_fixed[i]
+                    || protection[i] > 1e-6
+                    || fixed_masks
+                        .iter()
+                        .any(|m| m.coverage(nx, ny, source.width, source.height) > 1e-6),
+            );
+        }
+        color_alpha = crate::face_matting::recover_connected_portrait_fringe(
+            &crop,
+            &color_alpha,
+            &joint_owned,
+            &person,
+            &semantic_edge,
+            &forbidden,
+            fringe,
+        );
+    }
+    // The existing source physical matting trimap is the uncertain own-face
+    // edge. PersonAlpha is the selected person's combined class confidence,
+    // not an independently detected other-person instance. Keep its real
+    // clothing support, but do not turn uncertainty at that validated facial
+    // silhouette into an immovable geometric obstacle. Explicit/user masks
+    // remain authoritative and donor exclusion does not change.
+    let parser_edge_uncertainty = contour_matte
+        .map(|m| {
+            let mw = m.get("width").and_then(Value::as_u64).unwrap_or(1) as f32;
+            let mh = m.get("height").and_then(Value::as_u64).unwrap_or(1) as f32;
+            (w / mw).max(h / mh).max(1.0) * 1.5
+        })
+        .unwrap_or(0.0);
+    let own_edge_uncertainty = 2.0 + parser_edge_uncertainty;
+    for i in 0..count {
+        if !joint_neck || !inferred_person_fixed[i] {
+            continue;
+        }
+        let p = (
+            left as f32 + (i % cw) as f32 + 0.5,
+            top as f32 + (i / cw) as f32 + 0.5,
+        );
+        let contour_distance = polygon
+            .iter()
+            .enumerate()
+            .map(|(k, &a)| closest(p, a, polygon[(k + 1) % polygon.len()]).0)
+            .fold(f32::MAX, f32::min);
+        // Existing source-alpha localization uncertainty from validate_isoline
+        // plus the physical RGB trimap. This scales with parser raster pitch.
+        let own_face_uncertain_edge = (independent_head
+            && contour_distance <= own_edge_uncertainty)
+            || (joint_neck && joint_owned[i] && joint_alpha[i] > 0.8);
+        let explicit_fixed = protection[i] >= 1.0 - 1e-6
+            || fixed_masks
+                .iter()
+                .any(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+        if own_face_uncertain_edge && !explicit_fixed {
+            frozen[i] = false;
+            // Inferred other-person texels remain forbidden as color donors.
         }
     }
     // The refined matte represents physical foreground at the RGB edge.
@@ -1540,6 +1820,274 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let color_layers = crate::face_matting::estimate(&crop, &color_alpha);
     mark!("F/B estimate");
     let foreground = color_layers.as_ref().map(|(f, _)| f).unwrap_or(&crop);
+    let neck_support: Vec<f32> = neck_lighting_known
+        .iter()
+        .map(|&v| if v { 1.0 } else { 0.0 })
+        .collect();
+    let velocity = if joint_neck {
+        // One smooth source-forward velocity authority. No nearest-segment/MLS
+        // inverse offset enters the velocity. RBF control values are corrected by
+        // the measured advected source-contour residual after exp(v).
+        // Fixed context is not an anatomical attachment. A separate person or a
+        // user-protected patch stays exact, while nearby skin may shrink away from
+        // it. Only observed ears, hair and accessories taper the feasible contour.
+        let distance_map = |seeds: &[bool]| {
+            let mut distance = vec![u16::MAX; count];
+            let mut queue = VecDeque::new();
+            for (i, &fixed) in seeds.iter().enumerate() {
+                if fixed {
+                    distance[i] = 0;
+                    queue.push_back(i);
+                }
+            }
+            while let Some(i) = queue.pop_front() {
+                let next = distance[i].saturating_add(1);
+                for n in neighbors(i, cw, ch) {
+                    if next < distance[n] {
+                        distance[n] = next;
+                        queue.push_back(n);
+                    }
+                }
+            }
+            distance
+        };
+        let context_fixed: Vec<_> = frozen
+            .iter()
+            .zip(&attachment_fixed)
+            .map(|(&fixed, &attachment)| fixed && !attachment)
+            .collect();
+        let frozen_distance = distance_map(&context_fixed);
+        let attachment_distance = distance_map(&attachment_fixed);
+        let nearest_distance = |distance: &[u16], p: Point| {
+            let x = (p.0 - left as f32 - 0.5)
+                .clamp(0.0, (cw - 1) as f32)
+                .round() as usize;
+            let y = (p.1 - top as f32 - 0.5).clamp(0.0, (ch - 1) as f32).round() as usize;
+            distance[y * cw + x] as f32
+        };
+        let velocity_taper = (frame.width() * 0.035).clamp(6.0, 14.0);
+        let attachment_taper = (frame.width() * 0.14).max(8.0);
+        let external_constraint = |p: Point| {
+            if !region.contains(p.0 / w, p.1 / h) {
+                return 0.0;
+            }
+            let selection = output_mask
+                .as_ref()
+                .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
+                .unwrap_or(1.0);
+            let protected = protect_mask
+                .as_ref()
+                .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
+                .unwrap_or(0.0);
+            selection * (1.0 - protected)
+        };
+        // Intended lower-neck motion falloff; the unchanged ROI can cut it short.
+        // Compact support must already vanish there; no general ROI continuity guarantee.
+        // This is a motion falloff, not an alpha cutoff or a made-up skin border.
+        let neck_motion = |p: Point| {
+            if joint_neck {
+                1.0 - smoothstep(
+                    frame.bottom + frame.height() * 0.04,
+                    frame.bottom + frame.height() * 0.30,
+                    frame.coordinates(p).1,
+                )
+            } else {
+                1.0
+            }
+        };
+        let velocity_weight = |p: Point| {
+            smoothstep(
+                2.0,
+                velocity_taper,
+                nearest_distance(&attachment_distance, p),
+            ) * smoothstep(0.0, 4.0, nearest_distance(&frozen_distance, p))
+                * external_constraint(p)
+                * field.anchor_weight(p)
+                * neck_motion(p)
+        };
+        let mut control_positions = Vec::new();
+        let mut requested_positions = Vec::new();
+        let mut feasible_positions = Vec::new();
+        let mut velocity_values = Vec::new();
+        let mut movable = Vec::new();
+        let mut vertical_displacements = Vec::new();
+        for k in 0..128 {
+            let at = perimeter * k as f32 / 128.0;
+            let edge = lengths
+                .partition_point(|&d| d <= at)
+                .saturating_sub(1)
+                .min(polygon.len() - 1);
+            let t = (at - lengths[edge]) / (lengths[edge + 1] - lengths[edge]).max(1e-6);
+            let next = (edge + 1) % polygon.len();
+            let p = add(scale(polygon[edge], 1.0 - t), scale(polygon[next], t));
+            let requested = add(scale(target[edge], 1.0 - t), scale(target[next], t));
+            let distance = nearest_distance(&attachment_distance, p);
+            let achievable = smoothstep(2.0, attachment_taper, distance) * external_constraint(p);
+            let q = add(p, scale(sub(requested, p), achievable));
+            vertical_displacements.push(
+                (vertical_contour_offset(frame, polygon[edge], values) * (1.0 - t)
+                    + vertical_contour_offset(frame, polygon[next], values) * t)
+                    * achievable,
+            );
+            let weight = velocity_weight(p);
+            control_positions.push(p);
+            requested_positions.push(requested);
+            feasible_positions.push(q);
+            movable.push(weight > 0.05 && dot(sub(q, p), sub(q, p)) > 0.01);
+            velocity_values.push(if weight > 0.05 {
+                scale(sub(q, p), 1.0 / weight)
+            } else {
+                (0.0, 0.0)
+            });
+        }
+        let center_u = (frame.left + frame.right) * 0.5;
+        // Lateral feasibility stays active across vertical slider zero. Preserve
+        // its requested vertical displacement instead of projecting v to source.
+        for orientation in [1.0_f32, -1.0] {
+            let mut side_indices: Vec<_> = (0..control_positions.len())
+                .filter(|&i| {
+                    let (u, v) = frame.coordinates(control_positions[i]);
+                    let y = (v - frame.top) / frame.height();
+                    orientation * (u - center_u) < -frame.width() * 0.08
+                        && (0.35..0.985).contains(&y)
+                })
+                .collect();
+            side_indices.sort_by(|&a, &b| {
+                frame
+                    .coordinates(control_positions[a])
+                    .1
+                    .total_cmp(&frame.coordinates(control_positions[b]).1)
+            });
+            let samples: Vec<_> = side_indices
+                .iter()
+                .map(|&i| {
+                    let (u, v) = frame.coordinates(control_positions[i]);
+                    let desired = frame.coordinates(feasible_positions[i]).0;
+                    let requested = frame
+                        .coordinates(add(
+                            control_positions[i],
+                            scale(
+                                sub(requested_positions[i], control_positions[i]),
+                                external_constraint(control_positions[i]),
+                            ),
+                        ))
+                        .0;
+                    let fixed = velocity_weight(control_positions[i]) <= 0.001;
+                    (
+                        v,
+                        orientation * u,
+                        orientation * desired,
+                        orientation * requested,
+                        fixed,
+                    )
+                })
+                .collect();
+            let projected =
+                flow::project_side_curve(&samples).map_err(|message| invalid(&message))?;
+            for (&i, &oriented_u) in side_indices.iter().zip(&projected) {
+                let (_, v) = frame.coordinates(control_positions[i]);
+                feasible_positions[i] =
+                    frame.position(oriented_u * orientation, v + vertical_displacements[i]);
+                let weight = velocity_weight(control_positions[i]);
+                movable[i] = weight > 0.05
+                    && dot(
+                        sub(feasible_positions[i], control_positions[i]),
+                        sub(feasible_positions[i], control_positions[i]),
+                    ) > 0.01;
+                velocity_values[i] = if weight > 0.05 {
+                    scale(
+                        sub(feasible_positions[i], control_positions[i]),
+                        1.0 / weight,
+                    )
+                } else {
+                    (0.0, 0.0)
+                };
+            }
+        }
+        for anchor in &anchors {
+            let candidates = std::iter::once(anchor.center).chain((0..8).map(|k| {
+                if anchor.polygon.is_empty() {
+                    let a = std::f32::consts::TAU * k as f32 / 8.0;
+                    add(
+                        anchor.center,
+                        add(
+                            scale(anchor.across, anchor.rx * libm::cosf(a)),
+                            scale(anchor.down, anchor.ry * libm::sinf(a)),
+                        ),
+                    )
+                } else {
+                    anchor.polygon[k * anchor.polygon.len() / 8]
+                }
+            }));
+            for p in candidates {
+                if control_positions
+                    .iter()
+                    .any(|&q| dot(sub(p, q), sub(p, q)) < 1.0)
+                {
+                    continue;
+                }
+                control_positions.push(p);
+                requested_positions.push(p);
+                feasible_positions.push(p);
+                velocity_values.push((0.0, 0.0));
+                movable.push(false);
+            }
+        }
+        let support_weights: Vec<f32> = (0..count)
+            .map(|i| {
+                let p = (
+                    left as f32 + (i % cw) as f32 + 0.5,
+                    top as f32 + (i / cw) as f32 + 0.5,
+                );
+                velocity_weight(p)
+            })
+            .collect();
+        let rbf =
+            flow::CompactRbf::new(control_positions.clone(), (frame.width() * 0.31).max(12.0));
+        let mut velocity = flow::VelocityGrid::new(
+            (left as f32 + 0.5, top as f32 + 0.5),
+            cw,
+            ch,
+            vec![(0.0, 0.0); count],
+        );
+        for iteration in 0..5 {
+            let coefficients = rbf.solve(&velocity_values);
+            let vectors = (0..count)
+                .map(|i| {
+                    if support_weights[i] <= 1e-6 {
+                        return (0.0, 0.0);
+                    }
+                    let p = (
+                        left as f32 + (i % cw) as f32 + 0.5,
+                        top as f32 + (i / cw) as f32 + 0.5,
+                    );
+                    scale(rbf.evaluate(&coefficients, p), support_weights[i])
+                })
+                .collect();
+            velocity =
+                flow::VelocityGrid::new((left as f32 + 0.5, top as f32 + 0.5), cw, ch, vectors);
+            for i in 0..control_positions.len() {
+                if !movable[i] {
+                    continue;
+                }
+                let p = control_positions[i];
+                let q = velocity.transport(p, 1.0);
+                let error = sub(feasible_positions[i], q);
+                if iteration < 4 {
+                    let midpoint = scale(add(p, q), 0.5);
+                    let weight =
+                        (velocity_weight(p) + velocity_weight(midpoint) + velocity_weight(q)) / 3.0;
+                    velocity_values[i] =
+                        add(velocity_values[i], scale(error, 0.65 / weight.max(0.1)));
+                }
+            }
+        }
+        Some(velocity)
+    } else {
+        None
+    };
+    let mut grid =
+        (!joint_neck).then(|| ContourGrid::new((left as f32 + 0.5, top as f32 + 0.5), cw, ch));
     let mut samples = vec![([0.0; 4], 0.0); count];
     let mut changed = vec![false; count];
     let mut holes = vec![false; count];
@@ -1566,7 +2114,8 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             } else {
                 face_membership[i]
             };
-            if old_coverage < if contour_matte.is_some() { 1e-6 } else { 0.5 }
+            if !joint_neck
+                && old_coverage < if contour_matte.is_some() { 1e-6 } else { 0.5 }
                 && (contraction_only
                     || !(p.0 >= target_bounds.0
                         && p.1 >= target_bounds.1
@@ -1577,16 +2126,34 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             {
                 continue;
             }
-            let movement = scale(grid.inverse(&field, p), selection * (1.0 - protection[i]));
+            let movement = if let Some(velocity) = &velocity {
+                flow::inverse(velocity, p)
+            } else {
+                scale(
+                    grid.as_mut().expect("face-only grid").inverse(&field, p),
+                    selection * (1.0 - protection[i]),
+                )
+            };
             if movement.0.abs() + movement.1.abs() < 1e-5 {
                 continue;
             }
-            let sample = sample(
+            let mut sample = sample(
                 foreground,
                 &color_alpha,
                 x as f32 + movement.0,
                 y as f32 + movement.1,
             );
+            if !joint_neck && contour_matte.is_some() {
+                clip_supported_jaw_opacity(
+                    &mut sample,
+                    p,
+                    &crop,
+                    &neck_support,
+                    &field,
+                    frame,
+                    (left as f32, top as f32),
+                );
+            }
             // Background with zero old and new foreground is always bit-exact.
             if color_alpha[i] <= 1e-6 && sample.1 <= 1e-6 {
                 continue;
@@ -1610,15 +2177,19 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     } else {
         crop.clone()
     };
-    let lighting_changed = restore_neck_lighting(
-        &mut background,
-        &crop,
-        &holes,
-        &neck_lighting_known,
-        &frozen,
-        &field,
-        (left as f32, top as f32),
-    );
+    let lighting_changed = if joint_neck {
+        vec![false; count]
+    } else {
+        restore_neck_lighting(
+            &mut background,
+            &crop,
+            &holes,
+            &neck_lighting_known,
+            &frozen,
+            &field,
+            (left as f32, top as f32),
+        )
+    };
     for (i, &light_changed) in lighting_changed.iter().enumerate() {
         if light_changed {
             changed[i] = true;
@@ -1651,7 +2222,38 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     // ROI/protection/opacity/blend are applied once over the expanded support,
     // never again clipped by the original foreground alpha in engine.rs.
     mark!("compose layers");
-    let output = crate::mask::composite(source, &rendered, &support_params);
+    let mut output = if joint_neck {
+        // Normal blending uses selection/protection in the velocity once.
+        // Color blend modes additionally retain the public soft blend weights.
+        let mut composite_params = support_params.into_owned();
+        if composite_params
+            .get("blendMode")
+            .and_then(Value::as_str)
+            .unwrap_or("normal")
+            == "normal"
+        {
+            composite_params
+                .as_object_mut()
+                .expect("validated params")
+                .remove("mask");
+            composite_params
+                .as_object_mut()
+                .expect("validated params")
+                .remove("protectMask");
+        }
+        crate::mask::composite(source, &rendered, &composite_params)
+    } else {
+        crate::mask::composite(source, &rendered, &support_params)
+    };
+    if joint_neck {
+        // Non-normal blend modes must not recolor untouched or hard-frozen
+        // pixels merely because the transported layer copied the source there.
+        for (i, original) in source.pixels.chunks_exact(4).enumerate() {
+            if rendered.pixels[i * 4..i * 4 + 4] == *original {
+                output.pixels[i * 4..i * 4 + 4].copy_from_slice(original);
+            }
+        }
+    }
     #[cfg(not(target_arch = "wasm32"))]
     if std::env::var_os("FACE_CORE_PROFILE").is_some() {
         eprintln!(
@@ -1665,6 +2267,331 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn joint_portrait() -> (RgbaImage, Value) {
+        let (short_source, mut params) = portrait(160, 240);
+        let mut pixels = short_source.pixels;
+        pixels.extend((0..160 * 80).flat_map(|_| [20_u8, 50, 130, 255]));
+        let mut source = RgbaImage::new(160, 320, pixels).unwrap();
+        for point in params["semanticMasks"]["face"]["points"]
+            .as_array_mut()
+            .unwrap()
+        {
+            point["y"] = json!(point["y"].as_f64().unwrap() * 0.75);
+        }
+        let mut params = raster_params(&source, params);
+        params["semanticMasks"]["faceContour"] = params["semanticMasks"]["faceOutline"].clone();
+        params["semanticMasks"]["faceContourMask"] = params["semanticMasks"]["face"].clone();
+        let face: Vec<u8> = params["semanticMasks"]["face"]["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u8)
+            .collect();
+        let mut skin = face.clone();
+        let mut neck = vec![0_u8; 160 * 320];
+        let mut person = face.clone();
+        for y in 180..320 {
+            for x in 70..90 {
+                let i = y * 160 + x;
+                skin[i] = 255;
+                person[i] = 255;
+                if face[i] < 128 {
+                    neck[i] = 255;
+                    source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[
+                        205 + (x % 7) as u8,
+                        145 + (y % 5) as u8,
+                        90,
+                        255,
+                    ]);
+                }
+            }
+        }
+        let mask = |data: Vec<u8>| json!({"shape":"raster","width":160,"height":320,"data":data});
+        params["semanticMasks"]["skin"] = mask(skin);
+        params["semanticMasks"]["neck"] = mask(neck);
+        params["subjectMask"] = mask(person);
+        (source, params)
+    }
+
+    fn public_adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, ImageError> {
+        crate::apply_graph_json(
+            source,
+            &json!({"version":"1","operations":[{
+                "id":"face-joint-contract","type":"face.adjust","params":params
+            }]})
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn detected_joint_foreground_keeps_the_skin_join_connected_and_low_neck_fixed() {
+        let (source, params) = joint_portrait();
+        let output = public_adjust(&source, &params).unwrap();
+        for y in 180..220 {
+            for x in 76..84 {
+                let i = (y * 160 + x) * 4;
+                assert!(
+                    output.pixels[i] > 150 && output.pixels[i + 2] < 120,
+                    "scene hole at face/neck join {x},{y}: {:?}",
+                    &output.pixels[i..i + 4]
+                );
+            }
+        }
+        for y in 280..320 {
+            for x in 70..90 {
+                let i = (y * 160 + x) * 4;
+                assert_eq!(
+                    &output.pixels[i..i + 4],
+                    &source.pixels[i..i + 4],
+                    "low neck moved {x},{y}"
+                );
+            }
+        }
+        let before = span(&source, 120);
+        let after = span(&output, 120);
+        assert!(
+            after.0 >= before.0 + 4 && after.1 <= before.1 - 4,
+            "joint foreground cancelled slimming {before:?}->{after:?}"
+        );
+    }
+
+    #[test]
+    fn missing_zero_and_disconnected_neck_evidence_keep_the_face_only_contract() {
+        let (source, params) = joint_portrait();
+        for variant in [
+            "missing-skin",
+            "missing-neck",
+            "zero-neck",
+            "disconnected-neck",
+            "zero-skin",
+            "zero-skin-overlapped-neck",
+            "neck-only-inside-face",
+        ] {
+            let mut params = params.clone();
+            match variant {
+                "missing-skin" => {
+                    params["semanticMasks"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("skin");
+                }
+                "missing-neck" => {
+                    params["semanticMasks"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("neck");
+                }
+                "zero-neck" => {
+                    params["semanticMasks"]["neck"]["data"] = json!(vec![0_u8; 160 * 320]);
+                }
+                "disconnected-neck" => {
+                    let mut neck = vec![0_u8; 160 * 320];
+                    for y in 2..8 {
+                        for x in 2..8 {
+                            neck[y * 160 + x] = 255;
+                        }
+                    }
+                    params["semanticMasks"]["neck"]["data"] = json!(neck);
+                }
+                "zero-skin" => {
+                    params["semanticMasks"]["skin"]["data"] = json!(vec![0_u8; 160 * 320]);
+                }
+                "zero-skin-overlapped-neck" => {
+                    params["semanticMasks"]["skin"]["data"] = json!(vec![0_u8; 160 * 320]);
+                    params["semanticMasks"]["neck"]["data"] =
+                        params["semanticMasks"]["face"]["data"].clone();
+                }
+                "neck-only-inside-face" => {
+                    params["semanticMasks"]["neck"]["data"] =
+                        params["semanticMasks"]["face"]["data"].clone();
+                }
+                _ => unreachable!(),
+            }
+            let output = public_adjust(&source, &params).unwrap();
+            let mut legacy = params.clone();
+            legacy["semanticMasks"]
+                .as_object_mut()
+                .unwrap()
+                .remove("skin");
+            assert_eq!(
+                output,
+                public_adjust(&source, &legacy).unwrap(),
+                "fallback changed {variant}"
+            );
+            assert_ne!(
+                output.pixels, source.pixels,
+                "fallback stopped valid editing {variant}"
+            );
+        }
+    }
+
+    #[test]
+    fn joint_zero_controls_selection_and_full_protection_are_exact() {
+        let (source, params) = joint_portrait();
+        for field in ["adjustments", "mask", "protectMask"] {
+            let mut params = params.clone();
+            params[field] = match field {
+                "adjustments" => json!({}),
+                "mask" => {
+                    json!({"shape":"raster","width":160,"height":320,"data":vec![0_u8;160*320]})
+                }
+                _ => json!({"shape":"raster","width":160,"height":320,"data":vec![255_u8;160*320]}),
+            };
+            assert_eq!(
+                public_adjust(&source, &params).unwrap(),
+                source,
+                "identity contract failed for {field}"
+            );
+        }
+    }
+
+    #[test]
+    fn joint_non_normal_blend_preserves_hard_and_soft_mask_permissions() {
+        let (source, mut params) = joint_portrait();
+        params["blendMode"] = json!("multiply");
+        params["mask"] = json!({"shape":"raster","width":160,"height":320,
+            "data":(0..160*320).map(|i|if i%160<80 {255_u8}else{0}).collect::<Vec<_>>()});
+        params["protectMask"] =
+            json!({"shape":"rect","x":0.18,"y":0.25,"width":0.23,"height":0.12});
+        let output = public_adjust(&source, &params).unwrap();
+        assert_ne!(
+            output.pixels, source.pixels,
+            "non-normal selection lost valid editing"
+        );
+        for y in 0..320 {
+            for x in 0..160 {
+                let nx = (x as f32 + 0.5) / 160.0;
+                let ny = (y as f32 + 0.5) / 320.0;
+                let protected = coverage(&params["protectMask"], nx, ny, 160, 320) >= 1.0 - 1e-6;
+                if x >= 80 || protected || x < 16 || !(7..314).contains(&y) {
+                    let i = (y * 160 + x) * 4;
+                    assert_eq!(
+                        &output.pixels[i..i + 4],
+                        &source.pixels[i..i + 4],
+                        "permission leaked at {x},{y}"
+                    );
+                }
+            }
+        }
+        for (field, byte) in [("mask", 1_u8), ("protectMask", 254_u8)] {
+            let mut soft = params.clone();
+            soft.as_object_mut().unwrap().remove("mask");
+            soft.as_object_mut().unwrap().remove("protectMask");
+            soft[field] =
+                json!({"shape":"raster","width":160,"height":320,"data":vec![byte;160*320]});
+            let output = public_adjust(&source, &soft).unwrap();
+            let maximum = output
+                .pixels
+                .iter()
+                .zip(&source.pixels)
+                .map(|(&a, &b)| a.abs_diff(b))
+                .max()
+                .unwrap();
+            assert!(
+                maximum <= 3,
+                "near-zero {field} allowed full multiply effect: {maximum}"
+            );
+        }
+    }
+
+    #[test]
+    fn joint_width_controls_move_both_physical_sides_and_vertical_controls_move_material_endpoints()
+    {
+        let (source, mut params) = joint_portrait();
+        let top = 240.0 * 0.13;
+        let height = 240.0 * 0.74;
+        for (key, position, positive_narrows) in [
+            ("faceWidth", 0.50, true),
+            ("temples", 0.28, true),
+            ("cheekbones", 0.48, true),
+            ("jaw", 0.76, true),
+            ("foreheadWidth", 0.16, false),
+            ("chinWidth", 0.89, false),
+            ("chinPoint", 0.93, true),
+        ] {
+            let y = (top + height * position) as usize;
+            let before = span(&source, y);
+            for amount in [-100, 100] {
+                params["adjustments"] = json!({key:amount});
+                let output = public_adjust(&source, &params).unwrap();
+                let after = span(&output, y);
+                if (amount > 0) == positive_narrows {
+                    assert!(
+                        after.0 > before.0 && after.1 < before.1,
+                        "{key} {amount} did not narrow {before:?}->{after:?}"
+                    );
+                } else {
+                    assert!(
+                        after.0 < before.0 && after.1 > before.1,
+                        "{key} {amount} did not widen {before:?}->{after:?}"
+                    );
+                }
+            }
+        }
+        let endpoints = |image: &RgbaImage| {
+            let ys: Vec<_> = (0..320)
+                .filter(|&y| image.pixels[(y * 160 + 80) * 4] >= 218)
+                .collect();
+            (*ys.first().unwrap(), *ys.last().unwrap())
+        };
+        let before = endpoints(&source);
+        for key in ["forehead", "chin"] {
+            for amount in [-100, 100] {
+                params["adjustments"] = json!({key:amount});
+                let output = public_adjust(&source, &params).unwrap();
+                let after = endpoints(&output);
+                if key == "chin" {
+                    assert!(
+                        (after.1 as i32 - before.1 as i32) * amount > 0,
+                        "chin endpoint did not move {amount}: {before:?}->{after:?}"
+                    );
+                } else {
+                    assert!(
+                        (before.0 as i32 - after.0 as i32) * amount > 0,
+                        "forehead endpoint did not move {amount}: {before:?}->{after:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn joint_mixed_vertical_sliders_are_continuous_across_zero() {
+        let (source, mut params) = joint_portrait();
+        params["adjustments"] = json!({"faceWidth":70});
+        let base = public_adjust(&source, &params).unwrap();
+        for key in ["chin", "forehead"] {
+            for amount in [-0.0001_f64, 0.0001] {
+                params["adjustments"] = json!({"faceWidth":70,key:amount});
+                let nearby = public_adjust(&source, &params).unwrap();
+                let maximum = nearby
+                    .pixels
+                    .iter()
+                    .zip(&base.pixels)
+                    .map(|(&a, &b)| a.abs_diff(b))
+                    .max()
+                    .unwrap();
+                assert!(
+                    maximum <= 1,
+                    "{key} crossed zero with a discontinuous reroute: {maximum}"
+                );
+            }
+        }
+        params["adjustments"] = json!({"faceWidth":70,"chin":60,"forehead":-40,"jaw":20});
+        let combined = public_adjust(&source, &params).unwrap();
+        assert_ne!(
+            combined.pixels, base.pixels,
+            "mixed vertical/lateral controls were discarded"
+        );
+        for i in (280 * 160)..(320 * 160) {
+            assert_eq!(
+                &combined.pixels[i * 4..i * 4 + 4],
+                &source.pixels[i * 4..i * 4 + 4],
+                "mixed controls moved low neck"
+            );
+        }
+    }
+
     fn portrait(w: u32, h: u32) -> (RgbaImage, Value) {
         let mut pixels = Vec::new();
         let outline: Vec<Point> = (0..48)
@@ -2448,6 +3375,122 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn supported_contracted_jaw_clips_opaque_source_lobes_without_changing_color() {
+        let (w, h) = (64_usize, 64_usize);
+        let polygon: Vec<Point> = (0..64)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 64.0;
+                (32.0 + 18.0 * a.cos(), 24.0 + 20.0 * a.sin())
+            })
+            .collect();
+        let frame = Frame::new(&polygon, None, w as f32, h as f32);
+        let target = target_contour(&polygon, frame, &json!({"chin":-100}));
+        let field = ContourField {
+            source: &polygon,
+            target: &target,
+            anchors: &[],
+            support: 8.0,
+            mls: mls::RigidMls::new(vec![]),
+        };
+        let crop = RgbaImage::new(
+            w as u32,
+            h as u32,
+            vec![[80, 60, 45, 255]; w * h]
+                .into_iter()
+                .flatten()
+                .collect(),
+        )
+        .unwrap();
+        let clean: Vec<f32> = (0..w * h)
+            .map(|i| {
+                if i / w >= 45 && (20..44).contains(&(i % w)) {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        // True target bottom is y=41.0. A source mixed-alpha lobe falsely
+        // sampled as .9 must not survive at y=41.3 or y=42.0.
+        for y in [41.3, 42.0] {
+            let p = (32.0, y);
+            let mut rgba = ([198.0, 144.0, 90.0, 0.9], 0.9);
+            clip_supported_jaw_opacity(&mut rgba, p, &crop, &clean, &field, frame, (0.0, 0.0));
+            let expected = alpha(p, &target);
+            assert!(
+                (rgba.1 - expected).abs() < 1e-6,
+                "opacity lobe survived at {p:?}: {} > {expected}",
+                rgba.1
+            );
+            if rgba.1 > 1e-6 {
+                for (c, expected) in [220.0, 160.0, 100.0].iter().enumerate() {
+                    assert!(
+                        (rgba.0[c] / rgba.0[3] - expected).abs() < 1e-4,
+                        "face color changed instead of opacity"
+                    );
+                }
+            } else {
+                assert_eq!(rgba.0, [0.0; 4]);
+            }
+        }
+        // A correct fully internal sample remains exact, including alpha.
+        let mut interior = ([198.0, 144.0, 90.0, 0.9], 0.9);
+        clip_supported_jaw_opacity(
+            &mut interior,
+            (32.0, 40.0),
+            &crop,
+            &clean,
+            &field,
+            frame,
+            (0.0, 0.0),
+        );
+        assert_eq!(interior, ([198.0, 144.0, 90.0, 0.9], 0.9));
+    }
+
+    #[test]
+    fn jaw_opacity_clipping_requires_observed_neck_and_never_limits_expansion_or_cheek() {
+        let (w, h) = (64_usize, 64_usize);
+        let polygon: Vec<Point> = (0..64)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 64.0;
+                (32.0 + 18.0 * a.cos(), 24.0 + 20.0 * a.sin())
+            })
+            .collect();
+        let frame = Frame::new(&polygon, None, w as f32, h as f32);
+        let crop = RgbaImage::new(
+            w as u32,
+            h as u32,
+            vec![[80, 60, 45, 255]; w * h]
+                .into_iter()
+                .flatten()
+                .collect(),
+        )
+        .unwrap();
+        let value = ([198.0, 144.0, 90.0, 0.9], 0.9);
+        for (control, p, clean) in [
+            (-100, (32.0, 42.0), vec![0.0; w * h]),
+            (-100, (32.0, 42.0), vec![0.998; w * h]),
+            (-100, (50.0, 24.0), vec![1.0; w * h]),
+            (100, (32.0, 47.0), vec![1.0; w * h]),
+        ] {
+            let target = target_contour(&polygon, frame, &json!({"chin":control}));
+            let field = ContourField {
+                source: &polygon,
+                target: &target,
+                anchors: &[],
+                support: 8.0,
+                mls: mls::RigidMls::new(vec![]),
+            };
+            let mut actual = value;
+            clip_supported_jaw_opacity(&mut actual, p, &crop, &clean, &field, frame, (0.0, 0.0));
+            assert_eq!(
+                actual, value,
+                "unsupported/non-contracting edge changed at {p:?}"
+            );
+        }
+    }
+
     #[test]
     fn contracted_jaw_repositions_neck_illumination_without_warping_texture_or_scene() {
         let (w, h) = (64_usize, 64_usize);

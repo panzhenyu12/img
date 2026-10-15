@@ -1,0 +1,44 @@
+--- .run/face-rbf-v15-core/src/face.rs	2026-10-14 17:32:06
++++ .run/face-material-v1-core/src/face.rs	2026-10-14 17:43:32
+@@ -455,6 +455,15 @@
+                 classified[n] = true;
+                 front.push_back(n);
+             }
++        }
++    }
++    #[cfg(not(target_arch = "wasm32"))]
++    if let Ok(dir) = std::env::var("FACE_FLOW_DEBUG_DIR") {
++        for (name, values) in [("reconstruction-layer",layer.clone()),("known-layer",known_layer.to_vec())] {
++            image::GrayImage::from_raw(w as u32,h as u32,values.iter().map(|v|v.saturating_mul(100)).collect()).unwrap().save(format!("{dir}/{name}.png")).unwrap();
++        }
++        for (name, values) in [("reconstruction-target",target.as_slice()),("reconstruction-protected",protected.as_slice()),("holes",holes)] {
++            image::GrayImage::from_raw(w as u32,h as u32,values.iter().map(|&v| if v {255} else {0}).collect()).unwrap().save(format!("{dir}/{name}.png")).unwrap();
+         }
+     }
+     let mut known: Vec<bool> = target.iter().map(|t| !t).collect();
+@@ -1833,6 +1842,14 @@
+     } else {
+         crop.clone()
+     };
++    #[cfg(not(target_arch = "wasm32"))]
++    if let Ok(dir) = std::env::var("FACE_FLOW_DEBUG_DIR") {
++        image::RgbaImage::from_raw(cw as u32,ch as u32,background.pixels.clone()).unwrap().save(format!("{dir}/background-before-lighting.png")).unwrap();
++        image::RgbaImage::from_raw(cw as u32,ch as u32,crop.pixels.clone()).unwrap().save(format!("{dir}/source-crop.png")).unwrap();
++        image::RgbaImage::from_raw(cw as u32,ch as u32,foreground.pixels.clone()).unwrap().save(format!("{dir}/source-foreground.png")).unwrap();
++        image::GrayImage::from_raw(cw as u32,ch as u32,neck_lighting_known.iter().map(|&v| if v {255} else {0}).collect()).unwrap().save(format!("{dir}/known-neck.png")).unwrap();
++        image::GrayImage::from_raw(cw as u32,ch as u32,frozen.iter().map(|&v| if v {255} else {0}).collect()).unwrap().save(format!("{dir}/frozen.png")).unwrap();
++    }
+     let lighting_changed = restore_neck_lighting(
+         &mut background,
+         &crop,
+@@ -1846,6 +1863,10 @@
+         if light_changed {
+             changed[i] = true;
+         }
++    }
++    #[cfg(not(target_arch = "wasm32"))]
++    if let Ok(dir) = std::env::var("FACE_FLOW_DEBUG_DIR") {
++        image::RgbaImage::from_raw(cw as u32,ch as u32,background.pixels.clone()).unwrap().save(format!("{dir}/background-after-lighting.png")).unwrap();
+     }
+     mark!("reconstruct");
+     let mut rendered = input.clone();

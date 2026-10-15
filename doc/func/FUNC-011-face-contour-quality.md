@@ -1,8 +1,22 @@
 # FUNC-011 人脸轮廓与五官几何质量
 
-状态：2026-10-14 v10 统一使用物理 alpha 判断旧边缘、holes 和 donor，修复二值解析外缘保留混色的问题；五官保护和MLS固定点落在真实五官polygon内。脸型整体仍未达到逐功能8分验收。
+状态：2026-10-14 v19联合脸颈已按用户授权接入正式native/WASM核心，四档原照真实UI/Go/native/WASM与旧candidate全RGBA一致，受影响10项E2E通过，见[集成对账](../qa/face-joint-v19-integration/review.md)。以下v11及隔离v14–v19记录保留为各自历史快照；脸型整体仍未达到逐功能8分验收。
 
-最新逐项结果与原尺寸失败图见 [v10 QA](../qa/face-physical-alpha-v10/review.md)。该轮保留头发、耳朵和配饰原输出冻结合同；发际线扩张与前景头发遮挡的排序仍未解决，不用放宽保护统计来授予8分。
+用户随后明确拒绝当前瘦脸审美效果，认为不自然、曲线不好看，脸/五官/身体曲线不能统一。生产接入与字节一致只证明执行正确，不等于质量验收；本轮冻结部署保留，后续曲线候选另行对账，不恢复8分或旧数字评分。
+
+2026-10-14 用户原照仍出现瘦脸双向轮廓裂缝，按未通过/不可用处理，旧样片与保护计数不能覆盖此失败。见 [用户失败](../qa/user-face-contour-20261014-review.md)。v12 附件连接/边缘传输候选仍有脸颈材质断接，v13 连续可逆候选虽数值无折叠却出现凹陷/鼓包，都未接生产；见 [v12](../qa/face-side-v12/review.md)、[v13](../qa/face-flow-v13/review.md)。新版方向与 Gemini 最新混合方案比较见 [路线评审](../research/hybrid-portrait-route-20261014.md)。
+
+自行研发的轮廓/颈连接v14–v18仍为拒绝的隔离实验。v17保护/selection修复不改变用户六档失败输出；v18降低实际内收并有3项独立回归失败，颈层延拓/LaMa也未通过材质验收。完整版本、哈希和拒绝理由见[实验对账](FUNC-011-face-rbf-neck-experiments.md)。这些版本不因v19生产接入而改写成已接受。
+
+历史v19隔离快照把可信脸和可见上颈作为同一物理前景/同一速度流传输，保留低颈静止。同一原照四档大黑楔与脸颈斜接明显改善，强档仍约20px源脸边界运动；当时原skin细岛/耳根点/硬边与双端验证未完成，见[旧v19 QA](../qa/face-joint-v19/review.md)。本轮已把同效果接入正式共享核心，质量限制仍保留。
+
+当前v19公开operation/参数不增加experiment开关，可信skin与neck连通时默认走联合前景；neck gate须owned、faceContourMask≤.5、skin>.5且neck>.8，缺项/断开回退原有效face-only或手工路径。QP不再因chin/forehead从0跨到微小数值切换方法，竖向位移连续保留；混合模式/opacity/软选区合成同时维护semantic冻结和用户保护。最终gate源码face测试42 passed/0 failed/1 ignored，稍早全Rust206+10通过属于gate微调前快照；最终clippy/native/WASM/Go/Web及受影响10项E2E通过，旧40项隔离计数不加到生产测试数。
+
+新默认E2E用跟踪的真实检测polygon与生成head/face/skin/neck栅格，一项测试内四档真实UI保存/导出、Go fullRGBA parity、neck变化、保护和alpha均通过，无本机忽略照片/模型依赖。可选原照±30/±100四档UI/WASM、Go API、immutable native与旧candidate全RGBA差异0；实际浏览器耳/发/配饰coverage≥.5、原ROI外、y≥700低颈及alpha变化均0，见[实际UI权限](../qa/face-joint-v19-integration/actual-ui-contracts.json)。四个强度只有一张独立原照，耳侧12px遗漏skin岛、细点与硬边仍可见，不升8分。
+
+当前QP只在source-v排列的侧向曲线上施加单调/曲率约束，随后保留source-v并叠加解析dv插值；不能据此宣称混合chin/forehead后的最终物理外轮廓绝对无新凹凸或fold。normal保持一次几何衰减，non-normal补最终软选区/保护合成并恢复identity硬冻结。双端字节一致与有限采样数值回归不是普遍几何证明。
+
+最新原尺寸边缘改善、三个拒绝候选和120项保护回放见 [v11 QA](../qa/face-edge-v11/review.md)。v10 物理 alpha 证据见 [v10 QA](../qa/face-physical-alpha-v10/review.md)。该轮保留头发、耳朵和配饰原输出冻结合同；发际线扩张与前景头发遮挡的排序仍未解决，不用放宽保护统计来授予8分。
 
 真实脸缘变形、rigid MLS 与 F/B 颜色分離已实现；自然度验收仍未通过。强下巴缩短仍有颈部阴影补偿缺陷，不能以保护指标、测试通过或论文出处替代至少 8/10 的效果门槛。
 
@@ -14,7 +28,7 @@
 
 选择脸型或五官工具，检测当前调整层的输入人像，再调数值。检测不包含该层自身；上游几何或图层顺序改变后，应重新检测。自动检测失败时可手工描绘实际脸缘；仅矩形选区不具备人物前景信息，不能执行脸缘重塑。
 
-## 当前轮廓实现
+## 轮廓输入与保留的回退基础
 
 `engine.rs` 将 `face.adjust` 直接交给 `face.rs`，该模块自行合成一次。旧的整图局部拉伸与脸缘处归零的模板不再处理脸型参数。
 
@@ -27,13 +41,15 @@
 | `semanticMasks.faceContour` | 上述覆盖率的 .5 轮廓；提供真正脸缘的源/目标控制线，避免仅收缩外侧发型 |
 | `semanticMasks.face` | 含头发、耳朵、帽子等的头部上下文；v7起不再把这整个head alpha当作可移动脸部alpha |
 | `semanticMasks.faceOutline` | 头部前景的 .5 外轮廓；提供完整背景补偿上下文，不能替代长发内侧的脸缘 |
-| `semanticMasks.neck` | 已见脖子的覆盖率；用于下颌收缩露出脖子时的底层补偿 |
+| `semanticMasks.skin` / `neck` | 可信脸/上颈连通时定义v19联合物理前景；低颈归零，缺可靠连通时neck保留为face-only露底补偿 |
 | `semanticMasks.hair` / `ears` / `accessories` | 独立冻结头发、耳朵、眼镜/耳饰的原输出像素 |
 | `subjectMask` | 排除人物其他部位和衣服，防止被当成背景纹理 donor |
 | `region` / `mask` | 输出编辑支持区，独立于源人物 alpha |
 | `protectMask` | 用户冻结区；位移和最终合成都遵守保护 |
 
-核心先计算有序脸缘的目标位置，沿弧长取 64 个逆向控制点，再用 Schaefer 等（SIGGRAPH 2006）的 rigid MLS 构造反采样场。3px 轮廓带按对应曲线线段精确采样，内侧使用 MLS；4px 懒加载网格减少重复求解，距边缘约 8.7px 内仍精确计算。场的作用范围按像素距离衰减，眼、眉、鼻、唇作为固定 anchor。五官保护直接在原像素计算，支持滚转和非正方形图像，原脸缘不归零。
+当前自动语义路径使用`face_flow.rs`的RBF/SVF、可行侧向QP与联合脸颈coverage传输。下面MLS/F/B和v3–v11记录属于保留的历史/face-only与手工回退基础，不能把它们描述成默认联合流的新算法。
+
+旧核心计算有序脸缘的目标位置，沿弧长取64个逆向控制点，用Schaefer等（SIGGRAPH 2006）的rigid MLS构造反采样场。3px輪廓带精确采样，内侧MLS；4px懒加载网格、距边缘约8.7px内精确计算。眼、眉、鼻、唇作为固定anchor，五官原像素保护支持滚转和非方图，原脸缘不归零。
 
 不透明照片先用 Germer 等（2020）的 Fast Multi-Level Foreground Estimation 分离前景/背景颜色，再按 RGBA alpha 与实际面部 alpha 预乘采样，减少边缘携带旧背景色；真实透明 PNG 保留原 RGBA 路径。算法只估计 F/B，不估计人物 alpha。少量没有直接 donor 的内部不确定区使用估计背景颜色，不能称为恢复被遮住的真实纹理。
 
@@ -42,6 +58,8 @@ v7将F/B与采样alpha从整个head改为面部类别alpha，避免把头发texe
 v8新增`refine_portrait_alpha`：先将确定前景/背景donor各腐蚀2px，再在窄边带校正已经饱和为0/1但RGB仍混色的像素；内部确定区保持原alpha。身体仍调用原`refine_alpha`入口，不共享该脸部专用策略。
 
 v10 让 refined physical alpha 一致参与旧覆盖、holes、layer 和 donor eligibility；独立 head 上下文的确定空外部仍冻结。同一面部 tracing 才允许清理真实混合外缘。已知 F/B 回归与 72 项真实保护回放通过，但耳下 hair/scene 阶梯、黑三角和复杂隐藏纹理仍失败，不能记为自然度 8 分。
+
+v11 仅在面部 raster、下颌下24%、距目标曲线<8px、法线内收>1px且旧曲线外6px有coverage>=.999的clean neck支持时，以目标几何alpha限制采样opacity，并同倍缩放预乘颜色；不改源matte、MLS强度和neck照明。makeup/woman的新下巴齿状皮肤凸起减少，但旧暗弧、平颈部阴影、hair黑三角仍失败。72项faceWidth/jaw/chin与额外48项chinWidth/chinPoint保护回放通过，新增两项opacity/未混色RGB真值与禁用条件回归。切线均值、精确q照明与单调法线剖面均被拒绝，未降低测试要求。详见v11 QA。
 
 v9五官冻结按实际polygon内部+外侧2px过渡，MLS固定点也位于polygon内。旧的大enclosing ellipse及其极值固定点可能落入可编辑脸颊，在目标轮廓旁留下identity岛和凹口。新增回归检查眼旁轮廓至少真实内收6px，同时眼像素恒等；只改输出冻结、仍用旧ellipse handles的中间版本实际失败，仅移动5px，未作通过处理。
 
@@ -86,6 +104,8 @@ v3 对 face/neck 分类过渡保留完整可变边带，避免两类低置信被
 - v3 九参数六图 ±60 和强下巴六图 ±100 重新回放：外扩粗混色边减弱、延长旧点线明显减少；细边、强缩短阴影/浅点仍未通过。分类覆盖率不能替代完整物理 alpha，额头加长/加宽仍受固定头发合同限制。不得用某张修复成功图替代多样本至少 8 分验收。
 
 ## 变更记录
+
+- 2026-10-14 v11：目标下颌opacity约束只清理有neck支持的收缩碎片；120项保护通过，保留三个失败候选、纹理回归失败及原尺寸边缘对照，未授予8分。
 
 - 2026-10-13：用独立的真实脸缘控制、头部前景 alpha 和边带补偿替换旧模板；增加像素解析、软等值线校验、长发上下文和脖子/背景分层补偿；记录真实照片效果与检测失败。
 - 2026-10-13：采用 rigid MLS 与官方 F/B 估计公式、懒加载场网格、独立配饰/耳朵/头发保护，修复凹轮廓固定背景变化、原 alpha fringe 残影与补偿量化色块；五官增加源采样保护。研究来源与候选边界见 [研究记录](../research/face-warping-and-layered-matting.md)。

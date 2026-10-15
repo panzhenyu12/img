@@ -17,6 +17,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 libm = { version = "0.2.16", default-features = false }
+nalgebra = { version = "0.33", default-features = false, features = ["std"] }
+clarabel = { version = "0.10", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clap = { version = "4", features = ["derive"] }

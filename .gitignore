@@ -21,3 +21,35 @@ services/background-worker/__pycache__/
 services/background-worker/.pytest_cache/
 __pycache__/
 *.pyc
+
+# Local photo evidence and generated research artifacts. Existing tracked
+# history is retained; new commits contain code and written reports only.
+/core/image-core/tests/fixtures/
+/test/images/
+/test/reference/
+/doc/qa/**/*.png
+/doc/qa/**/*.jpg
+/doc/qa/**/*.jpeg
+/doc/qa/**/*.webp
+/doc/qa/**/*.json
+/doc/qa/**/*.log
+/doc/qa/**/*.zip
+/doc/qa/**/*.html
+/doc/research/sources/
+/experiments/**/deps/
+/experiments/**/*target*/
+/experiments/**/*.npy
+/experiments/**/*.npz
+/experiments/**/*.onnx
+/experiments/**/*.pt
+/experiments/**/*.pth
+/experiments/**/*.png
+/experiments/**/*.jpg
+/experiments/**/*.jpeg
+/experiments/**/*.webp
+/experiments/**/*.json
+/experiments/**/*.log
+/experiments/**/*.zip
+/experiments/**/*.bin
+/experiments/**/image-render*
+/experiments/**/*-render

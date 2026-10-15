@@ -9,7 +9,7 @@ QUALITY_PYTHON ?= services/background-worker/.venv/bin/python
 .PHONY: help setup dev api web agent web-install native wasm api-build build test check fmt \
 	rust-test api-test web-build e2e health stop clean models quality quality-face quality-body quality-clothing lint
 
-.PHONY: background-setup background-models background background-test client-models quality-skin quality-film body-setup body-models
+.PHONY: background-setup background-models background background-test client-models quality-skin quality-film body-setup body-models rust-photo-test
 
 help:
 	@echo "make dev          启动 Go API 和 Vite Web 开发服务器"
@@ -132,6 +132,10 @@ fmt:
 
 rust-test:
 	cargo test --manifest-path core/image-core/Cargo.toml
+
+# Photo-derived fixtures are local-only and must never be compiled into Git.
+rust-photo-test:
+	cargo test --release --manifest-path core/image-core/Cargo.toml local_photo_ -- --ignored
 
 api-test: catalog
 	cd $(API_DIR) && go test ./... && go vet ./...

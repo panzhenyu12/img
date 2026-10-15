@@ -1,0 +1,362 @@
+diff --git a/core/image-core/src/geometry.rs b/core/image-core/src/geometry.rs
+index 7924684..784f8cf 100644
+--- a/core/image-core/src/geometry.rs
++++ b/core/image-core/src/geometry.rs
+@@ -611,6 +611,25 @@ struct FeatureFrame {
+     height: f32,
+ }
+ 
++impl FeatureFrame {
++    /// Distance to the enclosing feature bounds in the eye-line basis. The
++    /// whole detected eye is fixed for eyebrow edits; adjacent skin approaches
++    /// that constraint smoothly instead of receiving a final hard pixel cut.
++    fn surrounding_motion(&self, x: f32, y: f32) -> f32 {
++        let delta = (x - self.center.0, y - self.center.1);
++        let u = delta.0 * self.across.0 + delta.1 * self.across.1;
++        let v = -delta.0 * self.across.1 + delta.1 * self.across.0;
++        // The detector eye polygon encloses the aperture, not the eyelid
++        // crease and eyeliner. Include that surrounding anatomy in the fixed
++        // envelope; otherwise preserving the white of the eye still bends
++        // its upper lid into an arch when the brow moves.
++        let lid_margin = (self.height * 0.75).clamp(2.0, 24.0);
++        let du = (u.abs() - self.width * 0.5 - lid_margin).max(0.0);
++        let dv = (v.abs() - self.height * 0.5 - lid_margin).max(0.0);
++        smoothstep(2.0, (self.width * 0.28).clamp(4.0, 24.0), du.hypot(dv))
++    }
++}
++
+ /// Use the detected eye line as a pixel-space basis. Width, height, rotation
+ /// and translations then have the same meaning on tilted and tall portraits.
+ fn feature_frame(p: &Value, name: &str, source: &RgbaImage) -> Option<FeatureFrame> {
+@@ -665,6 +684,94 @@ struct LocalWarp {
+     scale: (f32, f32),
+     translation: (f32, f32),
+     angle: f32,
++    preserve_eyes: bool,
++}
++
++/// Interpret the compact feature edits as a stationary velocity field. A
++/// direct x + v(x) warp can fold where the brow field approaches fixed eyes;
++/// integrating the same requested field changes the geometry continuously.
++fn feature_flow_velocity(
++    point: (f32, f32),
++    changes: &[LocalWarp],
++    fixed_eyes: &[FeatureFrame],
++    coverage: &impl Fn(f32, f32) -> f32,
++) -> (f32, f32) {
++    let mut velocity = (0.0, 0.0);
++    let selection = coverage(point.0, point.1);
++    if selection <= 0.0 {
++        return velocity;
++    }
++    for warp in changes {
++        let delta = (point.0 - warp.center.0, point.1 - warp.center.1);
++        let u = delta.0 * warp.across.0 + delta.1 * warp.across.1;
++        let v = -delta.0 * warp.across.1 + delta.1 * warp.across.0;
++        let d = (u / warp.radius.0).powi(2) + (v / warp.radius.1).powi(2);
++        if d >= 1.0 {
++            continue;
++        }
++        let eye_motion = if warp.preserve_eyes {
++            fixed_eyes.iter().fold(1.0, |weight, eye| {
++                weight * eye.surrounding_motion(point.0, point.1)
++            })
++        } else {
++            1.0
++        };
++        let weight = (1.0 - d).powi(2) * selection * eye_motion;
++        let a = warp.angle * weight;
++        let du = (u * warp.scale.0 + warp.translation.0) * weight
++            + u * (a.cos() - 1.0) - v * a.sin();
++        let dv = (v * warp.scale.1 + warp.translation.1) * weight
++            + u * a.sin() + v * (a.cos() - 1.0);
++        velocity.0 += du * warp.across.0 - dv * warp.across.1;
++        velocity.1 += du * warp.across.1 + dv * warp.across.0;
++    }
++    velocity
++}
++
++fn feature_flow_steps(changes: &[LocalWarp], fixed_eyes: &[FeatureFrame]) -> usize {
++    let eye_gradient: f32 = fixed_eyes.iter().map(|eye| {
++        1.5 / ((eye.width * 0.28).clamp(4.0, 24.0) - 2.0)
++    }).sum();
++    let gradient_bound: f32 = changes.iter().map(|warp| {
++        let speed = (warp.radius.0 * warp.scale.0.abs() + warp.translation.0.abs())
++            .hypot(warp.radius.1 * warp.scale.1.abs() + warp.translation.1.abs())
++            + warp.radius.0.max(warp.radius.1) * warp.angle.abs();
++        let support_gradient = 1.54 / warp.radius.0.min(warp.radius.1);
++        warp.scale.0.abs().max(warp.scale.1.abs()) + warp.angle.abs()
++            + speed * (support_gradient + if warp.preserve_eyes { eye_gradient } else { 0.0 })
++    }).sum();
++    // At least 32 RK4 steps, increasing when the compact field is steep.
++    // This is a numerical budget, not a reduction of the requested slider.
++    (gradient_bound * 4.0).ceil().max(32.0) as usize
++}
++
++fn integrate_feature_flow(
++    point: (f32, f32),
++    changes: &[LocalWarp],
++    fixed_eyes: &[FeatureFrame],
++    coverage: &impl Fn(f32, f32) -> f32,
++    steps: usize,
++    direction: f32,
++) -> (f32, f32) {
++    let velocity = |point| feature_flow_velocity(point, changes, fixed_eyes, coverage);
++    let initial = velocity(point);
++    if initial.0 == 0.0 && initial.1 == 0.0 {
++        return point;
++    }
++    let dt = direction / steps as f32;
++    let advance = |point: (f32, f32), delta: (f32, f32), time: f32| {
++        (point.0 + delta.0 * time, point.1 + delta.1 * time)
++    };
++    let mut current = point;
++    for _ in 0..steps {
++        let k1 = velocity(current);
++        let k2 = velocity(advance(current, k1, dt * 0.5));
++        let k3 = velocity(advance(current, k2, dt * 0.5));
++        let k4 = velocity(advance(current, k3, dt));
++        current.0 += dt / 6.0 * (k1.0 + 2.0 * k2.0 + 2.0 * k3.0 + k4.0);
++        current.1 += dt / 6.0 * (k1.1 + 2.0 * k2.1 + 2.0 * k3.1 + k4.1);
++    }
++    current
+ }
+ 
+ fn nose_alignment(p: &Value, source: &RgbaImage, amount: f32) -> Option<SymmetryWarp> {
+@@ -852,6 +959,7 @@ pub(crate) fn local_adjust_kind(
+                 scale: (sx * amount, sy * amount),
+                 translation: (translation.0 * amount, translation.1 * amount),
+                 angle: angle * amount,
++                preserve_eyes: key.starts_with("brow"),
+             });
+         }
+     };
+@@ -1134,6 +1242,17 @@ pub(crate) fn local_adjust_kind(
+         return Ok(output);
+     }
+ 
++    let eyebrow_eye_anchors: Vec<_> = if semantic_features
++        && changes.iter().any(|warp| warp.preserve_eyes)
++    {
++        ["leftEye", "rightEye"]
++            .iter()
++            .filter_map(|name| feature_frame(p, name, source))
++            .collect()
++    } else {
++        Vec::new()
++    };
++
+     let stationary: Vec<bool> = if stationary_masks.is_empty() {
+         Vec::new()
+     } else {
+@@ -1158,6 +1277,17 @@ pub(crate) fn local_adjust_kind(
+     // local displacement by the same coverage keeps the field continuous at
+     // the selection boundary and makes the fallback safe for manual masks.
+     let selection_mask = p.get("mask").filter(|value| value.is_object());
++    let flow_selection = selection_mask.map(PreparedMask::new);
++    let flow_protection = p.get("protectMask").filter(|value| value.is_object()).map(PreparedMask::new);
++    let use_feature_flow = semantic_features && changes.iter().any(|warp| warp.preserve_eyes);
++    let flow_steps = feature_flow_steps(&changes, &eyebrow_eye_anchors);
++    let flow_coverage = |x: f32, y: f32| {
++        let nx = x / source.width as f32;
++        let ny = y / source.height as f32;
++        if !region.contains(nx, ny) { return 0.0; }
++        flow_selection.as_ref().map(|mask| mask.coverage(nx, ny, source.width, source.height)).unwrap_or(1.0)
++            * (1.0 - flow_protection.as_ref().map(|mask| mask.coverage(nx, ny, source.width, source.height)).unwrap_or(0.0))
++    };
+     // Facial makeup is defined in the input feature coordinates. Color it
+     // before sampling geometry so an edited lip/eyebrow carries its makeup
+     // with it instead of leaving pigment at the pre-warp polygon location.
+@@ -1190,12 +1320,7 @@ pub(crate) fn local_adjust_kind(
+         }
+     }
+     let sampling_source = facial_input.as_ref().unwrap_or(source);
+-    let mut result = remap(
+-        sampling_source,
+-        source.width,
+-        source.height,
+-        true,
+-        |x, y| {
++    let feature_mapping = |x: f32, y: f32| {
+             let destination = y as usize * source.width as usize + x as usize;
+             if stationary.get(destination).copied().unwrap_or(false) {
+                 return (x, y);
+@@ -1217,7 +1342,14 @@ pub(crate) fn local_adjust_kind(
+             let mut ux = rx;
+             let mut uy = ry;
+ 
++            if use_feature_flow {
++                let (sx, sy) = integrate_feature_flow((x, y), &changes, &eyebrow_eye_anchors, &flow_coverage, flow_steps, 1.0);
++                ux += (sx - x) / (source.width as f32 * region.width);
++                uy += (sy - y) / (source.height as f32 * region.height);
++            }
++
+             for warp in &changes {
++                if use_feature_flow { break; }
+                 let delta = (x - warp.center.0, y - warp.center.1);
+                 let u = delta.0 * warp.across.0 + delta.1 * warp.across.1;
+                 let v = -delta.0 * warp.across.1 + delta.1 * warp.across.0;
+@@ -1227,7 +1359,14 @@ pub(crate) fn local_adjust_kind(
+                 if d >= 1.0 {
+                     continue;
+                 }
+-                let weight = (1.0 - d).powi(2) * selection_weight;
++                let eye_motion = if warp.preserve_eyes {
++                    eyebrow_eye_anchors
++                        .iter()
++                        .fold(1.0, |weight, eye| weight * eye.surrounding_motion(x, y))
++                } else {
++                    1.0
++                };
++                let weight = (1.0 - d).powi(2) * selection_weight * eye_motion;
+                 let a = warp.angle * weight;
+                 let du = (u * warp.scale.0 + warp.translation.0) * weight + u * (a.cos() - 1.0)
+                     - v * a.sin();
+@@ -1276,8 +1415,12 @@ pub(crate) fn local_adjust_kind(
+                 }
+             }
+             (sx, sy)
+-        },
+-    )?;
++        };
++    #[cfg(test)]
++    if use_feature_flow {
++        tests::audit_photographic_feature_flow(&feature_mapping, &changes, &eyebrow_eye_anchors, &flow_coverage, flow_steps, source, p);
++    }
++    let mut result = remap(sampling_source, source.width, source.height, true, feature_mapping)?;
+     // Clothing's frequency-based wrinkle/color pass retains its existing
+     // post-geometry behavior; it does not use facial feature coordinates.
+     if facial_input.is_none() {
+@@ -1773,6 +1916,87 @@ pub(crate) fn repair(source: &RgbaImage, p: &Value, heal: bool) -> Result<RgbaIm
+ mod tests {
+     use super::*;
+     use serde_json::json;
++
++    /// Optional photographic diagnostics execute the exact final Rust mapper,
++    /// including fixed-donor rejection, region/selection, and post fields.
++    /// It is test-only; release builds contain no environment or QA hooks.
++    pub(super) fn audit_photographic_feature_flow(
++        mapping: &impl Fn(f32, f32) -> (f32, f32),
++        changes: &[LocalWarp], eyes: &[FeatureFrame],
++        coverage: &impl Fn(f32, f32) -> f32, steps: usize,
++        source: &RgbaImage, params: &Value,
++    ) {
++        let Some(path) = std::env::var_os("BROW_FLOW_DIAGNOSTICS_OUT") else { return; };
++        let x0 = changes.iter().map(|w| w.center.0 - w.radius.0.max(w.radius.1) - 3.0).fold(source.width as f32, f32::min).floor().max(1.0) as u32;
++        let y0 = changes.iter().map(|w| w.center.1 - w.radius.0.max(w.radius.1) - 3.0).fold(source.height as f32, f32::min).floor().max(1.0) as u32;
++        let x1 = changes.iter().map(|w| w.center.0 + w.radius.0.max(w.radius.1) + 3.0).fold(0.0, f32::max).ceil().min(source.width as f32 - 2.0) as u32;
++        let y1 = changes.iter().map(|w| w.center.1 + w.radius.0.max(w.radius.1) + 3.0).fold(0.0, f32::max).ceil().min(source.height as f32 - 2.0) as u32;
++        let eye_masks: Vec<_> = ["leftEye", "rightEye"].iter().filter_map(|name| params.get("semanticMasks").and_then(|m| m.get(name))).map(PreparedMask::new).collect();
++        let eye_pixel = |x: f32, y: f32| eye_masks.iter().any(|m| m.coverage((x + 0.5) / source.width as f32, (y + 0.5) / source.height as f32, source.width, source.height) >= 0.5);
++        let other: Vec<_> = changes.iter().copied().filter(|w| !w.preserve_eyes).collect();
++        let mut minimum = f32::INFINITY;
++        let mut minimum_at = (0, 0);
++        let mut folds = 0usize;
++        let mut eye_donors = 0usize;
++        let mut maximum_eye_deviation = 0.0f32;
++        let mut reverse_error = 0.0f32;
++        let mut maximum_displacement = 0.0f32;
++        let derivative = 0.25;
++        for y in y0..=y1 {
++            for x in x0..=x1 {
++                let point = (x as f32, y as f32);
++                let mapped = mapping(point.0, point.1);
++                let xp = mapping(point.0 + derivative, point.1);
++                let xm = mapping(point.0 - derivative, point.1);
++                let yp = mapping(point.0, point.1 + derivative);
++                let ym = mapping(point.0, point.1 - derivative);
++                let jacobian = ((xp.0 - xm.0) * (yp.1 - ym.1) - (xp.1 - xm.1) * (yp.0 - ym.0)) / (4.0 * derivative * derivative);
++                if jacobian < minimum { minimum = jacobian; minimum_at = (x, y); }
++                folds += usize::from(jacobian <= 0.0);
++                let displacement = (mapped.0 - point.0).hypot(mapped.1 - point.1);
++                maximum_displacement = maximum_displacement.max(displacement);
++                let reversed = integrate_feature_flow(mapped, changes, eyes, coverage, steps, -1.0);
++                reverse_error = reverse_error.max((reversed.0 - point.0).hypot(reversed.1 - point.1));
++                if eyes.iter().any(|eye| eye.surrounding_motion(point.0, point.1) == 0.0) {
++                    let expected = integrate_feature_flow(point, &other, eyes, coverage, steps, 1.0);
++                    maximum_eye_deviation = maximum_eye_deviation.max((mapped.0 - expected.0).hypot(mapped.1 - expected.1));
++                }
++                if displacement > 0.1 && !eye_pixel(point.0, point.1) {
++                    let bx = mapped.0.floor(); let by = mapped.1.floor();
++                    let tx = mapped.0 - bx; let ty = mapped.1 - by;
++                    eye_donors += usize::from([(0.0,0.0,(1.0-tx)*(1.0-ty)),(1.0,0.0,tx*(1.0-ty)),(0.0,1.0,(1.0-tx)*ty),(1.0,1.0,tx*ty)].iter().any(|&(dx,dy,w)| w > 1e-6 && eye_pixel(bx+dx,by+dy)));
++                }
++            }
++        }
++        std::fs::write(path, serde_json::to_vec_pretty(&json!({
++            "scope":"Actual final Rust f32 feature_mapping; native pixel sampling coordinates; central derivative h=0.25px; full active support bounding rectangle. Other post fields are included.",
++            "region":[x0,y0,x1,y1],"steps":steps,"minimumJacobian":minimum,"minimumJacobianXY":[minimum_at.0,minimum_at.1],"foldPixels":folds,
++            "maxEyeEnvelopeDeviationFromOtherEditsPx":maximum_eye_deviation,"eyeDonorImportsOutsideOriginalEyes":eye_donors,
++            "maxInverseFlowReverseErrorPx":reverse_error,"maxDisplacementPx":maximum_displacement,
++            "adjustments":params.get("adjustments")
++        })).unwrap()).unwrap();
++    }
++
++    #[test]
++    #[ignore = "Photographic QA requires BROW_FLOW_CASES with immutable input/graph paths"]
++    fn photographic_brow_flow_diagnostics() {
++        let cases: Value = serde_json::from_slice(&std::fs::read(std::env::var("BROW_FLOW_CASES").unwrap()).unwrap()).unwrap();
++        let mut failures = Vec::new();
++        for case in cases.as_array().unwrap() {
++            let source = from_native(image::open(case["input"].as_str().unwrap()).unwrap().to_rgba8());
++            let graph: Value = serde_json::from_slice(&std::fs::read(case["graph"].as_str().unwrap()).unwrap()).unwrap();
++            let params = &graph["operations"][0]["params"];
++            std::env::set_var("BROW_FLOW_DIAGNOSTICS_OUT",case["diagnostics"].as_str().unwrap());
++            let result = local_adjust_kind(&source, params, "feature.adjust").unwrap();
++            std::env::remove_var("BROW_FLOW_DIAGNOSTICS_OUT");
++            as_native(&result).save(case["output"].as_str().unwrap()).unwrap();
++            let report: Value = serde_json::from_slice(&std::fs::read(case["diagnostics"].as_str().unwrap()).unwrap()).unwrap();
++            eprintln!("{} {}",case["label"].as_str().unwrap(),report);
++            if report["foldPixels"] != 0 { failures.push(format!("{}: final mapping folded",case["label"])); }
++            if report["maxEyeEnvelopeDeviationFromOtherEditsPx"].as_f64().unwrap() >= 0.05 { failures.push(format!("{}: non-target eye envelope changed",case["label"])); }
++        }
++        assert!(failures.is_empty(), "{}", failures.join("\n"));
++    }
+     fn source() -> RgbaImage {
+         RgbaImage::new(
+             2,
+@@ -2199,6 +2423,44 @@ mod tests {
+         RgbaImage::new(192, 192, pixels).unwrap()
+     }
+ 
++    #[test]
++    fn eyebrow_reshaping_moves_brows_without_bending_adjacent_eyes() {
++        let source = feature_fixture();
++        let polygon = |cx: f32, cy: f32, width: f32, height: f32| symmetry_polygon(cx * 256.0, cy * 256.0, width * 256.0, height * 256.0);
++        let semantics = json!({
++            "leftEye": polygon(0.31, 0.49, 0.18, 0.08),
++            "rightEye": polygon(0.69, 0.49, 0.18, 0.08),
++            "leftBrow": polygon(0.31, 0.38, 0.25, 0.09),
++            "rightBrow": polygon(0.69, 0.38, 0.25, 0.09)
++        });
++        for key in ["browPeak", "browTail", "browThickness", "browLength", "browSpacing"] {
++            for amount in [-100, 100] {
++                let params = json!({"adjustments":{key:amount},"semanticMasks":semantics});
++                let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
++                let mut brow_changes = 0;
++                for y in 0..source.height {
++                    for x in 0..source.width {
++                        let i = (y as usize * source.width as usize + x as usize) * 4;
++                        let nx = (x as f32 + 0.5) / source.width as f32;
++                        let ny = (y as f32 + 0.5) / source.height as f32;
++                        let inside = |name: &str| crate::mask::coverage(&semantics[name], nx, ny, source.width, source.height) >= 0.5;
++                        if inside("leftEye") || inside("rightEye") {
++                            assert_eq!(
++                                &output.pixels[i..i + 4], &source.pixels[i..i + 4],
++                                "{key}={amount} bent non-target eye at ({x},{y})"
++                            );
++                        }
++                        if inside("leftBrow") || inside("rightBrow") {
++                            brow_changes += usize::from(output.pixels[i..i + 4] != source.pixels[i..i + 4]);
++                        }
++                        assert_eq!(output.pixels[i + 3], source.pixels[i + 3]);
++                    }
++                }
++                assert!(brow_changes > 10, "{key}={amount} must still reshape the eyebrows");
++            }
++        }
++    }
++
+     #[test]
+     fn feature_geometry_follows_semantic_polygons_instead_of_fixed_face_anchors() {
+         let source = feature_fixture();

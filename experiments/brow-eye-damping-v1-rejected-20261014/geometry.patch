@@ -1,0 +1,120 @@
+diff --git a/core/image-core/src/geometry.rs b/core/image-core/src/geometry.rs
+index 7924684..fac5249 100644
+--- a/core/image-core/src/geometry.rs
++++ b/core/image-core/src/geometry.rs
+@@ -611,6 +611,20 @@ struct FeatureFrame {
+     height: f32,
+ }
+ 
++impl FeatureFrame {
++    /// Distance to the enclosing feature bounds in the eye-line basis. The
++    /// whole detected eye is fixed for eyebrow edits; adjacent skin approaches
++    /// that constraint smoothly instead of receiving a final hard pixel cut.
++    fn surrounding_motion(&self, x: f32, y: f32) -> f32 {
++        let delta = (x - self.center.0, y - self.center.1);
++        let u = delta.0 * self.across.0 + delta.1 * self.across.1;
++        let v = -delta.0 * self.across.1 + delta.1 * self.across.0;
++        let du = (u.abs() - self.width * 0.5).max(0.0);
++        let dv = (v.abs() - self.height * 0.5).max(0.0);
++        smoothstep(2.0, (self.width * 0.28).clamp(4.0, 24.0), du.hypot(dv))
++    }
++}
++
+ /// Use the detected eye line as a pixel-space basis. Width, height, rotation
+ /// and translations then have the same meaning on tilted and tall portraits.
+ fn feature_frame(p: &Value, name: &str, source: &RgbaImage) -> Option<FeatureFrame> {
+@@ -665,6 +679,7 @@ struct LocalWarp {
+     scale: (f32, f32),
+     translation: (f32, f32),
+     angle: f32,
++    preserve_eyes: bool,
+ }
+ 
+ fn nose_alignment(p: &Value, source: &RgbaImage, amount: f32) -> Option<SymmetryWarp> {
+@@ -852,6 +867,7 @@ pub(crate) fn local_adjust_kind(
+                 scale: (sx * amount, sy * amount),
+                 translation: (translation.0 * amount, translation.1 * amount),
+                 angle: angle * amount,
++                preserve_eyes: key.starts_with("brow"),
+             });
+         }
+     };
+@@ -1134,6 +1150,17 @@ pub(crate) fn local_adjust_kind(
+         return Ok(output);
+     }
+ 
++    let eyebrow_eye_anchors: Vec<_> = if semantic_features
++        && changes.iter().any(|warp| warp.preserve_eyes)
++    {
++        ["leftEye", "rightEye"]
++            .iter()
++            .filter_map(|name| feature_frame(p, name, source))
++            .collect()
++    } else {
++        Vec::new()
++    };
++
+     let stationary: Vec<bool> = if stationary_masks.is_empty() {
+         Vec::new()
+     } else {
+@@ -1227,7 +1254,14 @@ pub(crate) fn local_adjust_kind(
+                 if d >= 1.0 {
+                     continue;
+                 }
+-                let weight = (1.0 - d).powi(2) * selection_weight;
++                let eye_motion = if warp.preserve_eyes {
++                    eyebrow_eye_anchors
++                        .iter()
++                        .fold(1.0, |weight, eye| weight * eye.surrounding_motion(x, y))
++                } else {
++                    1.0
++                };
++                let weight = (1.0 - d).powi(2) * selection_weight * eye_motion;
+                 let a = warp.angle * weight;
+                 let du = (u * warp.scale.0 + warp.translation.0) * weight + u * (a.cos() - 1.0)
+                     - v * a.sin();
+@@ -2199,6 +2233,44 @@ mod tests {
+         RgbaImage::new(192, 192, pixels).unwrap()
+     }
+ 
++    #[test]
++    fn eyebrow_reshaping_moves_brows_without_bending_adjacent_eyes() {
++        let source = feature_fixture();
++        let polygon = |cx: f32, cy: f32, width: f32, height: f32| symmetry_polygon(cx * 256.0, cy * 256.0, width * 256.0, height * 256.0);
++        let semantics = json!({
++            "leftEye": polygon(0.31, 0.49, 0.18, 0.08),
++            "rightEye": polygon(0.69, 0.49, 0.18, 0.08),
++            "leftBrow": polygon(0.31, 0.38, 0.25, 0.09),
++            "rightBrow": polygon(0.69, 0.38, 0.25, 0.09)
++        });
++        for key in ["browPeak", "browTail", "browThickness", "browLength", "browSpacing"] {
++            for amount in [-100, 100] {
++                let params = json!({"adjustments":{key:amount},"semanticMasks":semantics});
++                let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
++                let mut brow_changes = 0;
++                for y in 0..source.height {
++                    for x in 0..source.width {
++                        let i = (y as usize * source.width as usize + x as usize) * 4;
++                        let nx = (x as f32 + 0.5) / source.width as f32;
++                        let ny = (y as f32 + 0.5) / source.height as f32;
++                        let inside = |name: &str| crate::mask::coverage(&semantics[name], nx, ny, source.width, source.height) >= 0.5;
++                        if inside("leftEye") || inside("rightEye") {
++                            assert_eq!(
++                                &output.pixels[i..i + 4], &source.pixels[i..i + 4],
++                                "{key}={amount} bent non-target eye at ({x},{y})"
++                            );
++                        }
++                        if inside("leftBrow") || inside("rightBrow") {
++                            brow_changes += usize::from(output.pixels[i..i + 4] != source.pixels[i..i + 4]);
++                        }
++                        assert_eq!(output.pixels[i + 3], source.pixels[i + 3]);
++                    }
++                }
++                assert!(brow_changes > 10, "{key}={amount} must still reshape the eyebrows");
++            }
++        }
++    }
++
+     #[test]
+     fn feature_geometry_follows_semantic_polygons_instead_of_fixed_face_anchors() {
+         let source = feature_fixture();

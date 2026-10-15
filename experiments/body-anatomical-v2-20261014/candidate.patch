@@ -1,0 +1,325 @@
+--- baseline-instrumented-body.rs
++++ src/body.rs
+@@ -132,6 +132,7 @@
+     center: f32,
+     extent: f32,
+     limb: bool,
++    thigh: bool,
+ }
+ fn add(warps: &mut Vec<Warp>, axis: Axis, values: &Value, key: &str, center: f32, extent: f32) {
+     let amount = percent(values, key);
+@@ -142,6 +143,7 @@
+             center,
+             extent,
+             limb: matches!(key, "arms" | "forearms" | "legs" | "thighs" | "calves"),
++            thigh: false,
+         });
+     }
+ }
+@@ -247,7 +249,11 @@
+         _ => &[],
+     };
+     for key in keys {
++        let before = warps.len();
+         add(warps, axis, values, key, 0.5, 0.5);
++        if warps.len() > before {
++            warps.last_mut().unwrap().thigh = part.ends_with("thigh");
++        }
+     }
+ }
+ fn torso_warps(warps: &mut Vec<Warp>, axis: Axis, values: &Value) {
+@@ -456,6 +462,44 @@
+         .max(1.0)
+ }
+ 
++/// Source-conditioned thigh change with a 26%-of-radius upper bound.
++/// Its derivative is in (-0.85, 0.85), so radius ± change(radius) both preserve
++/// strict source ordering. The excess has zero tangent at the knee reference.
++fn thigh_radius_change(radius: f32, joint_radius: f32) -> f32 {
++    let excess = (radius - joint_radius).abs();
++    let rounding = (joint_radius * 0.04).max(1.0);
++    let geometric = 0.85 * excess * excess / (excess + rounding);
++    let limit = radius * 0.26;
++    // C1 minimum with a fixed 0.5px transition. Using a fixed width keeps
++    // its derivative a convex mixture of the two monotone branch slopes.
++    let band = 0.5;
++    if geometric <= limit - band { geometric }
++    else if limit <= geometric - band { limit }
++    else { ((geometric + limit) * 0.5 - (geometric - limit).powi(2) / (4.0 * band) - band * 0.25).max(0.0) }
++}
++
++/// Evidence changes continuously with the measured contour. A cylinder or
++/// an unmeasurable knee retains a working legacy width control; a clear taper
++/// uses the source-order-preserving target. Intermediate confidence is not
++/// claimed to have the fully active model's no-new-extrema guarantee.
++fn thigh_source_evidence(sections: &[(f32,f32)]) -> ((f32,f32), f32) {
++    let mut joint = [0.0f32;2];
++    let mut reliability = [0.0f32;2];
++    for side in 0..2 {
++        let values: Vec<f32> = sections[56..=61].iter()
++            .map(|s| if side == 0 { s.0 } else { s.1 }).collect();
++        joint[side] = values.iter().copied().fold(0.0, f32::max);
++        let support = values.iter().map(|r| smoothstep(0.0,2.0,*r)).sum::<f32>();
++        reliability[side] = smoothstep(2.0,4.0,support);
++    }
++    let excess = sections[14..=48].iter().map(|&(a,b)| (a-joint[0]).max(b-joint[1]))
++        .fold(0.0,f32::max);
++    let scale = joint[0].max(joint[1]);
++    let confidence = smoothstep((scale*0.04).max(1.0),(scale*0.12).max(3.0),excess)
++        * reliability[0].min(reliability[1]);
++    ((joint[0],joint[1]),confidence)
++}
++
+ /// A cross-section stores the real left/right exterior edges independently.
+ /// One guessed half-width freezes a wide shirt edge or sends a touching arm's
+ /// displacement through the torso. The subject layer supplies contour data;
+@@ -465,6 +509,8 @@
+     warp: Warp,
+     sections: Vec<(f32, f32)>,
+     section_anchors: Vec<(f32, f32)>,
++    thigh_joint_radii: Option<(f32, f32)>,
++    thigh_confidence: f32,
+     fringe: f32,
+ }
+ impl ContourProfile {
+@@ -579,10 +625,19 @@
+                 (anchor(0), anchor(1))
+             })
+             .collect();
++        // Measure each visible distal thigh edge separately. A knee is a
++        // shape boundary condition, not another copy of a midpoint bell.
++        // Ignore the last two samples, where part masks often terminate.
++        let (thigh_joint_radii, thigh_confidence) = if warp.thigh {
++            let (joint, confidence) = thigh_source_evidence(&sections);
++            (Some(joint), confidence)
++        } else { (None, 0.0) };
+         Self {
+             warp,
+             sections,
+             section_anchors,
++            thigh_joint_radii,
++            thigh_confidence,
+             fringe,
+         }
+     }
+@@ -607,7 +662,26 @@
+         }
+         let endpoint = smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.88, 1.0, t));
+         let profile = (1.0 - distance * distance).powi(2) * endpoint;
+-        let target = radius * (1.0 - self.warp.amount * 0.26 * profile);
++        let target = if let Some(joint_radii) = self.thigh_joint_radii {
++            // A single, strictly increasing radius transform retains the
++            // source taper and asymmetric garment shape along the shaft.
++            // The proximal attachment is fixed; the distal reference itself
++            // is fixed by zero excess. This may limit a requested edit near
++            // the knee. It does not claim a 26% achieved circumference edit.
++            let joint = side(joint_radii);
++            let anatomical = if t >= 0.875 { radius } else {
++                // The newly supported below-knee-radius branch must join
++                // the fixed distal collar continuously. Above-reference
++                // radii retain the V1 path exactly.
++                let distal = if radius < joint { 1.0 - smoothstep(0.80,0.875,t) } else { 1.0 };
++                radius - self.warp.amount * smoothstep(0.0, 0.22, t) * distal
++                    * thigh_radius_change(radius, joint)
++            };
++            let legacy = radius * (1.0 - self.warp.amount * 0.26 * profile);
++            legacy + self.thigh_confidence * (anatomical - legacy)
++        } else {
++            radius * (1.0 - self.warp.amount * 0.26 * profile)
++        };
+         let core = radius * 0.30;
+         let output = across.abs();
+         if output <= core || output > radius.max(target) + self.fringe {
+@@ -1131,7 +1205,7 @@
+                 serde_json::json!({"t":t,"center":center,"sides":targets,"section_anchor":profile.section_anchors[i]})
+             }).collect();
+             serde_json::json!({"axis_origin":axis.origin,"axis_direction":axis.direction,"axis_length":axis.length,
+-                              "amount":profile.warp.amount,"sections":sections})
++                              "amount":profile.warp.amount,"thigh_joint_radii":profile.thigh_joint_radii,"thigh_confidence":profile.thigh_confidence,"sections":sections})
+         }).collect();
+         std::fs::write(path, serde_json::to_vec_pretty(&traces).unwrap()).unwrap();
+     }
+@@ -1306,6 +1380,167 @@
+     use super::*;
+     use serde_json::json;
+     #[test]
++    fn no_taper_evidence_does_not_silently_disable_a_thigh_control() {
++        let width=100; let height=160;
++        let mut alpha=vec![0.0; width*height];
++        for y in 0..height { for x in 20..80 {alpha[y*width+x]=1.0;} }
++        let profile=ContourProfile::new(Warp {
++            axis:Axis::new((50.0,10.0),(50.0,150.0),40.0).unwrap(),
++            amount:1.0,center:0.5,extent:0.5,limb:true,thigh:true,
++        },&alpha,width,height,false,4.0);
++        assert_eq!(profile.thigh_confidence,0.0);
++        assert!(profile.displacement((75.0,80.0)).0.abs()>3.0);
++    }
++    #[test]
++    fn thigh_evidence_and_blended_targets_are_continuous_through_uncertain_taper() {
++        let mut previous: Option<(f32,f32)> = None;
++        for i in 0..=8000 {
++            let excess=i as f32*0.001;
++            let mut sections=vec![(30.0,35.0);65];
++            for value in &mut sections[14..=48] {*value=(30.0+excess,35.0+excess);}
++            let ((_,knee),confidence)=thigh_source_evidence(&sections);
++            let radius=35.0+excess;
++            let legacy=radius*(1.0-0.26);
++            let anatomical=radius-thigh_radius_change(radius,knee);
++            let target=legacy+confidence*(anatomical-legacy);
++            if let Some((last_c,last_t))=previous {
++                assert!((confidence-last_c).abs()<0.001);
++                assert!((target-last_t).abs()<0.01,"target jump {target} after {last_t}");
++            }
++            previous=Some((confidence,target));
++        }
++        assert_eq!(previous.unwrap().0,1.0);
++    }
++    #[test]
++    fn below_reference_source_curves_remain_ordered_and_both_directions_have_effect() {
++        let radii=[50.37f32,51.15,52.47];
++        for amount in [-1.0f32,-0.3,0.3,1.0] {
++            let target:Vec<f32>=radii.iter().map(|r|r-amount*thigh_radius_change(*r,52.94)).collect();
++            assert!(target.windows(2).all(|p|p[0]<p[1]));
++            assert!((target[0]-radii[0]).abs() > amount.abs());
++        }
++    }
++    #[test]
++    fn below_reference_branch_meets_the_fixed_knee_without_a_displacement_jump() {
++        let axis=Axis::new((100.0,10.0),(100.0,210.0),60.0).unwrap();
++        for amount in [-1.0f32,1.0] {
++            let profile=ContourProfile {
++                warp:Warp{axis,amount,center:0.5,extent:0.5,limb:true,thigh:true},
++                sections:vec![(30.0,40.0);65],section_anchors:vec![(1.0,1.0);65],
++                thigh_joint_radii:Some((35.0,45.0)),thigh_confidence:1.0,fringe:4.0,
++            };
++            let shift=|t:f32|profile.displacement((125.0,10.0+200.0*t)).0;
++            assert!(shift(0.7).abs()>1.0);
++            assert!(shift(0.875-0.0001).abs()<0.0001);
++            assert_eq!(shift(0.875),(0.0));
++            assert!(shift(0.875-0.001).abs()/0.2<0.01);
++        }
++    }
++    #[test]
++    fn active_source_thigh_preserves_transparent_alpha_fixed_core_and_other_person() {
++        let width=160usize;let height=240usize;
++        let mut pixels=[9,14,20,0].repeat(width*height);
++        let mut subject=vec![0u8;width*height];let mut part=subject.clone();
++        for y in 20..220 {
++            let radius=40.0-15.0*(y as f32-20.0)/200.0;
++            for x in 0..width {
++                let i=y*width+x;
++                if ((x as f32+0.5)-80.0).abs()<radius {
++                    part[i]=255;subject[i]=255;
++                    pixels[i*4..i*4+4].copy_from_slice(&[220,50,80,128]);
++                }
++                if (145..155).contains(&x) && (60..180).contains(&y) {
++                    subject[i]=255;pixels[i*4..i*4+4].copy_from_slice(&[20,160,210,96]);
++                }
++            }
++        }
++        let source=RgbaImage::new(width as u32,height as u32,pixels).unwrap();
++        let mut params=json!({"bodyPart":"left-thigh","region":{"x":0.0,"y":0.0,"width":1.0,"height":1.0},
++            "landmarks":[{"x":0.5,"y":20.0/240.0},{"x":0.5,"y":220.0/240.0}],
++            "subjectMask":{"shape":"raster","width":width,"height":height,"data":subject},
++            "partMask":{"shape":"raster","width":width,"height":height,"data":part},
++            "protectMask":{"shape":"rect","region":{"x":0.49,"y":0.0,"width":0.02,"height":1.0}},
++            "adjustments":{"thighs":100}});
++        let alpha:Vec<f32>=part.iter().map(|x|*x as f32/255.0).collect();
++        let profile=ContourProfile::new(Warp{axis:Axis::new((80.0,20.0),(80.0,220.0),60.0).unwrap(),
++            amount:1.0,center:0.5,extent:0.5,limb:true,thigh:true},&alpha,width,height,false,4.0);
++        assert_eq!(profile.thigh_confidence,1.0);
++        for amount in [-100,100] {
++            params["adjustments"]["thighs"]=json!(amount);
++            let output=adjust(&source,&params).unwrap();
++            assert!(output.pixels!=source.pixels);
++            assert!(output.pixels.chunks_exact(4).all(|p|p[3]<=128));
++            for y in 0..height { for x in 0..width {
++                let i=(y*width+x)*4;
++                if x>=140 || (78..82).contains(&x) || (amount>0 && part[y*width+x]==0) {
++                    assert_eq!(&output.pixels[i..i+4],&source.pixels[i..i+4]);
++                }
++            } }
++        }
++    }
++    #[test]
++    fn thigh_source_transform_is_monotone_for_both_directions_and_scale_ranges() {
++        for knee in [1.0f32, 5.0, 40.0, 200.0] {
++            for amount in [-1.0f32, -0.3, 0.3, 1.0] {
++                let target = |r| r - amount * thigh_radius_change(r, knee);
++                assert_eq!(target(knee), knee);
++                if knee >= 5.0 { assert!((target(knee * 0.8) - knee * 0.8).abs() > 0.001); }
++                let mut previous = target(1.0);
++                for i in 1..20000 {
++                    let radius = 1.0 + i as f32 * knee * 0.0002;
++                    let current = target(radius);
++                    assert!(current > previous, "knee={knee} amount={amount} radius={radius}");
++                    assert!(thigh_radius_change(radius, knee) <= radius * 0.26001);
++                    previous = current;
++                }
++                let h = knee * 0.001;
++                let derivative = (target(knee + h) - target(knee)) / h;
++                assert!((derivative - 1.0).abs() < 0.025, "knee tangent {derivative}");
++            }
++        }
++    }
++    #[test]
++    fn measured_taper_does_not_acquire_the_legacy_mid_thigh_trough() {
++        // Frozen fashion-standing right thigh outside edge, a genuinely
++        // decreasing source segment. Legacy +100 reverses after t=.625.
++        let samples = [(0.375f32,50.12f32),(0.5,46.85),(0.625,43.36),(0.75,40.21),(0.875,38.47)];
++        let legacy: Vec<f32> = samples.iter().map(|(t,r)| r * (1.0 - 0.26 * (1.0 - ((t-0.5)/0.5).powi(2)).powi(2))).collect();
++        assert!(legacy[2] < legacy[3] && legacy[3] < legacy[4]);
++        for amount in [-1.0f32,-0.3,0.3,1.0] {
++            let targets: Vec<f32> = samples.iter().map(|(_,r)| r-amount*thigh_radius_change(*r,38.47)).collect();
++            assert!(targets.windows(2).all(|p|p[0] > p[1]), "{targets:?}");
++            assert_eq!(targets[4],38.47);
++            assert!((targets[0]-samples[0].1).abs() > amount.abs()*8.0);
++        }
++    }
++    #[test]
++    fn thigh_keeps_distinct_source_sides_and_anatomical_attachment_pixels() {
++        let axis=Axis::new((100.0,10.0),(100.0,210.0),60.0).unwrap();
++        for amount in [-1.0f32,1.0] {
++            let profile=ContourProfile {
++                warp: Warp{axis,amount,center:0.5,extent:0.5,limb:true,thigh:true},
++                sections: (0..65).map(|i| {let t=i as f32/64.0;(54.0-20.0*t,40.0-8.0*t)}).collect(),
++                section_anchors: vec![(1.0,1.0);65],
++                thigh_joint_radii: Some((36.5,33.0)),
++                thigh_confidence:1.0,
++                fringe:4.0,
++            };
++            for t in [0.0f32,0.875,0.95,1.0] {
++                assert_eq!(profile.displacement((60.0,10.0+200.0*t)),(0.0,0.0));
++                assert_eq!(profile.displacement((140.0,10.0+200.0*t)),(0.0,0.0));
++            }
++            assert_eq!(profile.displacement((100.0,100.0)),(0.0,0.0));
++            // Each side's target maps back to its own measured source edge.
++            for (sign,r,knee) in [(-1.0f32,44.0,36.5),(1.0,36.0,33.0)] {
++                let target=r-amount*thigh_radius_change(r,knee);
++                let p=(100.0-sign*target,110.0);
++                let d=profile.displacement(p);
++                assert!(((p.0+d.0-100.0).abs()-r).abs()<1e-4);
++            }
++        }
++    }
++
++    #[test]
+     fn an_occluder_crossing_the_bone_core_anchors_adjacent_sections_continuously() {
+         let width = 100;
+         let height = 180;
+@@ -1329,6 +1564,7 @@
+                 extent: 0.55,
+                 amount: 0.8,
+                 limb: false,
++                thigh: false,
+             },
+             &alpha,
+             width,
+@@ -1820,6 +2056,7 @@
+             center: 0.5,
+             extent: 0.5,
+             limb: true,
++            thigh: false,
+         };
+         let alpha = rasterize_mask(&params["subjectMask"], source.width, source.height);
+         let d = ContourProfile::new(

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('face controls exclude stationary ears, glasses, earrings, hair and neck', async ({ page }) => {
+test('face contour control classes exclude ears, glasses, earrings, hair and neck', async ({ page }) => {
   await page.goto('/');
   const layers = await page.evaluate(async () => {
     const { decodeFaceClasses } = await import('/src/core/parsing.ts');

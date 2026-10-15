@@ -1,0 +1,1 @@
+# face anatomical v30\n\nsource boundary donor 实验：joint face flow 外的暴露带沿 source/target 对应边段外法线，从 neck-only source layer 取 donor，按暴露宽度连续混合；joint 路径跳过旧 restore donor。\n

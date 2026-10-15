@@ -7,9 +7,12 @@
 //! of large or semantically complex scenes.
 
 use crate::engine::{byte, number};
-use crate::mask::{coverage, Region};
+#[cfg(test)]
+use crate::mask::coverage;
+use crate::mask::{PreparedMask, Region};
 use crate::{ImageError, RgbaImage};
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 fn invalid(message: &str) -> ImageError {
     ImageError::InvalidOperation(message.to_owned())
@@ -28,7 +31,67 @@ fn neighbours(index: usize, width: usize, height: usize) -> impl Iterator<Item =
     .flatten()
 }
 
-fn patch_score(
+struct PatchEvidence {
+    samples: Vec<(isize, [f32; 3])>,
+}
+
+impl PatchEvidence {
+    /// Target context is identical for every donor at this fill step. Build
+    /// it once in raster order instead of repeating bounds/known checks for
+    /// each candidate. Legal candidates have a complete matching window.
+    fn new(target: usize, radius: i32, width: usize, known: &[bool], pixels: &[u8]) -> Self {
+        let tx = target as i32 % width as i32;
+        let ty = target as i32 / width as i32;
+        let height = pixels.len() / (width * 4);
+        let mut samples = Vec::with_capacity(((2 * radius + 1).pow(2)) as usize);
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                let x = tx + dx;
+                let y = ty + dy;
+                if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+                    continue;
+                }
+                let i = y as usize * width + x as usize;
+                if known[i] {
+                    samples.push((
+                        dy as isize * width as isize + dx as isize,
+                        [
+                            pixels[i * 4] as f32,
+                            pixels[i * 4 + 1] as f32,
+                            pixels[i * 4 + 2] as f32,
+                        ],
+                    ));
+                }
+            }
+        }
+        Self { samples }
+    }
+
+    fn adjusted_score(&self, candidate: usize, original: &[u8], distance: i32, best: f32) -> f32 {
+        let compared = self.samples.len();
+        let denominator = compared.max(1) as f32;
+        let penalty = distance as f32 * 0.005;
+        let confidence = compared as f32 * 1e-4;
+        let mut error = 0.0;
+        for (index, &(offset, target)) in self.samples.iter().enumerate() {
+            let b = (candidate as isize + offset) as usize * 4;
+            for c in 0..3 {
+                let difference = target[c] - original[b + c] as f32;
+                error += difference * difference;
+            }
+            // SSD is nonnegative. Use the very same arithmetic as the final
+            // score so rounding cannot prune a candidate which would win.
+            // Ties never replace the earlier raster candidate.
+            if index % 8 == 7 && error / denominator + penalty - confidence >= best {
+                return f32::INFINITY;
+            }
+        }
+        error / denominator + penalty - confidence
+    }
+}
+
+#[cfg(test)]
+fn patch_score_reference(
     target: usize,
     candidate: usize,
     radius: i32,
@@ -149,8 +212,8 @@ pub(crate) fn inpaint(source: &RgbaImage, params: &Value) -> Result<RgbaImage, I
         .checked_mul(height)
         .ok_or(ImageError::InvalidDimensions)?;
     let region = Region::read(params.get("region"));
-    let mask = params.get("mask");
-    let protection = params.get("protectMask");
+    let mask = params.get("mask").map(PreparedMask::inline);
+    let protection = params.get("protectMask").map(PreparedMask::inline);
     let mut target = vec![false; count];
     let mut known = vec![false; count];
     let mut donors = vec![false; count];
@@ -160,10 +223,12 @@ pub(crate) fn inpaint(source: &RgbaImage, params: &Value) -> Result<RgbaImage, I
             let ny = (y as f32 + 0.5) / height as f32;
             let selected = region.contains(nx, ny)
                 && mask
-                    .map(|value| coverage(value, nx, ny, source.width, source.height) > 0.05)
+                    .as_ref()
+                    .map(|value| value.coverage(nx, ny, source.width, source.height) > 0.05)
                     .unwrap_or(true);
             let frozen = protection
-                .map(|value| coverage(value, nx, ny, source.width, source.height) > 1e-6)
+                .as_ref()
+                .map(|value| value.coverage(nx, ny, source.width, source.height) > 1e-6)
                 .unwrap_or(false);
             let i = y * width + x;
             target[i] = selected && !frozen;
@@ -266,17 +331,19 @@ pub(crate) fn inpaint(source: &RgbaImage, params: &Value) -> Result<RgbaImage, I
     let mut output = source.clone();
     let mut confidence: Vec<f32> = known.iter().map(|&v| if v { 1.0 } else { 0.0 }).collect();
     let mut remaining = targets.len();
+    // Keep only the current unknown boundary. A large hole should not be
+    // rescanned in its entirety after every copied patch. Sorted indices
+    // retain the old raster-order tie break and therefore the exact output.
+    let mut frontier: BTreeSet<usize> = targets
+        .iter()
+        .copied()
+        .filter(|&i| neighbours(i, width, height).any(|n| known[n]))
+        .collect();
     while remaining > 0 {
         let mut best_target = None;
         let mut best_priority = -1.0;
         let mut target_confidence = 0.0;
-        for &i in &targets {
-            if known[i] {
-                continue;
-            }
-            if !neighbours(i, width, height).any(|n| known[n]) {
-                continue;
-            }
+        for &i in &frontier {
             let (priority, c) = frontier_priority(
                 i,
                 patch_radius,
@@ -303,6 +370,7 @@ pub(crate) fn inpaint(source: &RgbaImage, params: &Value) -> Result<RgbaImage, I
         let tx = target_index as i32 % width as i32;
         let ty = target_index as i32 / width as i32;
         let radius = matching_radius;
+        let evidence = PatchEvidence::new(target_index, radius, width, &known, &output.pixels);
         let mut best_candidate = None;
         let mut best_score = f32::INFINITY;
         let y0 = (ty - search_radius).max(0);
@@ -321,17 +389,11 @@ pub(crate) fn inpaint(source: &RgbaImage, params: &Value) -> Result<RgbaImage, I
                 if !candidates[candidate] {
                     continue;
                 }
-                let (score, compared) = patch_score(
-                    target_index,
-                    candidate,
-                    radius,
-                    width,
-                    (&known, &output.pixels, &source.pixels),
-                );
                 // Prefer candidates with more contextual evidence, then their
                 // raster order for deterministic native/WASM output.
                 let distance = (x - tx).pow(2) + (y - ty).pow(2);
-                let adjusted = score + distance as f32 * 0.005 - compared as f32 * 1e-4;
+                let adjusted =
+                    evidence.adjusted_score(candidate, &source.pixels, distance, best_score);
                 if adjusted < best_score {
                     best_score = adjusted;
                     best_candidate = Some(candidate);
@@ -367,15 +429,8 @@ pub(crate) fn inpaint(source: &RgbaImage, params: &Value) -> Result<RgbaImage, I
                 if !candidates[i] {
                     continue;
                 }
-                let (score, compared) = patch_score(
-                    target_index,
-                    i,
-                    radius,
-                    width,
-                    (&known, &output.pixels, &source.pixels),
-                );
                 let distance = (x - tx).pow(2) + (y - ty).pow(2);
-                let adjusted = score + distance as f32 * 0.005 - compared as f32 * 1e-4;
+                let adjusted = evidence.adjusted_score(i, &source.pixels, distance, best_score);
                 if adjusted < best_score {
                     best_score = adjusted;
                     candidate = i;
@@ -432,6 +487,12 @@ pub(crate) fn inpaint(source: &RgbaImage, params: &Value) -> Result<RgbaImage, I
                     output.pixels[ti * 4 + c] = byte(output.pixels[ti * 4 + c] as f32 + value);
                 }
                 known[ti] = true;
+                frontier.remove(&ti);
+                for n in neighbours(ti, width, height) {
+                    if target[n] && !known[n] {
+                        frontier.insert(n);
+                    }
+                }
                 confidence[ti] = target_confidence;
                 remaining -= 1;
             }
@@ -463,6 +524,114 @@ mod tests {
                 .collect(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn bounded_search_retains_exhaustive_ssd_winner_and_float_ties() {
+        // Exercise clipped target windows, sparse usable evidence and many
+        // near ties. A pruned search must select the same immutable donor as
+        // the exhaustive score, including its original f32 rounding.
+        let width = 23usize;
+        let height = 19usize;
+        let original: Vec<u8> = (0..width * height * 4)
+            .map(|i| ((i * 73 + (i / 4).pow(2) * 17) % 256) as u8)
+            .collect();
+        let pixels: Vec<u8> = original
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| {
+                if i % 4 == 3 {
+                    v
+                } else {
+                    v.saturating_add((i % 3) as u8)
+                }
+            })
+            .collect();
+        for radius in 1..=4 {
+            for target in [0, width - 1, width * (height - 1), width * 8 + 11] {
+                for phase in 0..3 {
+                    let known: Vec<bool> =
+                        (0..width * height).map(|i| (i + phase) % 5 != 0).collect();
+                    let evidence = PatchEvidence::new(target, radius, width, &known, &pixels);
+                    let mut reference = (None, f32::INFINITY);
+                    let mut bounded = (None, f32::INFINITY);
+                    for y in radius as usize..height - radius as usize {
+                        for x in radius as usize..width - radius as usize {
+                            let candidate = y * width + x;
+                            let distance = (x as i32 - (target % width) as i32).pow(2)
+                                + (y as i32 - (target / width) as i32).pow(2);
+                            let (score, count) = patch_score_reference(
+                                target,
+                                candidate,
+                                radius,
+                                width,
+                                (&known, &pixels, &original),
+                            );
+                            let adjusted = score + distance as f32 * 0.005 - count as f32 * 1e-4;
+                            let complete = evidence.adjusted_score(
+                                candidate,
+                                &original,
+                                distance,
+                                f32::INFINITY,
+                            );
+                            assert_eq!(complete.to_bits(), adjusted.to_bits());
+                            let pruned =
+                                evidence.adjusted_score(candidate, &original, distance, bounded.1);
+                            if adjusted < reference.1 {
+                                reference = (Some(candidate), adjusted);
+                            }
+                            if pruned < bounded.1 {
+                                bounded = (Some(candidate), pruned);
+                            }
+                            // Exact and next-representable scores must obey
+                            // the strict less-than tie rule used by the fill.
+                            let next = f32::from_bits(adjusted.to_bits() + 1);
+                            assert_eq!(
+                                evidence
+                                    .adjusted_score(candidate, &original, distance, next)
+                                    .to_bits(),
+                                adjusted.to_bits()
+                            );
+                        }
+                    }
+                    assert_eq!(bounded, reference);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn implicit_rectangle_masks_keep_legacy_target_and_protection_semantics() {
+        let mut source = stripe(32, 32);
+        for y in 8..16 {
+            for x in 8..16 {
+                let i = (y * 32 + x) * 4;
+                source.pixels[i..i + 3].copy_from_slice(&[240, 30, 180]);
+            }
+        }
+        let mut implicit = json!({
+            "region":{"x":0.25,"y":0.25,"width":0.25,"height":0.25},
+            "mask":{"region":{"x":0.25,"y":0.25,"width":0.25,"height":0.25},
+                "points":[{"x":0.7,"y":0.7},{"x":0.9,"y":0.7},{"x":0.8,"y":0.9}]},
+            "protectMask":{"region":{"x":0.25,"y":0.25,"width":0.125,"height":0.25},
+                "points":[{"x":0.7,"y":0.7},{"x":0.9,"y":0.7},{"x":0.8,"y":0.9}]},
+            "radius":0.01
+        });
+        let mut explicit = implicit.clone();
+        explicit["mask"]["shape"] = json!("rect");
+        explicit["protectMask"]["shape"] = json!("rect");
+        let expected = inpaint(&source, &explicit).unwrap();
+        assert!(expected != source, "fixture must require a real fill");
+        assert!(
+            inpaint(&source, &implicit).unwrap() == expected,
+            "omitted mask shapes must retain rectangle selection/protection"
+        );
+        // An untyped whole-image selection still has no legal donor. Points
+        // are metadata unless the inline mask explicitly declares polygon.
+        implicit["region"] = json!({"x":0,"y":0,"width":1,"height":1});
+        implicit["mask"].as_object_mut().unwrap().remove("region");
+        implicit.as_object_mut().unwrap().remove("protectMask");
+        assert!(inpaint(&source, &implicit).is_err());
     }
 
     #[test]

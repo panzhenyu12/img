@@ -1,0 +1,1 @@
+# face anatomical v26\n\n隔离实验：joint flow 保留，取消 portrait F/B 估计，直接以物理联合 alpha 采样 source crop，核对棕色 join 是否由 F/B 层导致。\n

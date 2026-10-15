@@ -1,0 +1,32 @@
+--- a/core/src/eye_elastic.rs
++++ b/core/src/eye_elastic.rs
+@@ -157,6 +157,20 @@
+         let applied_angle=field_angle;
+         let swept_envelope=sweep(frame,&source_envelope,total_translation,total_angle,1.0);
+         let other_sweep=other.as_ref().map(|(f,e,t,a)|sweep(*f,&envelope(*f,e),*t,*a,1.0));
++        // Brow exclusion has a different contract from the rigid eye core:
++        // preserve every trajectory beginning in the original static eyelid
++        // envelope. The old forward-only aperture sweep missed inverse paths
++        // starting near the static envelope's outer corners.
++        let margin=(frame.height*0.75).clamp(2.0,24.0)+2.0;
++        let corners:Vec<_>=[(-1.0,-1.0),(-1.0,1.0),(1.0,-1.0),(1.0,1.0)].iter().map(|&(x,y)| {
++            let u=x*(frame.width*0.5+margin);let v=y*(frame.height*0.5+margin);
++            (frame.center.0+u*frame.across.0-v*frame.across.1,
++             frame.center.1+u*frame.across.1+v*frame.across.0)
++        }).collect();
++        let mut protected=sweep(frame,&corners,total_translation,total_angle,1.0);
++        protected.extend(sweep(frame,&corners,total_translation,total_angle,-1.0));
++        let protected=hull(protected);
++
+         let obstacle_clearance=other_sweep.as_ref().map(|o|clearance(&swept_envelope,o)).unwrap_or(f32::INFINITY);
+         let required_clearance=0.0;
+         let common_width=frame.width.max(other_frame.width);
+@@ -175,7 +189,7 @@
+             let dc=distance(p,&swept_envelope);let df=other_sweep.as_ref().map(|o|distance(p,o)).unwrap_or(f32::INFINITY);
+             let db=x.min(width-1-x).min(y.min(height-1-y))as f32*step;
+             core_distance[i]=dc;fixed_distance[i]=df;border_distance[i]=db;
+-            exclusion[i]=1.0-smooth(step*3.0,step*3.0+frame.width*0.28,dc);
++            exclusion[i]=1.0-smooth(step*2.0,step*2.0+frame.width*0.28,distance(p,&protected));
+             let delta=(p.0-frame.center.0,p.1-frame.center.1);
+             let u=delta.0*frame.across.0+delta.1*frame.across.1;
+             let v=-delta.0*frame.across.1+delta.1*frame.across.0;

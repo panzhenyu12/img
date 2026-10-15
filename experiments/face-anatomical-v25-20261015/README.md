@@ -1,0 +1,1 @@
+# face anatomical v25\n\n隔离实验：强制 face-only 路径，保留 source face matte + neck lighting reconstruction，观察是否比 joint flow 更连续。\n

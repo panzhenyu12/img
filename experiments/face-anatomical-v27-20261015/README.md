@@ -1,0 +1,1 @@
+# face anatomical v27\n\n隔离实验：joint flow 中也应用 clip_supported_jaw_opacity，限制目标下方 face alpha，检查棕色下颌条是否来自残留 face opacity。\n

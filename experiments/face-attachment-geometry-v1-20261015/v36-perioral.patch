@@ -1,0 +1,132 @@
+--- a/src/face.rs
++++ b/src/face.rs
+@@ -188,13 +188,18 @@
+     rx: f32,
+     ry: f32,
+     polygon: Vec<Point>,
++    skin_transition: f32,
++    skin_core: f32,
+ }
+ impl Anchor {
+     fn freeze(&self, p: Point) -> f32 {
++        self.freeze_over(p, 0.0, 2.0)
++    }
++    fn freeze_over(&self, p: Point, core: f32, transition: f32) -> f32 {
+         let delta = sub(p, self.center);
+         let r = (dot(delta, self.across) / self.rx).hypot(dot(delta, self.down) / self.ry);
+         if !self.polygon.is_empty() {
+-            if r > 1.8 {
++            if r > 1.8 + transition / self.rx.min(self.ry) {
+                 return 0.0;
+             }
+             if inside(p, &self.polygon) {
+@@ -211,7 +216,7 @@
+             // one row lower, creating a visible inward notch. Freeze the
+             // observed feature itself, with a two-pixel transition. MLS fixed
+             // handles distribute the surrounding skin motion continuously.
+-            return 1.0 - smoothstep(0.0, 2.0, distance);
++            return 1.0 - smoothstep(core, transition, distance);
+         }
+         1.0 - smoothstep(1.0, 1.7, r)
+     }
+@@ -238,6 +243,22 @@
+             rx = rx.max(dot(sub(p, c), frame.across).abs());
+             ry = ry.max(dot(sub(p, c), frame.down).abs());
+         }
++        // Keep the perioral crease attached to the observed lips. A fixed
++        // two-pixel ramp produces high strain next to a stationary lip corner
++        // at photographic resolution. Bound the transition by observed space
++        // to the face contour, so it cannot cancel the intended silhouette.
++        let (skin_core, skin_transition) = if key == "lips" || key == "teeth" {
++            let outline = semantics.and_then(|m| m.get("faceContour")).map(|m| points(m, w, h)).unwrap_or_default();
++            let mut clearance = f32::MAX;
++            for &p in &polygon {
++                for (i,&a) in outline.iter().enumerate() {
++                    clearance = clearance.min(closest(p,a,outline[(i+1)%outline.len()]).0);
++                }
++            }
++            let core = (rx * 2.0 * 0.08).min(clearance * 0.20);
++            let transition = (rx * 2.0 * 0.25).min(clearance * 0.80).max(core + 2.0);
++            (core, transition)
++        } else { (0.0, 2.0) };
+         // An enclosing ellipse protects the entire feature, including its
+         // corners. The surrounding transition moves skin continuously.
+         result.push(Anchor {
+@@ -247,6 +268,8 @@
+             rx: (rx * 1.45 + 1.0).max(1.0),
+             ry: (ry * 1.45 + 1.0).max(1.0),
+             polygon,
++            skin_transition,
++            skin_core,
+         });
+     }
+     // A detector without a nose polygon still fixes the central nose bridge
+@@ -262,6 +285,8 @@
+             rx: frame.width() * 0.105,
+             ry: frame.height() * 0.15,
+             polygon: Vec::new(),
++            skin_transition: 2.0,
++            skin_core: 0.0,
+         });
+     }
+     result
+@@ -331,6 +356,9 @@
+         );
+         let weight = 1.0 - smoothstep(0.0, self.support, distance);
+         (scale(movement, weight), distance)
++    }
++    fn anatomical_anchor_weight(&self, p: Point) -> f32 {
++        self.anchors.iter().fold(1.0, |weight, anchor| weight * (1.0-anchor.freeze_over(p,anchor.skin_core,anchor.skin_transition)))
+     }
+     fn anchor_weight(&self, p: Point) -> f32 {
+         let mut weight = 1.0;
+@@ -2146,7 +2174,7 @@
+             let vectors=(0..count).map(|i| {
+                 let p=(left as f32+(i%cw) as f32+0.5,top as f32+(i/cw) as f32+0.5);
+                 let weight=smoothstep(2.0,velocity_taper,nearest_distance(&attachment_distance,p))
+-                    *smoothstep(0.0,4.0,nearest_distance(&frozen_distance,p))*external_constraint(p)*field.anchor_weight(p);
++                    *smoothstep(0.0,4.0,nearest_distance(&frozen_distance,p))*external_constraint(p)*field.anatomical_anchor_weight(p);
+                 add(velocity.velocity(p),scale(model.velocity(p),weight))
+             }).collect();
+             velocity=flow::VelocityGrid::new((left as f32+0.5,top as f32+0.5),cw,ch,vectors);
+@@ -2526,6 +2554,40 @@
+             after.0 >= before.0 + 4 && after.1 <= before.1 - 4,
+             "joint foreground cancelled slimming {before:?}->{after:?}"
+         );
++    }
++
++    #[test]
++    fn width_transport_keeps_perioral_crease_attached_without_cancelling_cheek_motion() {
++        let (mut source, mut params) = joint_portrait();
++        params["semanticMasks"]["lips"] = json!({"shape":"polygon","points":[
++            {"x":60.0/160.0,"y":132.0/320.0},{"x":100.0/160.0,"y":132.0/320.0},
++            {"x":100.0/160.0,"y":146.0/320.0},{"x":60.0/160.0,"y":146.0/320.0}
++        ]});
++        // The oral commissure shadow extends a few pixels beyond the detected
++        // lip polygon. It must remain attached to the lip rather than become
++        // a lateral dark streak when the cheek is enlarged.
++        for y in 138..141 {
++            for x in 56..104 {
++                let i=(y*160+x)*4;
++                source.pixels[i..i+4].copy_from_slice(&[20,20,20,255]);
++            }
++        }
++        let before=span(&source,120);
++        for amount in [-100,100] {
++            params["adjustments"]["faceWidth"]=json!(amount);
++            let output=public_adjust(&source,&params).unwrap();
++            let dark:Vec<_>=(40..120).filter(|&x| {
++                let i=(139*160+x)*4;
++                output.pixels[i..i+3].iter().all(|&c| c<70)
++            }).collect();
++            assert!(!dark.is_empty());
++            assert!(*dark.first().unwrap()>=55 && *dark.last().unwrap()<=104,
++                "perioral crease detached at {amount}: {:?}", (dark.first(),dark.last()));
++            let after=span(&output,120);
++            assert!((after.0 as i32-before.0 as i32).abs()>=3
++                && (after.1 as i32-before.1 as i32).abs()>=3,
++                "preserving the mouth must not cancel cheek movement {amount}: {before:?}->{after:?}");
++        }
+     }
+ 
+     #[test]

@@ -1,0 +1,441 @@
+--- a/core/image-core/src/face.rs
++++ b/core/image-core/src/face.rs
+@@ -1719,6 +1719,54 @@
+             }
+         }
+     }
++    // Recover only physical alpha omitted by semantic zero at the connected
++    // face/neck edge. This does not alter owned components or frozen geometry.
++    if joint_neck && independent_head {
++        let raster = semantics.and_then(|m| m.get("skin")).unwrap();
++        let mw = raster.get("width").and_then(Value::as_u64).unwrap() as f32;
++        let mh = raster.get("height").and_then(Value::as_u64).unwrap() as f32;
++        let fringe = (2.0 + 1.5 * (w / mw).max(h / mh).max(1.0)).ceil() as usize;
++        let mut person = Vec::with_capacity(count);
++        let mut forbidden = Vec::with_capacity(count);
++        let mut semantic_edge = Vec::with_capacity(count);
++        let skin_mask = semantics.and_then(|m| m.get("skin")).map(PreparedMask::new);
++        for i in 0..count {
++            let nx = (left as f32 + (i % cw) as f32 + 0.5) / w;
++            let ny = (top as f32 + (i / cw) as f32 + 0.5) / h;
++            person.push(
++                person_mask
++                    .as_ref()
++                    .map(|m| m.coverage(nx, ny, source.width, source.height))
++                    .unwrap_or(0.0),
++            );
++            let skin_value = skin_mask
++                .as_ref()
++                .map(|m| m.coverage(nx, ny, source.width, source.height))
++                .unwrap_or(0.0);
++            let neck_value = neck_mask
++                .as_ref()
++                .map(|m| m.coverage(nx, ny, source.width, source.height))
++                .unwrap_or(0.0);
++            semantic_edge.push(skin_value.max(neck_value));
++            forbidden.push(
++                frozen[i]
++                    || inferred_person_fixed[i]
++                    || protection[i] > 1e-6
++                    || fixed_masks
++                        .iter()
++                        .any(|m| m.coverage(nx, ny, source.width, source.height) > 1e-6),
++            );
++        }
++        color_alpha = crate::face_matting::recover_connected_portrait_fringe(
++            &crop,
++            &color_alpha,
++            &joint_owned,
++            &person,
++            &semantic_edge,
++            &forbidden,
++            fringe,
++        );
++    }
+     // The existing source physical matting trimap is the uncertain own-face
+     // edge. PersonAlpha is the selected person's combined class confidence,
+     // not an independently detected other-person instance. Keep its real
+--- a/core/image-core/src/face_matting.rs
++++ b/core/image-core/src/face_matting.rs
+@@ -139,6 +139,173 @@
+         }
+     }
+     refined
++}
++
++/// Recover only a corroborated, connected portrait trimap omission. Class
++/// zero is not sufficient physical-background evidence if the selected-person
++/// observation and local RGB line both support the adjacent connected skin.
++/// No semantic label, geometry, or frozen output pixel is changed here.
++pub(crate) fn recover_connected_portrait_fringe(
++    source: &RgbaImage,
++    alpha: &[f32],
++    owned: &[bool],
++    person: &[f32],
++    semantic_edge: &[f32],
++    forbidden: &[bool],
++    fringe: usize,
++) -> Vec<f32> {
++    if source.pixels.chunks_exact(4).any(|p| p[3] != 255) {
++        return alpha.to_vec();
++    }
++    let (w, h) = (source.width as usize, source.height as usize);
++    let count = w * h;
++    let neighbors = |i: usize| {
++        let (x, y) = (i % w, i / w);
++        [
++            (x > 0).then(|| i - 1),
++            (x + 1 < w).then(|| i + 1),
++            (y > 0).then(|| i - w),
++            (y + 1 < h).then(|| i + w),
++        ]
++    };
++    let distances = |seeds: &[bool], limit: usize| {
++        let mut nearest = vec![usize::MAX; count];
++        let mut dist = vec![usize::MAX; count];
++        let mut q = VecDeque::new();
++        for (i, &yes) in seeds.iter().enumerate() {
++            if yes {
++                nearest[i] = i;
++                dist[i] = 0;
++                q.push_back(i);
++            }
++        }
++        while let Some(i) = q.pop_front() {
++            if dist[i] >= limit {
++                continue;
++            }
++            for n in neighbors(i).into_iter().flatten() {
++                if dist[n] > dist[i] + 1 {
++                    dist[n] = dist[i] + 1;
++                    nearest[n] = nearest[i];
++                    q.push_back(n);
++                }
++            }
++        }
++        (nearest, dist)
++    };
++    let certain = |i: usize, fg: bool| {
++        !forbidden[i]
++            && if fg {
++                owned[i] && alpha[i] >= 0.98
++            } else {
++                alpha[i] <= 0.02 && person[i] <= 1.0 / 255.0
++            }
++    };
++    let eroded = |fg: bool| {
++        (0..count)
++            .map(|i| {
++                let (x, y) = (i % w, i / w);
++                certain(i, fg)
++                    && (y.saturating_sub(1)..=(y + 1).min(h - 1)).all(|yy| {
++                        (x.saturating_sub(1)..=(x + 1).min(w - 1))
++                            .all(|xx| certain(yy * w + xx, fg))
++                    })
++            })
++            .collect::<Vec<bool>>()
++    };
++    let (_, distance) = distances(owned, fringe);
++    let (foreground, fd) = distances(&eroded(true), 12);
++    let (background, bd) = distances(&eroded(false), 12);
++    let observed = |i: usize, fg: bool| {
++        let (x, y) = (i % w, i / w);
++        let mut sum = [0.0f32; 3];
++        let mut n = 0.0f32;
++        for yy in y.saturating_sub(1)..=(y + 1).min(h - 1) {
++            for xx in x.saturating_sub(1)..=(x + 1).min(w - 1) {
++                let j = yy * w + xx;
++                if certain(j, fg) {
++                    for (c, value) in sum.iter_mut().enumerate() {
++                        *value += source.pixels[j * 4 + c] as f32;
++                    }
++                    n += 1.0;
++                }
++            }
++        }
++        sum.map(|v| v / n.max(1.0))
++    };
++    let mut result = alpha.to_vec();
++    let mut proposals = vec![0.0_f32; count];
++    for i in 0..count {
++        if alpha[i] > 1e-6
++            || forbidden[i]
++            || person[i] <= 0.15
++            || distance[i] > fringe
++            || fd[i] > 12
++            || bd[i] > 12
++        {
++            continue;
++        }
++        let (x, y) = (i % w, i / w);
++        let near_semantic = (y.saturating_sub(2)..=(y + 2).min(h - 1)).any(|yy| {
++            (x.saturating_sub(2)..=(x + 2).min(w - 1)).any(|xx| semantic_edge[yy * w + xx] > 0.02)
++        });
++        if !near_semantic {
++            continue;
++        }
++        let f = observed(foreground[i], true);
++        let b = observed(background[i], false);
++        let delta = [f[0] - b[0], f[1] - b[1], f[2] - b[2]];
++        let denominator = delta.iter().map(|x| x * x).sum::<f32>();
++        if denominator < 25.0 * 25.0 {
++            continue;
++        }
++        let candidate = ((0..3)
++            .map(|c| (source.pixels[i * 4 + c] as f32 - b[c]) * delta[c])
++            .sum::<f32>()
++            / denominator)
++            .clamp(0.0, 1.0);
++        let residual = (0..3)
++            .map(|c| (source.pixels[i * 4 + c] as f32 - (b[c] + candidate * delta[c])).powi(2))
++            .sum::<f32>();
++        proposals[i] = candidate;
++        if residual <= 3.0 * 12.0 * 12.0 && candidate > 1.0 / 255.0 {
++            result[i] = candidate;
++        }
++    }
++    // A local color-line threshold can reject a few samples in an otherwise
++    // continuous physical edge because neighboring skin has a small lighting
++    // or chromaticity gradient. Propagate only an already supported alpha to
++    // immediately connected, RGB-compatible proposals. Every proposal still
++    // passes the same person, ownership-distance, semantic, donor and explicit
++    // protection gates above; this never dilates an arbitrary semantic mask.
++    // Use simultaneous rounds so raster scan order cannot change the result.
++    for _ in 0..fringe {
++        let previous = result.clone();
++        let mut added = false;
++        for i in 0..count {
++            if result[i] > 1e-6 || proposals[i] < 0.5 {
++                continue;
++            }
++            if neighbors(i).into_iter().flatten().any(|j| {
++                if previous[j] < 0.5 || (previous[j] - proposals[i]).abs() > 0.15 || forbidden[j] {
++                    return false;
++                }
++                let color_distance = (0..3)
++                    .map(|c| {
++                        (source.pixels[i * 4 + c] as f32 - source.pixels[j * 4 + c] as f32).powi(2)
++                    })
++                    .sum::<f32>();
++                color_distance <= 3.0 * 8.0 * 8.0
++            }) {
++                result[i] = proposals[i];
++                added = true;
++            }
++        }
++        if !added {
++            break;
++        }
++    }
++    result
+ }
+ 
+ fn resize<T: Copy>(input: &[T], iw: usize, ih: usize, w: usize, h: usize) -> Vec<T> {
+@@ -254,6 +421,207 @@
+ mod tests {
+     use super::*;
+     #[test]
++    fn recovered_known_alpha_edge_transports_to_background_without_skin_islands() {
++        // Independent physical ground truth: a three-pixel parser omission at
++        // an antialiased skin edge. A small chromaticity shift crosses the
++        // single-pixel color-line cutoff, but the actual skin is still opaque.
++        let (w, h) = (48usize, 28usize);
++        let b = [20.0_f32, 30.0, 40.0];
++        let mut pixels = vec![0_u8; w * h * 4];
++        let mut truth = vec![0.0_f32; w * h];
++        let mut alpha = truth.clone();
++        let mut person = truth.clone();
++        let mut owned = vec![false; w * h];
++        let mut forbidden = owned.clone();
++        let mut fg = vec![[190.0_f32, 130.0, 100.0]; w * h];
++        for y in 0..h {
++            for x in 0..w {
++                let i = y * w + x;
++                truth[i] = if x >= 12 {
++                    1.0
++                } else if x == 11 {
++                    0.3
++                } else {
++                    0.0
++                };
++                person[i] = truth[i];
++                if x >= 15 {
++                    alpha[i] = 1.0;
++                    owned[i] = true;
++                }
++                if (12..=14).contains(&x) && (8..=14).contains(&y) {
++                    let shift = if y == 8 || y == 14 { 12.0 } else { 16.0 };
++                    fg[i][1] += shift;
++                    fg[i][2] += shift;
++                }
++                for c in 0..3 {
++                    pixels[i * 4 + c] =
++                        (b[c] * (1.0 - truth[i]) + fg[i][c] * truth[i]).round() as u8;
++                }
++                pixels[i * 4 + 3] = 255;
++            }
++        }
++        // A different person's nearby opaque skin is explicitly excluded.
++        // It is only two pixels from the target's physical edge.
++        for y in 20..24 {
++            let i = y * w + 10;
++            for c in 0..3 {
++                pixels[i * 4 + c] = fg[i][c] as u8;
++            }
++            person[i] = 1.0;
++            forbidden[i] = true;
++        }
++        let image = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
++        let recovered = recover_connected_portrait_fringe(
++            &image,
++            &alpha,
++            &owned,
++            &person,
++            &vec![1.0; w * h],
++            &forbidden,
++            5,
++        );
++        for y in 2..h - 2 {
++            for x in 10..18 {
++                let i = y * w + x;
++                assert!(
++                    (recovered[i] - truth[i]).abs() < 0.01,
++                    "physical opacity at {x},{y}: {} != {}",
++                    recovered[i],
++                    truth[i]
++                );
++            }
++        }
++        for i in 0..w * h {
++            if forbidden[i] || person[i] == 0.0 {
++                assert_eq!(recovered[i], alpha[i]);
++            }
++        }
++        // For both contraction and expansion, compare transported physical
++        // opacity against the analytic translated half-plane, rather than
++        // treating darker newly revealed background as a failure.
++        for displacement in [-6_isize, 6] {
++            for y in 2..h - 2 {
++                for x in 7..w - 7 {
++                    let sx = (x as isize - displacement) as usize;
++                    let si = y * w + sx;
++                    let expected_alpha = if sx >= 12 {
++                        1.0
++                    } else if sx == 11 {
++                        0.3
++                    } else {
++                        0.0
++                    };
++                    for c in 0..3 {
++                        let actual = b[c] * (1.0 - recovered[si]) + fg[si][c] * recovered[si];
++                        let expected = b[c] * (1.0 - expected_alpha) + fg[si][c] * expected_alpha;
++                        assert!((actual-expected).abs()<1.0,"transport {displacement} at {x},{y} channel {c}: {actual} != {expected}");
++                    }
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn connected_fringe_uses_observed_rgb_and_rejects_fixed_or_separate_people() {
++        let (w, h) = (48usize, 24usize);
++        let mut pixels = [20u8, 30, 40, 255].repeat(w * h);
++        let mut alpha = vec![0.0; w * h];
++        let mut person = alpha.clone();
++        let mut owned = vec![false; w * h];
++        let mut forbidden = owned.clone();
++        for y in 0..h {
++            for x in 0..w {
++                let i = y * w + x;
++                if x >= 15 {
++                    alpha[i] = 1.0;
++                    owned[i] = true;
++                }
++                if x >= 12 {
++                    person[i] = 1.0;
++                    pixels[i * 4..i * 4 + 4].copy_from_slice(&[190, 130, 100, 255]);
++                }
++                if x == 11 {
++                    person[i] = 0.3;
++                    pixels[i * 4..i * 4 + 4].copy_from_slice(&[71, 60, 58, 255]);
++                }
++                // Disconnected same-colored person and explicit fixed texel.
++                if x == 4 {
++                    person[i] = 1.0;
++                    pixels[i * 4..i * 4 + 4].copy_from_slice(&[190, 130, 100, 255]);
++                }
++            }
++        }
++        forbidden[12 * w + 12] = true;
++        let image = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
++        let result = recover_connected_portrait_fringe(
++            &image,
++            &alpha,
++            &owned,
++            &person,
++            &vec![1.0; w * h],
++            &forbidden,
++            5,
++        );
++        assert!(result[10 * w + 12] > 0.98);
++        assert!((result[10 * w + 11] - 0.3).abs() < 0.02);
++        assert_eq!(result[12 * w + 12], 0.0);
++        assert_eq!(result[10 * w + 4], 0.0);
++        for i in 0..w * h {
++            if person[i] <= 1.0 / 255.0 || alpha[i] > 0.0 {
++                assert_eq!(result[i], alpha[i]);
++            }
++        }
++        let mut transparent = image.clone();
++        transparent.pixels[3] = 128;
++        assert_eq!(
++            recover_connected_portrait_fringe(
++                &transparent,
++                &alpha,
++                &owned,
++                &person,
++                &vec![1.0; w * h],
++                &forbidden,
++                5
++            ),
++            alpha
++        );
++    }
++    #[test]
++    fn connected_fringe_refuses_rgb_inconsistent_with_skin_background_line() {
++        let (w, h) = (32usize, 20usize);
++        let mut pixels = [20u8, 30, 40, 255].repeat(w * h);
++        let mut alpha = vec![0.0; w * h];
++        let mut person = alpha.clone();
++        let mut owned = vec![false; w * h];
++        for y in 0..h {
++            for x in 12..w {
++                let i = y * w + x;
++                person[i] = 1.0;
++                pixels[i * 4..i * 4 + 4].copy_from_slice(if x >= 15 {
++                    &[190, 130, 100, 255]
++                } else {
++                    &[20, 240, 30, 255]
++                });
++                if x >= 15 {
++                    alpha[i] = 1.0;
++                    owned[i] = true;
++                }
++            }
++        }
++        let image = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
++        let result = recover_connected_portrait_fringe(
++            &image,
++            &alpha,
++            &owned,
++            &person,
++            &vec![1.0; w * h],
++            &vec![false; w * h],
++            5,
++        );
++        assert_eq!(result[10 * w + 13], 0.0);
++    }
++    #[test]
+     fn portrait_trimap_corrects_saturated_mixed_edge_and_keeps_certain_interior() {
+         let (w, h) = (64, 16);
+         // A semantic label is binary despite a real two-pixel skin/hair
