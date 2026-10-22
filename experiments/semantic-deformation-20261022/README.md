@@ -78,6 +78,22 @@ See `doc/research/regional-face-target-experiment-20261022.md` for the explorato
 comparison and its limitations. The cached source polygons are not anatomical
 ground truth or prescribed beauty ratios.
 
+`source_regions.py --output <new-directory-under-test/results>` records source
+region associations without modifying any target or image deformation. It binds
+the historical MediaPipe canonical index order, the actual cached 36 coordinates,
+eye/lip polygons, and the original face frame. Graph coordinates use normalized
+positions times image size; the source audit uses photograph pixel indices. The
+declared half-pixel conversion runs exactly once for graph points; source128 and
+the frame are already in index coordinates and remain unchanged.
+
+The output locates each side's eye-height and mouth-height intersections and a
+chin-152 projection by continuous contour arc length. It rejects ambiguous,
+crossing, missing, reordered or inconsistent source evidence. All associations
+retain `visibility_status=unknown` and `automatic_edit_authorized=false`: detector
+topology and proximity cannot establish visible skin behind hair or a bone
+landmark. The script produces ignored source overlays for visual inspection;
+it does not enable a new automatic edit, run detection, or call the solver.
+
 The local photo renderer used for historical comparisons is the existing binary
 at `.run/face-current-20261019-target3/release/examples/face-photo-transport`.
 Its source is in `core/image-core/examples/face-photo-transport.rs`, with the
