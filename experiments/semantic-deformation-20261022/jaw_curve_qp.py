@@ -9,13 +9,66 @@ NumPy/SciPy are offline research dependencies, not a Web runtime dependency.
 import copy
 import hashlib
 import json
+from types import SimpleNamespace
 
 import numpy as np
-from scipy.linalg import block_diag
+from scipy.linalg import block_diag, null_space, solve_triangular
 from scipy.optimize import Bounds, LinearConstraint, linprog, minimize
+from scipy.sparse import csc_matrix
 
 from jaw_collocation import _prepare
 from jaw_bilateral import build_bilateral_coupling
+
+
+def _solve_precise_qp(hessian, linear, matrix, rhs, equality, equality_rhs,
+                      lower, upper, normalization):
+    """Numerically solve the same convex QP after SLSQP precision stalls.
+
+    Fixed coordinates and the one already-feasible nonzero jaw-area equality
+    are eliminated first; this is not a generic multi-equality feasibility API.
+    Cholesky whitening changes variables, without a ridge, altered preference,
+    relaxed inequality, or attenuated amount. Acceptance remains a separate
+    check of the original physical constraints after reconstruction.
+    """
+    import clarabel
+    fixed = lower == upper; free = ~fixed
+    x = np.zeros(len(linear)); x[fixed] = lower[fixed]
+    hf = hessian[np.ix_(free, free)]
+    lf = linear[free]+hessian[np.ix_(free, fixed)]@x[fixed]
+    eq = equality[:, free]; wanted = equality_rhs-equality[:, fixed]@x[fixed]
+    particular = np.linalg.lstsq(eq, wanted, rcond=None)[0]
+    null = null_space(eq)
+    reduced_hessian = null.T@hf@null
+    reduced_linear = null.T@(hf@particular+lf)
+    if not len(reduced_linear):
+        x[free] = particular
+        feasible = (np.all(matrix@x >= rhs-1e-12) and np.all(x >= lower-1e-12)
+                    and np.all(x <= upper+1e-12)
+                    and np.allclose(equality@x, equality_rhs, rtol=0., atol=1e-12))
+        return SimpleNamespace(x=x, success=bool(feasible), version=clarabel.__version__,
+                               message='zero-dimensional equality solution checked in original coordinates')
+    factor = np.linalg.cholesky(reduced_hessian/normalization)
+    whiten = solve_triangular(factor.T, np.eye(len(reduced_linear)), lower=False)
+    transform = null@whiten
+    finite_lower = np.isfinite(lower[free]); finite_upper = np.isfinite(upper[free])
+    identity = np.eye(int(free.sum()))
+    physical_rows = np.vstack([matrix[:, free], identity[finite_lower], -identity[finite_upper]])
+    physical_rhs = np.r_[rhs-matrix[:, fixed]@x[fixed],
+                         lower[free][finite_lower], -upper[free][finite_upper]]
+    a = physical_rows@transform
+    b = physical_rhs-physical_rows@particular
+    # As in the tested boundary QP: never magnify nearly fixed rows into a
+    # huge RHS. Scaling does not replace the original-coordinate checks.
+    norms = np.maximum(np.linalg.norm(a, axis=1), 1.)
+    a = -a/norms[:, None]; b = -b/norms
+    settings = clarabel.DefaultSettings(); settings.verbose = False; settings.max_iter = 200
+    settings.tol_gap_abs = 1e-10; settings.tol_gap_rel = 1e-10; settings.tol_feas = 1e-12
+    solved = clarabel.DefaultSolver(csc_matrix(2.*np.eye(len(reduced_linear))),
+        2.*whiten.T@reduced_linear/normalization, csc_matrix(a), b,
+        [clarabel.NonnegativeConeT(len(b))], settings).solve()
+    x[free] = particular+transform@np.asarray(solved.x)
+    return SimpleNamespace(x=x, success=solved.status == clarabel.SolverStatus.Solved,
+                           message=str(solved.status), version=clarabel.__version__)
 
 
 def _geometry_hash(geometry):
@@ -289,6 +342,42 @@ def solve_jaw_curve_profile(geometry, amount, *, max_radius_fraction=.13,
             if not any(counts) or not solver_success:
                 break
             matrix = np.vstack([matrix, *added]); bounds_rhs = np.r_[bounds_rhs, *added_rhs]
+        # Retain the exact old path for candidates that already pass. A solver
+        # success flag cannot override a physical continuous-constraint failure.
+        if solver_success and any(counts):
+            fallback = {'method': 'clarabel_cholesky_whitened_same_qp',
+                'reason': 'SLSQP reported success but continuous cuts still failed after refinement',
+                'same_objective_and_constraints': True, 'refinement': []}
+            report['precision_fallback'] = fallback
+            for iteration in range(8):
+                try:
+                    solved = _solve_precise_qp(hessian, linear, matrix, bounds_rhs,
+                        equality, np.array([wanted/area_norm]), lower, upper, normalization)
+                except (ImportError, np.linalg.LinAlgError) as error:
+                    fallback['error'] = str(error); solver_success = False
+                    report['solver_message'] = 'precision fallback failed: '+str(error)
+                    break
+                x = solved.x; solver_success = bool(solved.success)
+                fallback['clarabel_version'] = solved.version
+                report['solver_message'] = 'precision fallback: '+solved.message
+                added, added_rhs, counts = [], [], []
+                minimum_numerators = []
+                for j, arc in enumerate(arcs):
+                    centers, numerator, _ = problem.continuous_minima(arc, x[offset[j]:offset[j+1]])
+                    minimum_numerators.append(float(numerator.min()) if len(numerator) else None)
+                    bad = numerator < -1e-8; counts.append(int(bad.sum()))
+                    if np.any(bad):
+                        local, original = problem.turn_rows(arc, centers[bad])
+                        full = np.zeros((int(bad.sum()), size)); full[:, offset[j]:offset[j+1]] = local
+                        added.append(full); added_rhs.append(-original)
+                fallback['refinement'].append({'round': iteration, 'solver_success': solver_success,
+                    'solver_message': solved.message, 'active_rows': len(bounds_rhs),
+                    'continuous_violating_subintervals': counts,
+                    'continuous_min_numerator': minimum_numerators,
+                    'signed_area_error_px2': float(area@x-wanted)})
+                if not solver_success or not any(counts):
+                    break
+                matrix = np.vstack([matrix, *added]); bounds_rhs = np.r_[bounds_rhs, *added_rhs]
     candidate_area = float(area@x)
     report['solver_success'] = solver_success
     report['signed_area_error_px2'] = candidate_area-wanted

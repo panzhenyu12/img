@@ -91,10 +91,10 @@ quality-semantic-local:
 	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_input_contract.py test_controller_adapter.py test_jaw_local.py
 
 quality-jaw-curve:
-	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_curve_qp.py test_jaw_target_profile.py test_export_jaw_curve_profile.py test_jaw_collocation.py test_source_boundary_soft_targets.py test_boundary_curve_qp.py test_export_boundary_curve.py test_audit_interface_chord_field.py
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_curve_qp.py test_jaw_qp_precision.py test_jaw_target_profile.py test_export_jaw_curve_profile.py test_jaw_collocation.py test_source_boundary_soft_targets.py test_boundary_curve_qp.py test_export_boundary_curve.py test_audit_interface_chord_field.py
 
 quality-jaw-bilateral:
-	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_bilateral.py test_jaw_curve_qp.py test_jaw_target_profile.py test_export_jaw_curve_profile.py test_audit_jaw_bilateral_field.py
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_bilateral.py test_jaw_curve_qp.py test_jaw_qp_precision.py test_jaw_target_profile.py test_export_jaw_curve_profile.py test_audit_jaw_bilateral_field.py
 
 # Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
 quality-film: native
