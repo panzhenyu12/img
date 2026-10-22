@@ -1,0 +1,31 @@
+{
+  "frame": {
+    "origin": [0, 0],
+    "across": [1, 0],
+    "down": [0, 1],
+    "bounds": [-100, 0, 100, 200],
+    "midline_u": 0
+  },
+  "calibration": {"max_radius_fraction": 0.2, "chin_fade_start": 0.88},
+  "amount": 60,
+  "contour": [
+    {"id": "left-upper", "source": [-80, 20]},
+    {"id": "right-cheek", "source": [100, 96]},
+    {"id": "chin", "source": [10, 200]}
+  ],
+  "parts": [
+    {
+      "id": "right-eye",
+      "label": "eye",
+      "source_points": [[30, 60], [50, 60], [40, 70]],
+      "motion": {"kind": "shape_preserving_translation", "anchor": [40, 60]}
+    },
+    {
+      "id": "background",
+      "label": "wall",
+      "source_points": [[150, 60], [150, 100]],
+      "motion": {"kind": "fixed_position"}
+    }
+  ],
+  "relations": []
+}

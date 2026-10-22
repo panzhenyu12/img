@@ -5,9 +5,10 @@ WEB_DIR := apps/web
 API_ADDR ?= http://127.0.0.1:8080
 WEB_ADDR ?= http://127.0.0.1:5173
 QUALITY_PYTHON ?= services/background-worker/.venv/bin/python
+SEMANTIC_PYTHON ?= $(QUALITY_PYTHON)
 
 .PHONY: help setup dev api web agent web-install native wasm api-build build test check fmt \
-	rust-test api-test web-build e2e health stop clean models quality quality-face quality-body quality-clothing lint
+	rust-test api-test web-build e2e health stop clean models quality quality-face quality-body quality-clothing quality-semantic quality-semantic-local lint
 
 .PHONY: background-setup background-models background background-test client-models quality-skin quality-film body-setup body-models rust-photo-test
 
@@ -20,6 +21,8 @@ help:
 	@echo "make e2e          验证 WASM 预览、画笔、历史和 native 导出"
 	@echo "make quality      在真实人像/身形/衣物照片上生成对比和失败报告"
 	@echo "make quality-film 在六张照片上回放胶片响应，保留哈希和首次/热运行时间"
+	@echo "make quality-semantic 运行语义形变隔离测试，不构建 Web/Go，不读取本地照片"
+	@echo "make quality-semantic-local 另验本地照片输入合同；照片及数组缺失时跳过"
 	@echo "make background   启动可选 LaMa 本地去人模型 (8091)"
 	@echo "make background-models 安装可选模型环境并下载校验权重"
 	@echo "make client-models 下载校验浏览器去人 ONNX 模型"
@@ -73,6 +76,16 @@ background-test:
 
 quality-skin:
 	node scripts/check_portrait_quality.mjs --features
+
+# Install experiments/semantic-deformation-20261022/requirements.txt into the
+# chosen SEMANTIC_PYTHON environment. No Web/Go/native-image build is needed.
+quality-semantic:
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_reduced_field.py test_reduced_constrained.py
+	cargo test --offline --manifest-path experiments/semantic-deformation-20261022/rust-controls/Cargo.toml
+
+# This optional target reads ignored source arrays and photo bytes (hash only).
+quality-semantic-local:
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_input_contract.py test_controller_adapter.py
 
 # Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
 quality-film: native

@@ -62,6 +62,7 @@ FUNC-编号-功能短名.md
 - [FUNC-023 人像边缘颜色分解与遮挡合成（隔离实验，未验收）](FUNC-023-portrait-layer-matting.md)
 - [FUNC-024 整体脸型与可编辑预设（隔离原型，未上线）](FUNC-024-whole-face-shape.md)
 - [FUNC-025 修图工具→细项→算法→验收对账](FUNC-025-tool-algorithm-ledger.md)
+- [FUNC-028 部位语义目标与连续形变实验（隔离算法，强档仍有失败）](FUNC-028-semantic-deformation-20261022.md)
 - [FUNC-022 唇周附着与局部应变（隔离组件改善，未上线）](FUNC-022-perioral-attachment-quality.md)
 - [人像与衣物修图算法调研](../research/portrait-retouching-algorithms.md)
 - [像素蛋糕桌面手册：84组功能与算法映射](../research/pixelcake-manual-functional-audit-20261015.md)
