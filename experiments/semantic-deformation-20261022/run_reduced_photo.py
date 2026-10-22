@@ -24,8 +24,12 @@ from evaluate import source_geometry, inverse_points, sample, inspect, summarize
 from audit_same_input_protection import sampler, line_maximum
 
 
-def run(inp, out, stride=8, fine_band=4, refinement=None, constrained=False):
+def run(inp, out, stride=8, fine_band=4, refinement=None, constrained=False, correct_previous=None):
     started = time.perf_counter()
+    if constrained and correct_previous is not None:
+        raise ValueError('choose either the initial constrained solve or a focused correction')
+    if correct_previous is not None and Path(read(correct_previous/'protocol.json')['input']).resolve() != inp:
+        raise ValueError('focused correction must use the same frozen input')
     out.mkdir(parents=True, exist_ok=False)
     validation = validate_input(inp)
     save(out / 'input-validation.json', validation)
@@ -54,11 +58,14 @@ def run(inp, out, stride=8, fine_band=4, refinement=None, constrained=False):
     code = out / 'executed-code'; code.mkdir()
     for name in ['run_reduced_photo.py', 'reduced_field.py', 'reduced_constrained.py', 'input_contract.py']:
         shutil.copy2(Path(__file__).with_name(name), code / name)
+    if correct_previous is not None:
+        shutil.copy2(Path(__file__).with_name('focused_correction.py'), code/'focused_correction.py')
     save(out / 'protocol.json', {'input': str(inp), 'inputs_sha256': hashes,
          'stride_grid_cells': stride, 'fine_band_grid_cells': fine_band,
          'source_requests_masks_weights_and_fine_grid_unchanged': True,
          'new_search_space': 'z=R a; minimize original quadratic over a with all original line equalities',
          'bounded_active_source_SOC': constrained,
+         'focused_correction_previous_case': str(correct_previous) if correct_previous else None,
          'old_full_space_optimality_claimed': False, 'old_geometry_thresholds_unchanged': True,
          'no_strength_scaling_clipping_or_output_interpolation': True,
          'historical_failures_not_reclassified': True})
@@ -68,8 +75,12 @@ def run(inp, out, stride=8, fine_band=4, refinement=None, constrained=False):
     save(out / 'reduction.json', reduction); save_npz(out / 'reduction.npz', r)
     h, rhs = load_npz(folder / 'hessian.npz'), np.load(folder / 'rhs.npy')
     lines = load_npz(lines_file) if lines_file.exists() else None
-    result = (solve_constrained_reduced(h, rhs, r, grid, data['node_to_variable'], lines)
-              if constrained else solve_reduced(h, rhs, r, lines))
+    if correct_previous is not None:
+        from focused_correction import solve_focused_reduced
+        result = solve_focused_reduced(h, rhs, r, grid, data['node_to_variable'], lines, correct_previous)
+    else:
+        result = (solve_constrained_reduced(h, rhs, r, grid, data['node_to_variable'], lines)
+                  if constrained else solve_reduced(h, rhs, r, lines))
     z = result['solution']; np.save(out / 'solution.npy', z)
     np.save(out / 'coefficients.npy', result['coefficients'])
     if 'multipliers' in result:
@@ -92,6 +103,7 @@ def run(inp, out, stride=8, fine_band=4, refinement=None, constrained=False):
     decision = {'source_geometry': geometry, 'solver_scope': 'reduced_subspace_only',
                 'aesthetic_approval': False, 'requested_amount': c['requested_amount'],
                 'bounded_active_source_SOC': constrained,
+                'focused_correction': correct_previous is not None,
                 'solver_status': result['report'].get('status', 'reduced_equality_solution'),
                 'solver_diagnostic_only': result['report'].get('diagnostic_only', False),
                 'full_variables': r.shape[0], 'reduced_variables': r.shape[1]}
@@ -173,9 +185,11 @@ def run(inp, out, stride=8, fine_band=4, refinement=None, constrained=False):
         for i, im in enumerate([before, after]):
             panel.paste(Image.fromarray(im).crop(box), (i*pw, 32))
         draw.text((4, 4), 'Original', fill='black')
-        draw.text((pw+4, 4), f'Reduced {c["requested_amount"]:+.0f}; offline candidate', fill='black')
+        status = 'offline candidate' if decision['image_contract_pass'] else 'diagnostic; contract failed'
+        draw.text((pw+4, 4), f'Reduced {c["requested_amount"]:+.0f}; {status}', fill='black')
         panel.save(out / (name + '.png'))
-    finish('requires_independent_visual_review')
+    finish('requires_independent_visual_review' if decision['image_contract_pass']
+           else 'reject_image_contract_diagnostic_render_only')
 
 
 if __name__ == '__main__':
@@ -185,8 +199,12 @@ if __name__ == '__main__':
     parser.add_argument('--stride', type=int, default=8)
     parser.add_argument('--fine-band', type=int, default=4)
     parser.add_argument('--refinement', type=Path)
-    parser.add_argument('--constrained', action='store_true',
-                        help='bounded source SOC experiment; final image gates still apply')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--constrained', action='store_true',
+                       help='bounded source SOC experiment; final image gates still apply')
+    modes.add_argument('--correct-previous', type=Path,
+                       help='one focused correction of a rejected case, preserving its input and basis')
     args = parser.parse_args()
     run(args.input.resolve(), args.output.resolve(), args.stride, args.fine_band,
-        args.refinement.resolve() if args.refinement else None, args.constrained)
+        args.refinement.resolve() if args.refinement else None, args.constrained,
+        args.correct_previous.resolve() if args.correct_previous else None)

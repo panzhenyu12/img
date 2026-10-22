@@ -24,6 +24,30 @@ at most two source SOC active-set rounds. All paths refuse to overwrite results.
 The source proxy, actual float32 inverse, material RGB and background lines are
 separate gates; failures never imply an accepted image.
 
+`--correct-previous <rejected-case>` performs one 12-second-limited solve after
+mapping actual failing inverse cells back to their complete source-cell
+enclosures. It retains all previous active constraints and adds a one-cell halo,
+with unchanged basis, objective, strength and source roles. The previous case's
+input, matrices, coefficients and fields are verified before use. A further call
+needs newly added source constraints; when failures are absent or already fully
+covered, it rejects a repeated identical solve. It does not run an unbounded retry loop.
+The 12-second limit covers Clarabel solving, not assembly, input audits or image
+evaluation. All actual inverse, RGB and line checks still run afterward.
+
+`rust-controls/prepare_source_forward_input.py` substitutes a face controller at
+the **same signed amount** as its frozen parent. A different amount must use a
+matching parent input, preserving neck and earring motion. Copying +30 attachment
+targets into a nominal +60 request is rejected even if all hashes are updated.
+
+`prepare_hair_inputs.py --output <new-directory>` constructs the third local
+photograph's signed inputs from its own recorded +60 and -60 baselines. Its
+18 neck targets retain the same signed amount as the face. Replay of this local
+evidence adapter requires **Pillow 11.1.0** and the ignored source corpus;
+the synthetic signed-neck tests do not need those files or that Pillow version.
+Because the historical RGB audit referenced by its provenance is missing, it
+explicitly freezes new source polygon masks bound to a later existing same-photo
+audit. It never presents these masks as recovered historical ground truth.
+
 The local photo renderer used for historical comparisons is the existing binary
 at `.run/face-current-20261019-target3/release/examples/face-photo-transport`.
 Its source is in `core/image-core/examples/face-photo-transport.rs`, with the
