@@ -94,6 +94,27 @@ topology and proximity cannot establish visible skin behind hair or a bone
 landmark. The script produces ignored source overlays for visual inspection;
 it does not enable a new automatic edit, run detection, or call the solver.
 
+`prepare_jaw_input.py --parent <original-source-input> --audit <source-audit.json>
+--sidecar <source-regions.json> --review <source-review.json> --binary <jaw-arc-targets>
+--output <new-directory>` prepares the independent `jaw_arc_v1` operation. The
+first adapter supports the reviewed woman source's mouth-to-chin arcs only.
+It rejects neck targets, accessory roles and nonzero position priors. Rust
+targets are checked against an independent source-arclength polynomial. The
+other 6,205 target rows, source frame, original Hessian, material roles, fixed
+pixels, weights and background constraints remain unchanged for this source.
+
+The frozen source review is a model's offline selection, not a visibility
+detector: sidecar visibility stays unknown and automatic editing stays disabled.
+`compare_jaw_results.py` reports actual arc-midpoint motion and outside-arc drift
+beside source/whole-width/local-jaw images. Same slider number is not equal area
+or exactly equal local displacement. See the jaw protocol and visual review
+linked from FUNC-028; one development source does not establish beauty quality.
+
+`test_jaw_input.py` uses synthetic inputs only. Optional `test_jaw_local.py`
+checks ignored source evidence and Rust/Python parity. Set
+`JAW_CONTROLLER_BINARY=/absolute/path/to/jaw-arc-targets` to test a binary in a
+separate target directory without replacing hash-bound experimental binaries.
+
 The local photo renderer used for historical comparisons is the existing binary
 at `.run/face-current-20261019-target3/release/examples/face-photo-transport`.
 Its source is in `core/image-core/examples/face-photo-transport.rs`, with the

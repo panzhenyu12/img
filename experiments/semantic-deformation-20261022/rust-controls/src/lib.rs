@@ -1,6 +1,8 @@
 //! Source-coordinate target generation only. This crate does not warp pixels.
 use serde::{Deserialize, Serialize};
 
+pub mod arc;
+
 pub type Point = [f64; 2];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

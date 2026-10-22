@@ -1,6 +1,7 @@
 # Semantic deformation controls: isolated source-target experiment
 
-Date: 2026-10-22. Scope: whole-face width **target generation only**. No automatic
+Date: 2026-10-22. Scope: whole-face width, regional width and selected jaw-arc
+**target generation only**. No automatic
 detection, dense deformation solver, resampling, image completion, production
 integration or eight-point quality acceptance is supplied by this crate.
 
@@ -136,6 +137,52 @@ equivariance, shared part-anchor behavior, and invalid-profile rejection. The
 CLI regression was observed failing on the previous unknown-field rejection and
 passing with the new implementation. These tests establish target behavior,
 not photographic quality.
+
+## Selected jaw-arc target experiment
+
+The separate `jaw-arc-targets` binary and `arc::generate` entry point create
+`jaw_arc_v1` targets from an explicitly selected source-contour arc. They do not
+change the whole-width or regional controllers. Input contains the original
+`frame`, `amount`, `max_radius_fraction`, ordered closed `contour: [[x,y], ...]`,
+and `arcs: [{id, start: {edge,t}, end: {edge,t}, direction}]`. An edge joins row
+`edge` to `(edge+1)%N`; boundary `t` is in `[0,1]`, and direction is `+1` or `-1`
+in source row order. The source path must be simple with finite, nonzero edges.
+The complete original contour and frame remain unchanged.
+
+Inside each selected arc, normalized **original arc length** `q` drives
+`gain = 64*q^3*(1-q)^3`. Gain is zero outside the arc, and its first two
+derivatives vanish at the endpoints. The across-axis target displacement is
+`-amount/100 * max_radius_fraction * (u-midline_u) * gain`. There is no chin
+height fade or vertical motion. Each side retains its own source radius and arc
+length. There is no symmetry replacement, automatic rescaling, or redistribution
+of a protected region's edit amount into another region.
+
+Endpoints and outside rows keep exact source coordinates; zero amount does too.
+The output includes each row's `point_gain` and interior `arc_id`, plus resolved
+continuous arc lengths. Continuous overlap is rejected even when it lies wholly
+between sampled rows; shared endpoints are allowed. Invalid bounds, crossed
+source paths, nonfinite values and malformed directions are rejected.
+
+Selecting a contour arc is an explicit experimental input. It does not establish
+visible skin, anatomical landmarks, material ownership or automatic editing
+authorization. C2 **gain** does not prove a C2 dense image field, no folding,
+natural jaw curvature or a good-looking result. Neck and other attachments must
+be bound by the caller to the same source request and independently checked.
+
+Use a separate build directory when frozen local experiments hash older binaries:
+
+```sh
+CARGO_TARGET_DIR=/absolute/path/to/isolated-target cargo test --offline --test jaw_arc
+CARGO_TARGET_DIR=/absolute/path/to/isolated-target cargo run --offline --quiet --bin jaw-arc-targets < selected-jaw.json
+```
+
+Eleven focused tests cover a known rectangular-arc displacement, zero and signed
+asymmetric behavior, quarter gain and endpoint derivatives, rigid/similarity
+equivariance, continuous overlap, circular indexing, malformed input, crossing
+contours and the actual JSON CLI. Fractional shared endpoints across row zero
+are compared directly, without reconstructing them from a rounded arc length;
+even a one-ULP positive overlap remains rejected without an epsilon. These tests
+verify target behavior, not photo quality.
 
 ## Connections and occlusion are explicit evidence
 

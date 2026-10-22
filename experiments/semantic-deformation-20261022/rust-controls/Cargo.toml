@@ -11,3 +11,7 @@ serde_json = { version = "1", features = ["float_roundtrip"] }
 [[bin]]
 name = "face-width-targets"
 path = "src/main.rs"
+
+[[bin]]
+name = "jaw-arc-targets"
+path = "src/jaw_arc_main.rs"

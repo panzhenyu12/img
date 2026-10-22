@@ -18,6 +18,7 @@ from source_forward_input import line_constraints
 
 RUST_CONTROLLER_VARIANT = 'rust-whole-face-width-controller-v1'
 REGIONAL_CONTROLLER_VARIANT = 'regional-contour-source-v1'
+JAW_CONTROLLER_VARIANT = 'jaw-arc-source-v1'
 
 
 def require_same_signed_amount(parent_amount, requested_amount):
@@ -117,6 +118,76 @@ def _validate_regional(inp, c, source, intent, data, checked):
     _same(data['target_destinations'][untouched], pd['target_destinations'][untouched], 'regional nonedited target rows')
 
 
+def _validate_jaw(inp, c, source, intent, data, checked):
+    """Independently validate an explicitly reviewed source-arc editing intent."""
+    from prepare_jaw_input import (ORIGINAL_DEFINITION, validate_review, verify_sidecar,
+        expected_targets, check_controller_output, controller_request, input_artifacts)
+    descriptor = c['jaw_variant']
+    if (descriptor.get('variant') != JAW_CONTROLLER_VARIANT or source.get('jaw_variant') != descriptor
+            or intent.get('jaw_variant') != descriptor or descriptor.get('automatic_edit_authorized') is not False):
+        raise ValueError('jaw source/review/controller descriptors differ')
+    parent = Path(descriptor['parent_input']).resolve()
+    if parent == inp or read(parent/'contract.json').get('target_definition') != ORIGINAL_DEFINITION:
+        raise ValueError('jaw parent must be original woman source_input')
+    parent_validation = validate_input(parent)
+    if parent_validation['input_kind'] != 'source_input': raise ValueError('jaw parent is not source_input')
+    checked.update(parent_validation['verified_input_hashes'])
+    if sha(parent/'contract.json') != descriptor['parent_contract_sha256']:
+        raise ValueError('jaw parent contract changed')
+    pc, ps = read(parent/'contract.json'), read(parent/'source-contract.json')
+    require_same_signed_amount(pc['requested_amount'], c['requested_amount'])
+    mutable_contract = {'source_contract', 'source_contract_sha256', 'target_intent_sha256',
+        'target_definition', 'jaw_variant', 'execution_status', 'solving_authorized'}
+    if {k: v for k, v in c.items() if k not in mutable_contract} != {k: v for k, v in pc.items() if k not in mutable_contract}:
+        raise ValueError('jaw original geometry/material contract changed')
+    mutable_source = {'targets', 'target_definition', 'jaw_variant', 'source_target_rule', 'solving_authorized'}
+    if {k: v for k, v in source.items() if k not in mutable_source} != {k: v for k, v in ps.items() if k not in mutable_source}:
+        raise ValueError('jaw original source roles/weights/priors changed')
+    pd = dict(np.load(parent/'data.npz', allow_pickle=False))
+    if set(data) != set(pd): raise ValueError('jaw original data fields changed')
+    for key in pd:
+        if key not in ('target_destinations', 'target_deltas'):
+            _same(data[key], pd[key], 'jaw original '+key)
+        else:
+            _same(data[key][128:], pd[key][128:], 'jaw non-face '+key)
+    mutable_files = {'contract.json', 'source-contract.json', 'target-intent.json', 'data.npz',
+                     'target_deltas.npy', 'quadratic/rhs.npy'}
+    for name in input_artifacts(parent):
+        if name not in mutable_files and sha(inp/name) != sha(parent/name):
+            raise ValueError('jaw static source artifact changed: '+name)
+    audit_path, sidecar_path, review_path = [Path(descriptor[key]) for key in
+        ['source_audit', 'source_sidecar', 'source_review']]
+    for key, path in [('source_audit', audit_path), ('source_sidecar', sidecar_path), ('source_review', review_path)]:
+        if sha(path) != descriptor[key+'_sha256']: raise ValueError('jaw frozen '+key+' differs')
+        checked[str(path)] = sha(path)
+    audit, sidecar, review = read(audit_path), read(sidecar_path), read(review_path)
+    if (audit['name'] != 'woman' or audit['input_sha256'][audit['source_image']] != pc['source_photo_sha256']
+            or sidecar['provenance']['input_sha256'].get(str(audit_path)) != sha(audit_path)):
+        raise ValueError('jaw frozen source audit/calibration differs')
+    _hashes(audit['input_sha256'], inp, checked)
+    _hashes(sidecar['provenance']['input_sha256'], inp, checked)
+    _hashes(review['evidence_images_sha256'], inp, checked)
+    provenance = read(Path(pc['baseline'])/'provenance.json')
+    graph = Path(provenance['source_trace']).parent/'graph.json'
+    verify_sidecar(audit, sidecar, graph)
+    arcs = validate_review(review, audit, sidecar, sha(sidecar_path))
+    expected, gains, ids = expected_targets(pd, ps, provenance, audit, arcs, c['requested_amount'])
+    if (not np.isfinite(data['target_destinations']).all()
+            or np.max(abs(data['target_destinations']-expected), initial=0.) > 1e-10):
+        raise ValueError('jaw targets differ from independent source-arc polynomial')
+    request = controller_request(pd, audit, arcs, c['requested_amount'])
+    if descriptor['controller_request'] != request:
+        raise ValueError('jaw request differs from reviewed arcs/source calibration/signed amount')
+    binary = Path(descriptor['controller_binary'])
+    if sha(binary) != descriptor['controller_binary_sha256']: raise ValueError('jaw controller binary changed')
+    checked[str(binary)] = sha(binary)
+    output = descriptor['controller_output']
+    check_controller_output(output, pd, expected, gains, ids)
+    _same(np.asarray([row['target'] for row in output['targets']]), data['target_destinations'][:128], 'jaw Rust output targets')
+    _same(np.asarray(intent['source']), pd['target_sources'][:128], 'jaw intent source')
+    _same(np.asarray(intent['requested']), data['target_destinations'][:128], 'jaw intent targets')
+
+
 def _validate_input(inp):
     started = time.perf_counter()
     inp = Path(inp).resolve()
@@ -185,6 +256,10 @@ def _validate_input(inp):
     if intent['amount'] != amount or sha(inp / 'target-intent.json') != c['target_intent_sha256']:
         raise ValueError('target intent differs')
     variant_names = (c.get('target_definition'), source.get('target_definition'), intent.get('name'))
+    if JAW_CONTROLLER_VARIANT in variant_names:
+        if kind != 'source_input' or any(name != JAW_CONTROLLER_VARIANT for name in variant_names):
+            raise ValueError('jaw variant declarations differ')
+        _validate_jaw(inp, c, source, intent, data, checked)
     if REGIONAL_CONTROLLER_VARIANT in variant_names:
         if kind != 'source_input' or any(name != REGIONAL_CONTROLLER_VARIANT for name in variant_names):
             raise ValueError('regional controller variant declarations differ')
