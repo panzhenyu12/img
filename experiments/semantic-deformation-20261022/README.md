@@ -187,5 +187,93 @@ before solving. The user-neck experiment preserved the selected pixels but intro
 a visible shoulder at the upper transition, and -100 failed final geometry. It is
 retained as a rejected experiment, not an approved neck-preservation algorithm.
 
+### Equal-area jaw curve experiment
+
+`jaw_curve_qp.py` changes the requested jaw shape while keeping the original
+source polyline and the signed area change of the continuous beta request.
+It combines a physical smoothing length with no-new-reversal constraints in
+source-convex, height-monotone finite-chord windows. Flat, nonmonotone and
+unobserved anatomy remain unknown; this is not a universal convexity guarantee.
+The continuous checker examines piecewise-quadratic extrema rather than only
+sampling control nodes. Four-point Gauss integration on each source edge gives
+the degree-seven beta area reference without a sampling-dependent strength.
+
+`export_jaw_curve_profile.py --protocol <frozen-source-protocol.json> --amount 100
+--smoothing 8 --output <new-directory>` freezes a signed profile with its source,
+algorithm, parameters, numerical report and interface verification. No photo is
+rendered by this command. `jaw_target_profile.py` verifies source identity and
+applies the baked displacement to original contour rows, collocation points and
+independent probes without multiplying slider strength a second time.
+
+Use `run_portable_jaw.py ... --target-profile <profile.json> --amounts 100
+--collocation-spacing 2 --field-stride 1` for a separate photo experiment. A
+profile belongs to one source and one signed amount. The beta controller remains
+available for comparisons with the same field basis, support and weights.
+
+`--soft-source-boundary <source-constraint.json> --soft-boundary-density .05
+--soft-boundary-fade 16` adds optional, source-reviewed neck centerline targets
+before the solve. Their line-integral weight fades at finite segment endpoints;
+the source curve is not extended into unknown transitions. This is a soft
+zero-motion preference, not a hard mask or a promise to preserve an uncertainty
+band. `source_boundary_soft_targets.py` does not modify solved fields or pixels.
+
+`audit_jaw_profile_field.py` compares the actual final f32 maps, including closed
+contour area and sampled chord angles, rather than reporting requested targets
+as achieved effects. The photo review remains separate. Run the focused synthetic
+suite using `make quality-jaw-curve SEMANTIC_PYTHON=<python-with-requirements>`;
+it needs no photographs or application build.
+
+The soft neck-only experiment still produced a shoulder at the upper join.
+`boundary_curve_qp.py` therefore studies the complete source-reviewed visible
+interface. The source-turn-preserving formulation was rejected when its turn
+constraints conflicted with the preserved upper motion; both failures remain
+recorded. The separate `gradient_bounded_motion_fairing` controller preserves
+the upper preferred motion pointwise, reconnects to the lower preferred motion,
+and bounds signed displacement derivatives to the preferred curve's existing
+range while minimizing bending and a soft lower-neck displacement penalty.
+Only the added spline correction is C2. Source turn signs and final image
+naturalness remain diagnostics, not a guarantee of this controller.
+
+`export_boundary_curve.py --interface <reviewed-interface.json> --baseline
+<passing-case> --profile <matching-jaw-profile.json> --preferred-audit
+<frozen-field-audit.json> --controller gradient_bounded_motion_fairing --output
+<new-directory>` validates the original review, the historical profile digest
+and the independent audit's field/protocol/decision hashes before exporting.
+Pass its `boundary-motion.json` to `run_portable_jaw.py --boundary-motion` with
+the same image/profile/amount. It appends source targets to the solve and checks
+their actual f32 execution with the same error/gain limits as the jaw. The
+ordinary soft-zero-boundary and full-interface controllers are compared
+separately; their options cannot be combined implicitly.
+
+`chord_bounded_motion_fairing` additionally bounds the source-relative
+finite-chord turn numerator in the preferred curve's signed global range,
+separately at 4/8/16 source-pixel arclength radii. Fourth-degree piecewise
+extrema are checked continuously and violating locations refine the QP.
+Global extrema can still conceal a worse turn at another location: the
+negative user-photo trial reproduced that failure.
+
+`local_chord_motion_fairing --local-slope-change-max .008` adds a local
+trust region: at every checked scale and continuous position, the correction
+to the two-chord slope difference relative to the frozen preferred curve is
+bounded. The default limit is .01; it is dimensionless, not an angle or a
+beauty threshold. Both sides of the raw polynomial inequality and the extrema
+of the normalized rational expression are checked. The original jaw area,
+upper nonzero movement, source coordinates and global budgets remain intact.
+
+These two chord controllers use the existing Clarabel dependency with
+Cholesky-whitened variables. Row scaling only reduces large rows: amplifying
+near-zero compact-spline endpoint rows previously generated RHS magnitudes
+above 70 million and caused a rigidly rotated copy to converge differently.
+Only a solved QP plus the original-coordinate continuous checks can export
+targets. A curved-source signed/rotation regression covers this failure.
+
+`audit_interface_chord_field.py --baseline <case> --candidate <case> --target
+<boundary-motion.json> --output <new-directory> --actual-local-change-limit .01`
+independently samples the final f32 maps at two source-arclength pitches.
+It preserves the strict global-budget findings and separately compares local
+changes against the actual baseline and the frozen preferred PCHIP curve.
+An output observation limit is an explicit experiment parameter, not a reason
+to silently reinterpret a target-layer check as a final-field guarantee.
+
 See `rust-controls/README.md` for target behavior and
 `doc/func/FUNC-028-semantic-deformation-20261022.md` for acceptance limits.

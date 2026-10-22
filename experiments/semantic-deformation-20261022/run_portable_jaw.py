@@ -65,7 +65,9 @@ def validate_review_boundaries(geometry,review):
 
 
 def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.),
-        additional_protection=None, collocation_spacing=None, field_stride=4):
+        additional_protection=None, collocation_spacing=None, field_stride=4,
+        target_profile=None, soft_source_boundary=None,
+        soft_boundary_density=.05, soft_boundary_fade=16., boundary_motion=None):
     started=time.perf_counter()
     if output.exists(): raise FileExistsError('refusing to overwrite portable jaw results')
     proof,review=read(proof_path),read(review_path)
@@ -96,6 +98,63 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
     lips=pixels(params['semanticMasks']['lips']['points'],size)
     geometry=jaw_geometry(contour,oval,eyes,lips)
     validate_review_boundaries(geometry,review)
+    profile=None
+    if target_profile is not None:
+        from jaw_target_profile import load_profile, apply_profile_samples, profile_contour_targets
+        if len(amounts)!=1 or collocation_spacing is None:
+            raise ValueError('one signed amount and continuous collocation required for a frozen profile')
+        profile=load_profile(target_profile,geometry,amounts[0])
+        bound_inputs=read(Path(profile['source_protocol']))['inputs_sha256']
+        if any(bound_inputs.get(str(path.resolve()))!=sha(path)
+               for path in [source_path,evidence,proof_path,review_path]):
+            raise ValueError('profile source identity differs from this reviewed image and detection')
+        hashes[str(target_profile.resolve())]=sha(target_profile)
+        for key in ['source_protocol','qp_source','qp_report','export_source']:
+            path=profile.get(key+'_path',profile.get(key))
+            if path:
+                hashes[str(Path(path).resolve())]=profile[key+'_sha256']
+    soft=None
+    if soft_source_boundary is not None and boundary_motion is not None:
+        raise ValueError('compare boundary controllers separately before combining objectives')
+    if soft_source_boundary is not None:
+        from source_boundary_soft_targets import sample_boundary_soft_targets
+        boundary=read(soft_source_boundary)
+        if (boundary.get('schema')!='reviewed-source-neck-boundary-candidate-v1'
+                or boundary.get('source_image_sha256')!=sha(source_path)
+                or boundary.get('source_size')!=list(size)
+                or boundary.get('mode')!='model_source_visual_review_only'
+                or boundary.get('automatic_edit_authorized') is not False):
+            raise ValueError('soft boundary requires this image and explicit offline source review')
+        for path,digest in boundary['input_hashes'].items():
+            if sha(path)!=digest:raise ValueError('soft boundary source evidence changed')
+            hashes[path]=digest
+        hashes[str(soft_source_boundary.resolve())]=sha(soft_source_boundary)
+        soft=sample_boundary_soft_targets([s['source_points'] for s in boundary['segments']],
+            uncertainty_px=[s['uncertainty_radius_px'] for s in boundary['segments']],
+            spacing=2.,density=soft_boundary_density,fade_length=soft_boundary_fade)
+    if boundary_motion is not None:
+        boundary=read(boundary_motion)
+        if (boundary.get('schema')!='source-boundary-motion-targets-v1'
+                or boundary.get('source_image_sha256')!=sha(source_path)
+                or boundary.get('source_size')!=list(size)
+                or len(amounts)!=1 or boundary.get('amount')!=amounts[0]
+                or target_profile is None or boundary.get('jaw_profile_sha256')!=sha(target_profile)):
+            raise ValueError('boundary motion must bind the same image, signed amount and jaw profile')
+        bound=boundary.get('inputs_sha256',{})
+        if bound.get(str(source_path.resolve()))!=sha(source_path):
+            raise ValueError('boundary motion must retain the original image identity')
+        for path,digest in bound.items():
+            if sha(path)!=digest:raise ValueError('boundary motion inputs changed')
+            hashes[path]=digest
+        hashes[str(boundary_motion.resolve())]=sha(boundary_motion)
+        soft={key:np.asarray(boundary[key],float) for key in ['source','target','weights']}
+        if (soft['source'].ndim!=2 or soft['source'].shape[1]!=2 or not len(soft['source'])
+                or soft['target'].shape!=soft['source'].shape
+                or soft['weights'].shape!=(len(soft['source']),)
+                or not all(np.isfinite(soft[key]).all() for key in ['source','target','weights'])
+                or np.any(soft['weights']<=0.)):
+            raise ValueError('finite boundary source/target/positive weights with matching rows required')
+        soft['report']=boundary['report']
     fixed,crop,roles,radius=fixed_support(size,params,geometry)
     refinement=None
     if additional_protection is not None:
@@ -124,6 +183,12 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         'amounts':list(amounts),'max_radius_fraction':.13,'support_radius_px':radius,
         'target_weight':4.,'bending_weight':.05,'membrane_weight':.001,
         'collocation_spacing':collocation_spacing,
+        'target_controller':profile['controller'] if profile else 'jaw_arc_v1',
+        'frozen_target_profile':str(target_profile) if profile else None,
+        'profile_amount_already_baked':True if profile else None,
+        'soft_source_boundary':soft['report'] if soft is not None else None,
+        'soft_source_boundary_evidence':str(soft_source_boundary) if soft_source_boundary is not None else None,
+        'boundary_motion_evidence':str(boundary_motion) if boundary_motion is not None else None,
         'field_reduction_stride':field_stride,
         'continuous_arc_probe_spacing_px':.5,
         'problem':'new portable source quadratic; not the historical whole-face objective',
@@ -141,15 +206,28 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
     for amount in amounts:
         case=output/('zero' if amount==0 else ('plus' if amount>0 else 'minus')+f'{abs(amount):g}')
         case.mkdir();tick=time.perf_counter()
-        target,request,controller=request_targets(geometry,amount,binary)
+        if profile is None:
+            target,request,controller=request_targets(geometry,amount,binary)
+        else:
+            target=profile_contour_targets(geometry,profile)
+            request={'source_geometry':geometry,'amount':amount,
+                     'frozen_profile':str(target_profile),'profile_sha256':sha(target_profile)}
+            controller={'controller':profile['controller'],'amount_already_baked':True,
+                        'targets':target.tolist(),'aesthetic_approval':False}
         save(case/'request.json',request);save(case/'controller.json',controller)
         controls=None
         if collocation_spacing is not None:
             controls=sample_jaw_targets(geometry,amount,spacing=collocation_spacing)
-        problem=build_problem((size[1],size[0]),
-            contour if controls is None else controls['source'],
-            target if controls is None else controls['target'],fixed_points,crop=crop,
-            target_weights=4. if controls is None else controls['weights'],stride=field_stride)
+            if profile is not None:controls=apply_profile_samples(controls,profile,geometry)
+        fit_source=contour if controls is None else controls['source']
+        fit_target=target if controls is None else controls['target']
+        fit_weights=np.full(len(contour),4.) if controls is None else controls['weights']
+        if soft is not None:
+            fit_source=np.vstack([fit_source,soft['source']])
+            fit_target=np.vstack([fit_target,soft['target']])
+            fit_weights=np.r_[fit_weights,soft['weights']]
+        problem=build_problem((size[1],size[0]),fit_source,fit_target,fixed_points,crop=crop,
+            target_weights=fit_weights,stride=field_stride)
         if controls is not None:
             save(case/'collocation.json',controls['report'])
         result=solve_problem(problem)
@@ -171,6 +249,16 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
             decision['status']='rejected_final_geometry';save(case/'decision.json',decision)
             results.append(decision);continue
         edited,sampling=render_frozen_field(rgba,field,crop,method='bilinear')
+        if soft is not None:
+            soft_actual,soft_closure=inverse_points(field.astype(float),soft['source']-np.array(crop[:2]))
+            soft_actual+=crop[:2]
+            soft_motion=np.linalg.norm(soft_actual-soft['source'],axis=1)
+            np.savez_compressed(case/'soft-boundary-motion.npz',source=soft['source'],actual=soft_actual,
+                                target=soft['target'],weights=soft['weights'])
+            decision['soft_boundary']={'max_motion_px':float(soft_motion.max()),
+                'mean_motion_px':float(soft_motion.mean()),'closure':soft_closure,
+                'max_target_error_px':float(np.linalg.norm(soft_actual-soft['target'],axis=1).max()),
+                'soft_pre_solve_targets_only':True,'fixed_boundary_claim':False}
         changed=np.any(edited!=rgba,axis=2)
         # Measure the actual sampled f32 inverse as its own continuous map.
         actual,actual_closure=inverse_points(field.astype(float),contour-np.array(crop[:2]))
@@ -185,6 +273,7 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
             fixed_changed_pixels=fixed_changed,whole_image_changed_pixels=total_changed)
         probes=independent_jaw_probes(geometry,amount,spacing=.5,
             collocation_spacing=2. if collocation_spacing is None else collocation_spacing)
+        if profile is not None:probes=apply_profile_samples(probes,profile,geometry)
         probe_actual,probe_closure=inverse_points(field.astype(float),probes['source']-np.array(crop[:2]))
         probe_actual+=crop[:2]
         dense_execution=evaluate_result(probes['source'],probes['target'],probe_actual,amount=amount,
@@ -192,6 +281,11 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         np.savez_compressed(case/'arc-probes.npz',source=probes['source'],target=probes['target'],actual=probe_actual)
         save(case/'arc-probes.json',{'execution':dense_execution,'sampling':probes['report'],'closure':probe_closure})
         passed=execution['passed'] and dense_execution['passed']
+        if boundary_motion is not None:
+            boundary_gate=evaluate_result(soft['source'],soft['target'],soft_actual,amount=amount,
+                fixed_changed_pixels=fixed_changed,whole_image_changed_pixels=total_changed)
+            decision['boundary_motion_execution_gate']=boundary_gate
+            passed=passed and boundary_gate['passed']
         decision.update(status='requires_visual_review' if passed else 'rejected_numerical_execution',
             fixed_pixels=int(fixed.sum()),fixed_changed_pixels=fixed_changed,
             role_changed_pixels=role_changes,whole_image_changed_pixels=total_changed,
@@ -226,6 +320,17 @@ if __name__=='__main__':
     p.add_argument('--additional-protection',type=Path)
     p.add_argument('--collocation-spacing',type=float)
     p.add_argument('--field-stride',type=int,default=4)
+    p.add_argument('--amounts',type=float,nargs='+',default=[0.,60.,-60.])
+    p.add_argument('--target-profile',type=Path)
+    p.add_argument('--soft-source-boundary',type=Path)
+    p.add_argument('--soft-boundary-density',type=float,default=.05)
+    p.add_argument('--soft-boundary-fade',type=float,default=16.)
+    p.add_argument('--boundary-motion',type=Path)
     a=p.parse_args();run(a.evidence.resolve(),a.proof.resolve(),a.review.resolve(),a.binary.resolve(),a.output.resolve(),
                         additional_protection=a.additional_protection.resolve() if a.additional_protection else None,
-                        collocation_spacing=a.collocation_spacing,field_stride=a.field_stride)
+                        collocation_spacing=a.collocation_spacing,field_stride=a.field_stride,
+                        amounts=tuple(a.amounts),
+                        target_profile=a.target_profile.resolve() if a.target_profile else None,
+                        soft_source_boundary=a.soft_source_boundary.resolve() if a.soft_source_boundary else None,
+                        soft_boundary_density=a.soft_boundary_density,soft_boundary_fade=a.soft_boundary_fade,
+                        boundary_motion=a.boundary_motion.resolve() if a.boundary_motion else None)
