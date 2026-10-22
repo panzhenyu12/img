@@ -11,7 +11,7 @@ SEMANTIC_PYTHON ?= $(QUALITY_PYTHON)
 	rust-test api-test web-build e2e health stop clean models quality quality-face quality-body quality-clothing quality-semantic quality-semantic-local lint
 
 .PHONY: background-setup background-models background background-test client-models quality-skin quality-film body-setup body-models rust-photo-test
-.PHONY: quality-jaw-curve quality-jaw-bilateral quality-jaw-retained
+.PHONY: quality-jaw-curve quality-jaw-bilateral quality-jaw-retained quality-jaw-joint
 
 help:
 	@echo "make dev          启动 Go API 和 Vite Web 开发服务器"
@@ -98,6 +98,9 @@ quality-jaw-bilateral:
 
 quality-jaw-retained:
 	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_retained_bend.py test_audit_jaw_retained_bend.py
+
+quality-jaw-joint:
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_joint_jaw_boundary_field.py test_rank_one_inverse_contract.py test_interval_polynomial_cones.py test_inverse_field_linearization.py test_joint_inverse_feedback.py
 
 # Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
 quality-film: native
