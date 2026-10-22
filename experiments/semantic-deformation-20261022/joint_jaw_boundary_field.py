@@ -7,6 +7,7 @@ does not authorize rendering or export a runnable target profile.
 import time
 import hashlib
 import json
+from types import SimpleNamespace
 import numpy as np
 from scipy.linalg import block_diag
 from scipy.sparse import csc_matrix, csr_matrix, diags, vstack, hstack, block_diag as sparse_block_diag
@@ -18,6 +19,7 @@ from jaw_bilateral import build_bilateral_coupling
 from source_boundary_soft_targets import sample_boundary_soft_targets
 from forward import cell_jacobians
 from interval_polynomial_cones import nonnegative_cubic_block
+from measure_jaw_preference_start import measure_preference_start
 
 
 def qp_fingerprint(p,q,a,b,cone_description):
@@ -269,6 +271,174 @@ def _refine_regions(regions,cuts,sign):
     return np.asarray(result).reshape(-1,3)
 
 
+def interface_chord_conditions(name,curve,radius,band=None):
+    """Optional source-relative bend magnitudes; never expand known domains.
+
+    N is the finite-chord numerator, not the turning angle. For source sign s,
+    the lower condition is s*(Ntarget-low*Nsource)>=0 and the upper condition
+    is -s*(Ntarget-high*Nsource)>=0. Both reuse the exact cubic interval engine.
+    """
+    regions=curve.source_turn_regions(radius)
+    if band is None:return [(name,curve,regions,radius,0.)]
+    band=np.asarray(band,float)
+    if band.shape!=(2,) or not np.isfinite(band).all() or not (0.<band[0]<=1.<=band[1]):
+        raise ValueError('source-relative interface bend band must be finite with 0 < lower <= 1 <= upper')
+    upper=regions.copy();upper[:,2]*=-1.
+    return [(name+':source-bend-lower',curve,regions,radius,float(band[0])),
+            (name+':source-bend-upper',curve,upper,radius,float(band[1]))]
+
+
+def interface_displacement_bending(curve,density,smoothing_length_px,node_spacing_px):
+    """Jaw-convention discrete bending of displacement on original arclength.
+
+    For uniform original s nodes, R = D2 B with D2 = [1,-2,1]/h^2.
+    H = density * length_scale^4 * h * R.T R. The solver passes P=2H,
+    so its added objective is z.T H z (no extra 1/2). Affine u(s) is
+    unpenalized; this does not claim arbitrary spatial-affine invariance.
+    No source curvature, zero-order displacement or endpoint slope is fitted.
+    Like the existing jaw term, interior-node quadrature spans L-h, not L.
+    """
+    parameters=np.asarray([density,smoothing_length_px,node_spacing_px],float)
+    if not np.isfinite(parameters).all() or density<0 or smoothing_length_px<0 or node_spacing_px<=0:
+        raise ValueError('finite nonnegative bending density/length and positive node spacing required')
+    count=max(2,int(np.ceil(curve.length/node_spacing_px)))+1
+    nodes=np.linspace(0.,curve.length,count);h=curve.length/(count-1)
+    d2=diags([np.ones(count-2),np.full(count-2,-2.),np.ones(count-2)],
+             [0,1,2],shape=(count-2,count),format='csr')/h**2
+    operator=(d2@curve.op(nodes)).tocsr();weight=float(density*smoothing_length_px**4*h)
+    return {'operator':operator,'weight':weight,'nodes':nodes,
+            'hessian':(weight*(operator.T@operator)).tocsc(),
+            'report':{'node_count':count,'source_length_px':curve.length,'actual_spacing_px':h,
+                      'quadrature_span_px':(count-2)*h,'density':float(density),
+                      'smoothing_length_px':float(smoothing_length_px),
+                      'requested_node_spacing_px':float(node_spacing_px)}}
+
+
+def interface_displacement_bending_energy(regularizers,z):
+    """Measure the exact added objective using residuals, avoiding cancellation."""
+    curves=[]
+    for name,regularizer in regularizers:
+        derivative=regularizer['operator']@z
+        energy=float(regularizer['weight']*(derivative@derivative))
+        curves.append({'id':name,**regularizer['report'],'energy_px3':energy,
+                       'maximum_abs_discrete_second_derivative_per_px':float(abs(derivative).max(initial=0.))})
+    return {'total_energy_px3':sum(c['energy_px3'] for c in curves),'curves':curves}
+
+
+def jaw_start_displacement_regularizer(curve,length_px):
+    """Exact weighted first-derivative energy on a known source jaw prefix.
+
+    u(source(s)) is quadratic inside each original source-edge/grid-cell
+    piece. Its derivative is linear, and w(s/length) is degree five, so
+    four-point Gauss integrates w*u'^2 exactly in real arithmetic. The
+    spatial gradient is evaluated only at interior quadrature sites and
+    contracted with the original source-segment tangent. No unknown upper
+    continuation or endpoint derivative equality is invented.
+    """
+    if not np.isfinite(length_px) or length_px<=0 or length_px>curve.length:
+        raise ValueError('positive jaw-start window must fit the known original source arc')
+    cuts=np.unique(np.r_[0.,curve.breaks[(curve.breaks>0.)&(curve.breaks<length_px)],length_px])
+    lo,hi=cuts[:-1],cuts[1:];g,weights=np.polynomial.legendre.leggauss(4)
+    positions=((lo+hi)[:,None]/2+(hi-lo)[:,None]*g/2).ravel()
+    points=curve.source(positions)
+    source_edges=np.searchsorted(curve.knots,positions,side='right')-1
+    tangent=(curve.points[source_edges+1]-curve.points[source_edges])/(
+        curve.knots[source_edges+1]-curve.knots[source_edges])[:,None]
+    _,dx,dy=point_operators(points,curve.problem['grid'],curve.problem['mapping'],curve.size)
+    operator=(diags(tangent[:,0])@dx+diags(tangent[:,1])@dy).tocsr()
+    t=positions/length_px
+    # Algebraically 1-10t^3+15t^4-6t^5; factored to retain positivity near 1.
+    taper=(1.-t)**3*(1.+3.*t+6.*t**2)
+    ds_weights=((hi-lo)[:,None]*weights/2).ravel()
+    quadrature_weights=length_px**2*ds_weights*taper
+    return {'curve':curve,'operator':operator,'weights':quadrature_weights,'positions':positions,'ds_weights':ds_weights,
+            'hessian':(operator.T@diags(quadrature_weights)@operator).tocsc(),
+            'report':{'window_end_px':float(length_px),'source_grid_piece_count':len(lo),
+                      'quadrature_points':len(positions),'quadrature_degree_exact':7,
+                      'original_source_window':[0.,float(length_px)]}}
+
+
+def curve_window_motion(curve,z,end):
+    """Exact displacement extrema of each original quadratic source piece."""
+    if not np.isfinite(end) or end<=0 or end>curve.length:
+        raise ValueError('motion window must fit the known original source arc')
+    cuts=np.unique(np.r_[0.,curve.breaks[(curve.breaks>0.)&(curve.breaks<end)],end])
+    lo,hi=cuts[:-1],cuts[1:]
+    positions=(lo[None,:]+(hi-lo)[None,:]*np.array([0.,.5,1.])[:,None]).ravel()
+    values=(curve.op(positions)@z).reshape(3,-1);candidates=[]
+    for sign in [1.,-1.]:
+        t,_=polynomial_minima(sign*values);where=lo+(hi-lo)*t
+        motion=curve.op(where)@z;i=int(np.argmax(abs(motion)))
+        candidates.append((float(abs(motion[i])),float(where[i])))
+    magnitude,where=max(candidates)
+    return {'window_end_source_arclength_px':float(end),'at_window_end_px':float((curve.op([end])@z)[0]),
+            'maximum_abs_motion_px':magnitude,'maximum_at_source_arclength_px':where,
+            'method':'exact quadratic extrema on original source/grid pieces, not endpoint-only sampling'}
+
+
+def jaw_start_displacement_energy(regularizers,z):
+    curves=[]
+    for name,regularizer in regularizers:
+        derivative=regularizer['operator']@z
+        curves.append({'id':name,**regularizer['report'],
+            'energy_px3':float(regularizer['weights']@(derivative**2)),
+            'prefix_motion':[curve_window_motion(regularizer['curve'],z,end) for end in [2.,6.]
+                             if end<=regularizer['curve'].length]})
+    return {'total_energy_px3':sum(c['energy_px3'] for c in curves),'curves':curves}
+
+
+def jaw_prefix_intent_block(curve,prefix_px,scale_px,energy_cap):
+    """One exact unweighted known-prefix Dirichlet SOC, never a soft weight."""
+    if not np.isfinite([scale_px,energy_cap]).all() or scale_px<=0 or energy_cap<0:
+        raise ValueError('positive fixed physical scale and nonnegative original-intent budget required')
+    quadrature=jaw_start_displacement_regularizer(curve,prefix_px)
+    operator=(diags(scale_px*np.sqrt(quadrature['ds_weights']))@quadrature['operator']).tocsr()
+    zero=csr_matrix((1,curve.size))
+    return {'curve':curve,'operator':operator,'energy_cap':float(energy_cap),
+            'prefix_px':float(prefix_px),'scale_px':float(scale_px),
+            'A':vstack([zero,-operator],format='csr'),
+            'b':np.r_[np.sqrt(energy_cap),np.zeros(operator.shape[0])],
+            'report':{'prefix_px':float(prefix_px),'outer_scale_px':float(scale_px),
+                      'energy_cap_px3':float(energy_cap),'soc_radius':float(np.sqrt(energy_cap)),
+                      'cauchy_motion_bound_at_prefix_end_px':float(np.sqrt(prefix_px*energy_cap)/scale_px),
+                      'source_grid_piece_count':quadrature['report']['source_grid_piece_count'],
+                      'quadrature_points':len(quadrature['positions'])}}
+
+
+def jaw_prefix_intent_blocks(preference,jaws,amount,fraction,scale_px,node_spacing_px):
+    """Six separate budgets from existing unsolved Plateau beta, not fitted fields."""
+    prefixes=[float(node_spacing_px),float(scale_px/2.),float(scale_px)]
+    if not (0.<prefixes[0]<prefixes[1]<prefixes[2]):
+        raise ValueError('three distinct nested original physical prefix scales required')
+    result=[]
+    for arc,curve in zip(preference.arcs,jaws):
+        for prefix in prefixes:
+            measured=measure_preference_start(preference,arc,amount,fraction,prefix,'equal_area_plateau')
+            # The measurement uses prefix^2; convert only that dimensional
+            # prefactor to the same scale^2 as every field constraint.
+            cap=measured['unweighted_energy_px3']*(scale_px/prefix)**2
+            block=jaw_prefix_intent_block(curve,prefix,scale_px,cap)
+            block['report'].update(id=arc['id'],intent='existing equal-area PlateauProblem.beta',
+                amount=float(amount),max_radius_fraction=float(fraction),
+                preference_scale=float(preference.scale),
+                preference_integral_method='analytic radius/envelope derivative, degree<=10, nine-point Gauss on original polynomial pieces',
+                preference_antiderivative_difference_px3=measured['unweighted_quadrature_antiderivative_difference_px3']*(scale_px/prefix)**2)
+            result.append(block)
+    return result
+
+
+def check_jaw_prefix_intent(blocks,z):
+    rows=[]
+    for block in blocks:
+        residual=block['operator']@z;energy=float(residual@residual);cap=block['energy_cap']
+        rows.append({**block['report'],'actual_energy_px3':energy,'energy_margin_px3':cap-energy,
+                     'accepted':bool(energy<=cap),
+                     'actual_motion':curve_window_motion(block['curve'],z,block['prefix_px'])})
+    count=sum(not row['accepted'] for row in rows)
+    return {'accepted':count==0,'violations':count,'constraints':rows,
+            'gate':'each independent exact physical energy <= its original Plateau budget, with no added tolerance'}
+
+
 def _independent_equalities(rows,targets,tolerance=1e-10):
     """Small equality set only: normalized modified Gram-Schmidt, keep RHS."""
     vectors=[];rhs=[];redundant=0
@@ -321,7 +491,9 @@ def continuous_nonjaw_motion(full,old,z):
 
 def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*,
         smoothing_length_px=12.,jaw_radius_px=16.,interface_radius_px=12.,
-        node_spacing_px=2.,neck_density=.05,neck_fade_px=16.,max_rounds=8):
+        node_spacing_px=2.,neck_density=.05,neck_fade_px=16.,max_rounds=8,
+        interface_bend_band=None,allow_strict_polish=True,regularize_interface_displacement=False,
+        regularize_jaw_start=False,constrain_jaw_start_intent=False,reuse_first_round=None):
     """Bounded-budget new target distribution; diagnostic source field only.
 
     Jaw preference, discrete smoothing and bilateral coupling equal the prior
@@ -331,6 +503,9 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
     """
     import clarabel
     started=time.monotonic()
+    prior_elapsed=0. if reuse_first_round is None else float(reuse_first_round['prior_elapsed_seconds'])
+    if not np.isfinite(prior_elapsed) or prior_elapsed<0.:
+        raise ValueError('finite nonnegative prior source solve budget debit required')
     if not np.isfinite(amount) or abs(amount)>100:raise ValueError('amount must be finite within ±100')
     if np.any(problem['target_weights']!=0):raise ValueError('joint grid must have no already-frozen target objective')
     frame=geometry['frame'];across,down=[np.asarray(frame[k],float) for k in ['across','down']]
@@ -360,13 +535,41 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
         'curve_controller':'exact interval polynomial PSD2/SOC certificates on actually violating original source/grid pieces; known hard-zero quadratic sign pieces factor exactly to linear inequalities; original point cuts, hard equalities and continuous extrema oracle retained',
         'new_target_distribution':True,'source_curves_unmodified':True,'unknown_curves_joined':False,
         'anatomical_interface_assignment':'unknown','rho':.5,'interface_radius_px':interface_radius_px,
+        'interface_source_relative_bend_band':None if interface_bend_band is None else list(map(float,interface_bend_band)),
+        'interface_shape_constraint_change':interface_bend_band is not None,
+        'interface_bend_band_scope':'signed target/source finite-chord numerator ratio on unchanged known source-turn pieces only; not an angle ratio or absolute slope bound',
+        'interface_displacement_bending':{'enabled':bool(regularize_interface_displacement),
+            'density':float(neck_density),'smoothing_length_px':float(smoothing_length_px),
+            'requested_node_spacing_px':float(node_spacing_px),
+            'formula':'density * smoothing_length_px^4 * h * sum((D2 B z)^2); P=2H, no additional half',
+            'scope':'displacement only on uniform original arclength across each complete observed interface; no source-curvature fitting, endpoint slope constraint, new hard domain or joined anatomy',
+            'units':'px^3; matching the existing jaw displacement objective',
+            'limits':'discrete second derivative at interior nodes; quadrature spans L-h; affine u(s) has zero energy, not all spatial affine fields'},
+        'jaw_start_displacement_regularization':{'enabled':bool(regularize_jaw_start),
+            'length_px':float(smoothing_length_px),'additional_weight':1.,
+            'formula':'length_px^2 * integral_0^length_px w(s/length_px) * (du/ds)^2 ds; P=2H, no additional half',
+            'taper':'w(t)=1-10t^3+15t^4-6t^5',
+            'scope':'known original jaw prefix only; no continuation above the jaw, endpoint tangent equality, area/support/band modification or weight scan',
+            'units':'px^3; matching the existing jaw displacement objective',
+            'quadrature':'four Gauss points per original source-edge/grid-cell piece split at the exact window end; polynomial degree seven'},
+        'jaw_start_intent_constraints':{'enabled':bool(constrain_jaw_start_intent),
+            'new_hard_shape_intent_constraint':bool(constrain_jaw_start_intent),'feasibility_assumed':False,
+            'formula':'each side and prefix: smoothing_length^2 * integral_0^prefix (du/ds)^2 <= same integral of original PlateauProblem.beta derivative',
+            'prefix_definition':'[node_spacing, smoothing_length/2, smoothing_length] on the original known source jaw',
+            'budget_source':'existing unsolved equal-area Plateau beta; no adjusted total strength, ratio, side pooling or weight scan',
+            'field_integral':'four-Gauss exact degree-two integrand on original source/grid pieces; no taper',
+            'preference_integral':'nine-Gauss exact degree-ten integrand on original radius/quintic pieces; no taper'},
         'jaw_radius_px':jaw_radius_px,'source_sign_threshold_px2':1e-8,
         'nonjaw_area_row_norm':float(np.linalg.norm(nonjaw_area.data)),
         'objective':'existing node-sampled plateau preference + same discrete jaw smoothing and bilateral1; portable grid energy; existing discrete neck soft0 quadrature',
         'maximum_refinement_rounds':int(max_rounds),'refinement':[],
+        'intermediate_almost_solved_policy':'finite AlmostSolved may only provide new original geometry/curve/sign constraints; never accepted; no-new-constraint and other unsuccessful status stop',
+        'reused_first_round':None if reuse_first_round is None else {
+            'source_report':reuse_first_round['source_report'],'subproblem_sha256':reuse_first_round['subproblem_sha256'],
+            'prior_elapsed_seconds':prior_elapsed,'counted_as_round':0,'new_round_budget_not_reset':True},
         'total_solve_budget_seconds':60.,'maximum_round_seconds':15.,
         'numerical_solver_tolerances':{'primal_feasibility':1e-12,'absolute_objective_gap':1e-10,'relative_objective_gap':1e-10},
-        'same_subproblem_strict_polish':{'maximum_attempts':1,'only_after_no_new_constraint_and_remaining_geometry_violation':True,
+        'same_subproblem_strict_polish':{'maximum_attempts':int(bool(allow_strict_polish)),'only_after_no_new_constraint_and_remaining_geometry_violation':True,
             'primal_feasibility':1e-13,'absolute_objective_gap':1e-12,'relative_objective_gap':1e-12},
         'jaw_sign_definition':'sign(-amount * original source radius); source midline crossings partitioned; zero-radius sites constrained to zero, unknown anatomy unchanged',
         'source_parameterization':'original jaw cumulative arclength knots retained exactly; chord right endpoint uses symbolic (L-r)+r=L only for an exactly equal center; out-of-range source/center inputs rejected',
@@ -393,12 +596,30 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
     neck_op=point_operators(soft['source'],problem['grid'],problem['mapping'],full.size)[0]
     hessian=(hessian+neck_op.T@diags(soft['weights'])@neck_op).tocsc()
     report['neck_soft0']=soft['report']
+    interface_regularizers=[(segment['id'],interface_displacement_bending(
+        curve,neck_density,smoothing_length_px,node_spacing_px))
+        for segment,curve in zip(interface_segments,interfaces)]
+    if regularize_interface_displacement:
+        for _,regularizer in interface_regularizers:
+            hessian=(hessian+regularizer['hessian']).tocsc()
+        report['objective']+='; full observed interface displacement bending on original arclength'
+    jaw_start_regularizers=[]
+    if regularize_jaw_start:
+        jaw_start_regularizers=[(arc['id'],jaw_start_displacement_regularizer(curve,smoothing_length_px))
+                                for arc,curve in zip(old.arcs,jaws)]
+        for _,regularizer in jaw_start_regularizers:
+            hessian=(hessian+regularizer['hessian']).tocsc()
+        report['objective']+='; known jaw-start finite-window displacement derivative energy'
+    start_intent_blocks=jaw_prefix_intent_blocks(preference,jaws,amount,.13,smoothing_length_px,node_spacing_px) if constrain_jaw_start_intent else []
+    report['jaw_start_intent_constraints']['budgets']=[block['report'] for block in start_intent_blocks]
+    if constrain_jaw_start_intent:
+        report['source_continuous_accepted_scope']+='; all six independent original-Plateau prefix-energy budgets'
     reports=[]
     for arc,curve in zip(old.arcs,jaws):
         regions=_refine_regions(old.convex_regions(arc),curve.chord_partition(jaw_radius_px),arc['side'])
         reports.append((arc['id'],curve,regions,jaw_radius_px,.5))
     for segment,curve in zip(interface_segments,interfaces):
-        reports.append((segment['id'],curve,curve.source_turn_regions(interface_radius_px),interface_radius_px,0.))
+        reports.extend(interface_chord_conditions(segment['id'],curve,interface_radius_px,interface_bend_band))
     matrix_rows=[];thresholds=[];seen_planes=set()
     def add_rows(matrix,lower):
         matrix=matrix.tocsr();keep=[]
@@ -425,6 +646,9 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
     z=None;solver_ok=False;diagnostic_solver_state=None;diagnostic_qp=None
     strict_pending=False;strict_used=False
     geometry_rows=[];geometry_rhs=[];geometry_cones=[];seen_corners=set()
+    intent_rows=[block['A'] for block in start_intent_blocks]
+    intent_rhs=[block['b'] for block in start_intent_blocks]
+    intent_cones=[clarabel.SecondOrderConeT(len(block['b'])) for block in start_intent_blocks]
     polynomial_blocks=[];polynomial_keys=[];seen_pieces=set();factorized_sign_pieces=set()
     def add_polynomial(key,coefficients):
         if key in seen_pieces:return 0
@@ -448,7 +672,7 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
     for iteration in range(max_rounds+1):
         is_strict=strict_pending;strict_pending=False
         if iteration>=max_rounds and not is_strict:break
-        remaining=60.-(time.monotonic()-started)
+        remaining=60.-prior_elapsed-(time.monotonic()-started)
         if remaining<=0:report['rejection']='TimedOut: total source solve budget exhausted';break
         if not is_strict:
             matrix=vstack(matrix_rows,format='csr');lower=np.concatenate(thresholds)
@@ -460,10 +684,10 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
             scale=np.maximum(rownorm,1.)
             matrix=diags(1/scale)@matrix;lower=lower/scale
             extra_variables=6*len(polynomial_blocks);total_variables=full.size+extra_variables
-            base=vstack([eq,-matrix,*geometry_rows],format='csc')
+            base=vstack([eq,-matrix,*intent_rows,*geometry_rows],format='csc')
             a=hstack([base,csr_matrix((base.shape[0],extra_variables))],format='csc')
-            b=np.concatenate([eq_rhs,-lower,*geometry_rhs])
-            cones=[clarabel.ZeroConeT(len(eq_rhs)),clarabel.NonnegativeConeT(len(lower)),*geometry_cones]
+            b=np.concatenate([eq_rhs,-lower,*intent_rhs,*geometry_rhs])
+            cones=[clarabel.ZeroConeT(len(eq_rhs)),clarabel.NonnegativeConeT(len(lower)),*intent_cones,*geometry_cones]
             blocks=[nonnegative_cubic_block(coefficients,constant,
                         auxiliary_start=full.size+6*index,total_variables=total_variables)
                     for index,(coefficients,constant) in enumerate(polynomial_blocks)]
@@ -479,7 +703,7 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
             strict_used=True
             if qp_fingerprint(solver_h,solver_q,a,b,cone_description)!=subproblem_hash:
                 raise AssertionError('strict numerical polish must use the unchanged conic QP')
-        remaining=60.-(time.monotonic()-started)
+        remaining=60.-prior_elapsed-(time.monotonic()-started)
         if remaining<=0:report['rejection']='TimedOut: total source solve budget exhausted';break
         settings=clarabel.DefaultSettings();settings.verbose=False;settings.max_iter=160
         settings.time_limit=min(15.,remaining)
@@ -491,15 +715,31 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
             'settings':{name:getattr(settings,name) for name in dir(settings)
                         if not name.startswith('_') and not callable(getattr(settings,name))}}
         round_started=time.monotonic()
-        solved=clarabel.DefaultSolver(solver_h,solver_q,a,b,cones,settings).solve()
+        reused=iteration==0 and reuse_first_round is not None
+        if reused:
+            if subproblem_hash!=reuse_first_round['subproblem_sha256']:
+                raise ValueError('reused first-round QP fingerprint must exactly match the rebuilt unchanged numerical problem')
+            state=reuse_first_round['state'];old_row=reuse_first_round['row']
+            if (np.shape(state['primal_vector'])!=(total_variables,)
+                or np.shape(state['primal_slack'])!=(a.shape[0],)
+                or np.shape(state['dual_vector'])!=(a.shape[0],)
+                or old_row['solver_status']!='AlmostSolved'
+                or any(not np.isfinite(value).all() for value in state.values())):
+                raise ValueError('finite complete same-dimension AlmostSolved first-round state required')
+            solved=SimpleNamespace(status=clarabel.SolverStatus.AlmostSolved,x=state['primal_vector'],
+                s=state['primal_slack'],z=state['dual_vector'],iterations=old_row['solver_iterations'],
+                r_prim=old_row['solver_primal_residual'],r_dual=old_row['solver_dual_residual'])
+        else:solved=clarabel.DefaultSolver(solver_h,solver_q,a,b,cones,settings).solve()
         solver_ok=solved.status==clarabel.SolverStatus.Solved
+        finite_state=all(np.isfinite(value).all() for value in [solved.x,solved.s,solved.z])
         z=np.asarray(solved.x[:full.size])
         if np.isfinite(solved.x).all():
             diagnostic_solver_state={'primal_vector':np.asarray(solved.x),
                 'primal_slack':np.asarray(solved.s),'dual_vector':np.asarray(solved.z)}
         row={'round':iteration,'solver_status':str(solved.status),'constraint_rows':len(lower),'curves':[],'sign':[],
              'same_subproblem_strict_polish':is_strict,'subproblem_sha256':subproblem_hash,
-             'solver_seconds':time.monotonic()-round_started,'round_budget_seconds':settings.time_limit,
+             'solver_seconds':old_row['solver_seconds'] if reused else time.monotonic()-round_started,
+             'solver_state_reused_without_resolve':reused,'round_budget_seconds':settings.time_limit,
              'geometry_constrained_corners':len(seen_corners),
              'interval_polynomial_certificates':len(polynomial_blocks),'auxiliary_variables':extra_variables,
              'interval_certificate_piece_keys':[list(key) for key in polynomial_keys],
@@ -507,8 +747,9 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
              'solver_iterations':solved.iterations,
              'solver_primal_residual':float(solved.r_prim) if np.isfinite(solved.r_prim) else None,
              'solver_dual_residual':float(solved.r_dual) if np.isfinite(solved.r_dual) else None,
-             'solver_absolute_objective_gap':float(abs(solved.obj_val-solved.obj_val_dual)) if np.isfinite([solved.obj_val,solved.obj_val_dual]).all() else None}
-        if not np.isfinite(solved.x).all():
+             'solver_absolute_objective_gap':old_row['solver_absolute_objective_gap'] if reused else (
+                 float(abs(solved.obj_val-solved.obj_val_dual)) if np.isfinite([solved.obj_val,solved.obj_val_dual]).all() else None)}
+        if not finite_state:
             report['refinement'].append(row);report['rejection']='TimedOut' if str(solved.status)=='MaxTime' else 'Solver did not return Solved within fixed budget';break
         count=0
         previous_planes=len(seen_planes);previous_pieces=len(seen_pieces);previous_polynomials=len(polynomial_blocks)
@@ -536,6 +777,8 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
         row['ideal_inverse_source_geometry']=geometry_check
         row['new_geometry_corners']=add_geometry(bad_corners)
         count+=geometry_check['violating_source_cell_corners']
+        row['jaw_start_intent']=check_jaw_prefix_intent(start_intent_blocks,z)
+        count+=row['jaw_start_intent']['violations']
         row['jaw_area_error_px2']=float((jaw_area@z)[0]-wanted)
         row['full_contour_area_error_px2']=float((full_area@z)[0]-wanted)
         row['endpoint_max_px']=max(abs(float((r@z)[0])) for r in endpoint_rows)
@@ -544,6 +787,11 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
         row['new_interval_polynomial_certificates']=len(polynomial_blocks)-previous_polynomials
         row['new_exact_interval_constraints']=len(seen_pieces)-previous_pieces
         if not solver_ok:
+            new_constraints=(row['new_distinct_cut_planes']>0 or row['new_geometry_corners']>0 or row['new_exact_interval_constraints']>0)
+            if solved.status==clarabel.SolverStatus.AlmostSolved and finite_state and new_constraints and not is_strict:
+                row['intermediate_almost_solved_separation_only']=True
+                row['next_action']='Append newly discovered original geometry/curve/sign constraints and continue; this state cannot be accepted'
+                continue
             report['rejection']='TimedOut' if str(solved.status)=='MaxTime' else 'Solver did not return Solved within fixed budget'
             row['physical_checks_are_failed_solver_diagnostics_only']=True
             break
@@ -555,7 +803,7 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
             report['rejection']='Same-subproblem strict numerical polish failed original physical constraints'
             break
         if row['new_distinct_cut_planes']==0 and row['new_geometry_corners']==0 and row['new_exact_interval_constraints']==0:
-            if not strict_used and geometry_check['violating_source_cell_corners']>0:
+            if allow_strict_polish and not strict_used and geometry_check['violating_source_cell_corners']>0:
                 strict_pending=True
                 row['next_action']='One strict numerical solve of exactly this conic subproblem; no changed objective or constraint'
                 continue
@@ -567,12 +815,20 @@ def solve_joint_field(problem,geometry,amount,interface_segments,neck_segments,*
         report['nonjaw_area_px2']=float((nonjaw_area@z)[0])
         report['neck_motion_max_px']=float(abs(neck_op@z).max())
         report['neck_weighted_squared_motion']=float(soft['weights']@((neck_op@z)**2))
+        report['interface_displacement_bending'].update(interface_displacement_bending_energy(interface_regularizers,z))
+        report['jaw_start_displacement_regularization'].update(jaw_start_displacement_energy(jaw_start_regularizers,z))
+        report['jaw_start_intent_constraints']['final_check']=check_jaw_prefix_intent(start_intent_blocks,z)
         report['source_field_geometry']=source_field_geometry(problem,z,across)
         report['continuous_nonjaw_motion']=continuous_nonjaw_motion(full,old,z)
-    report['total_source_solve_seconds']=time.monotonic()-started
+    report['current_source_solve_seconds']=time.monotonic()-started
+    report['prior_source_solve_seconds']=prior_elapsed
+    report['total_source_solve_seconds']=prior_elapsed+report['current_source_solve_seconds']
     # Even a feasible source solution is diagnostic-only. Caller may save raw
     # arrays for independent review, never candidate-profile/executable output.
     return {'report':report,'diagnostic_solution':z if z is not None and np.isfinite(z).all() else None,
             'diagnostic_solver_state':diagnostic_solver_state,
             'diagnostic_qp':diagnostic_qp,
+            'interface_displacement_regularizers':interface_regularizers,
+            'jaw_start_regularizers':jaw_start_regularizers,
+            'jaw_start_intent_blocks':start_intent_blocks,
             'curves':jaws+interfaces,'full_curve':full,'jaw_problem':old}

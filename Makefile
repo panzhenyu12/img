@@ -100,7 +100,7 @@ quality-jaw-retained:
 	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_retained_bend.py test_audit_jaw_retained_bend.py
 
 quality-jaw-joint:
-	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_joint_jaw_boundary_field.py test_rank_one_inverse_contract.py test_interval_polynomial_cones.py test_inverse_field_linearization.py test_joint_inverse_feedback.py
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_joint_jaw_boundary_field.py test_rank_one_inverse_contract.py test_interval_polynomial_cones.py test_inverse_field_linearization.py test_joint_inverse_feedback.py test_interface_bend_oracle.py test_joint_diagnostic_render.py test_jaw_start_oracle.py test_measure_jaw_preference_start.py test_jaw_prefix_intent.py
 
 # Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
 quality-film: native

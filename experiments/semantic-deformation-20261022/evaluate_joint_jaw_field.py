@@ -1,7 +1,9 @@
-"""Inspect a frozen accepted source solution and render an offline comparison.
+"""Inspect a frozen source solution and render an offline comparison.
 
 The final float32 inverse and numerical execution must pass independently.
 Photographic quality and continuous final-curve constraints remain unapproved.
+Explicit diagnostic mode can preview rejected but strictly monotone maps;
+the original failed source/final checks remain failed in the output report.
 """
 import argparse
 import hashlib
@@ -25,12 +27,21 @@ def read(path):return json.loads(Path(path).read_text())
 def save(path,value):Path(path).write_text(json.dumps(value,indent=2,allow_nan=False)+'\n')
 
 
-def run(report_path,source_path,fixed_path,baseline_path,output):
+def inspect_for_render(field, *, diagnostic=False):
+    final=inspect(field)
+    diagnostic_safe=(diagnostic and final['symmetric_eigenvalue_min']>0.
+        and final['corners_nonpositive_determinant']==0
+        and final['boundary_max_displacement']==0.)
+    return final, bool(final['passed_strict'] or diagnostic_safe)
+
+
+def run(report_path,source_path,fixed_path,baseline_path,output,*,diagnostic=False):
     report_path,source_path,fixed_path,baseline_path,output=[Path(p).resolve() for p in
         [report_path,source_path,fixed_path,baseline_path,output]]
     if output.exists():raise FileExistsError('refusing to overwrite joint photo evidence')
     reference=read(report_path)
-    if reference.get('source_continuous_accepted') is not True:
+    source_accepted=reference.get('source_continuous_accepted') is True
+    if not source_accepted and not diagnostic:
         raise ValueError('original continuous source conditions must pass before photo evaluation')
     for path in [source_path,fixed_path]:
         if reference['inputs_sha256'].get(str(path))!=sha(path):
@@ -69,14 +80,19 @@ def run(report_path,source_path,fixed_path,baseline_path,output):
     inverse,closure=inverse_points(forward/spacing,q)
     field=((inverse-q)*spacing).reshape(height,width,2).astype('<f4')
     np.save(output/'inverse-field.npy',field)
-    final=inspect(field);report={'amount':reference['amount'],'source_report':str(report_path),
-        'source_conditions_accepted':True,'source_field_geometry':source_check,
+    final,may_render=inspect_for_render(field,diagnostic=diagnostic)
+    report={'amount':reference['amount'],'source_report':str(report_path),
+        'source_conditions_accepted':source_accepted,'source_rejection':reference.get('rejection'),
+        'source_field_geometry':source_check,
         'actual_f32_inverse_geometry':final,'inverse_closure_grid_units':closure,
         'inverse_closure_max_source_px':closure['closure_max_px']*spacing[0],
         'inputs_sha256':inputs,'executed_code_manifest':str(manifest),'rendered':False,
+        'diagnostic_mode_requested':bool(diagnostic),
+        'diagnostic_render_only':not(source_accepted and final['passed_strict']),
+        'execution_accepted':False,
         'image_approval':False,'continuous_final_curve_approval':False,
         'limits':'Offline numerical execution and photo review only. Sampled curve response does not certify final continuous chord conditions or naturalness.'}
-    if final['passed_strict']:
+    if may_render:
         edited,sampling=render_frozen_field(rgba,field,crop,method='bilinear')
         changed=np.any(edited!=rgba,axis=2);fixed_changed=int(np.count_nonzero(changed&fixed))
         fixed_inverse=float(np.linalg.norm(field[fixed[top:top+height,left:left+width]],axis=1).max(initial=0.))
@@ -95,8 +111,13 @@ def run(report_path,source_path,fixed_path,baseline_path,output):
                 'maximum_target_error_px':float(np.linalg.norm(actual-curve['target'],axis=1).max())})
         report.update(fixed_changed_pixels=fixed_changed,fixed_inverse_max_px=fixed_inverse,
             changed_pixels=int(changed.sum()),curve_execution=curve_results,sampling=sampling)
-        if fixed_changed==0 and fixed_inverse==0. and all(c['execution']['passed'] for c in curve_results):
+        curves_accepted=all(c['execution']['passed'] for c in curve_results)
+        report['curve_execution_accepted']=curves_accepted
+        report['diagnostic_render_only']=not(source_accepted and final['passed_strict'] and curves_accepted)
+        if fixed_changed==0 and fixed_inverse==0. and (curves_accepted or diagnostic):
             Image.fromarray(edited).save(output/'photo.png');report['rendered']=True
+            report['execution_accepted']=source_accepted and final['passed_strict'] and curves_accepted
+            report['photo_sha256']=sha(output/'photo.png')
             contour=np.asarray(reference['source_geometry']['contour'])
             lo=np.maximum(np.floor(contour.min(0)-20).astype(int),0)
             hi=np.minimum(np.ceil(contour.max(0)+60).astype(int),[rgba.shape[1],rgba.shape[0]])
@@ -106,7 +127,8 @@ def run(report_path,source_path,fixed_path,baseline_path,output):
                 ('jaw',(int(lo[0]),max(0,int(contour[:,1].max()-125)),int(hi[0]),int(hi[1])))]:
                 w,h=box[2]-box[0],box[3]-box[1];panel=Image.new('RGB',(3*w,h+28),'white');draw=ImageDraw.Draw(panel)
                 for i,(im,label) in enumerate([(original,'Source'),(baseline,'Retained-bend baseline'),
-                    (Image.fromarray(edited).convert('RGB'),'Joint source field; unapproved')]):
+                    (Image.fromarray(edited).convert('RGB'),
+                     'Diagnostic map; REJECTED' if report['diagnostic_render_only'] else 'Joint source field; unapproved')]):
                     panel.paste(im.crop(box),(i*w,28));draw.text((i*w+3,5),label,fill='black')
                 panel.save(output/(name+'.png'))
     if any(sha(path)!=digest for path,digest in {**inputs,**code_hashes}.items()):
@@ -115,10 +137,11 @@ def run(report_path,source_path,fixed_path,baseline_path,output):
     report['elapsed_evaluation_seconds']=time.perf_counter()-started
     save(output/'report.json',report)
     print(json.dumps({k:report.get(k) for k in ['rendered','actual_f32_inverse_geometry','fixed_changed_pixels',
-        'fixed_inverse_max_px','elapsed_evaluation_seconds']}),flush=True)
+        'fixed_inverse_max_px','diagnostic_render_only','execution_accepted','elapsed_evaluation_seconds']}),flush=True)
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--diagnostic',action='store_true',help='preview rejected but strictly monotone maps; never changes acceptance')
     for name in ['report','source','fixed','baseline','output']:parser.add_argument('--'+name,type=Path,required=True)
-    args=parser.parse_args();run(args.report,args.source,args.fixed,args.baseline,args.output)
+    args=parser.parse_args();run(args.report,args.source,args.fixed,args.baseline,args.output,diagnostic=args.diagnostic)

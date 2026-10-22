@@ -12,7 +12,7 @@ from PIL import Image
 
 from export_jaw_curve_profile import check_protocol
 from jaw_target_profile import load_profile
-from joint_jaw_boundary_field import solve_joint_field
+from joint_jaw_boundary_field import solve_joint_field, interface_displacement_bending_energy, jaw_start_displacement_energy, check_jaw_prefix_intent, qp_fingerprint
 from portable_field import build_problem
 from portable_jaw import fixed_support, jaw_geometry, pixels
 from run_portable_jaw import snapshot_local_code, validate_review_boundaries
@@ -21,6 +21,44 @@ from run_portable_jaw import snapshot_local_code, validate_review_boundaries
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def read(path):return json.loads(Path(path).read_text())
 def save(path,value):Path(path).write_text(json.dumps(value,indent=2,allow_nan=False)+'\n')
+
+
+def load_first_round_reuse(folder,problem,geometry,amount,current_inputs):
+    """Bind one frozen failed first round, then let the solver re-separate it."""
+    from scipy.sparse import load_npz
+    folder=Path(folder).resolve();path=folder/'report.json';report=read(path)
+    if (len(report['refinement'])!=1 or report['refinement'][0]['solver_status']!='AlmostSolved'
+        or report['refinement'][0]['same_subproblem_strict_polish']
+        or report['source_continuous_accepted'] or report['source_geometry']!=geometry
+        or report['amount']!=amount or report['grid']!=problem['grid']
+        or any(report['inputs_sha256'].get(p)!=digest for p,digest in current_inputs.items())):
+        raise ValueError('reuse requires one unchanged signed-source first-round AlmostSolved report and matching input hashes')
+    state_path=folder/'diagnostic-solver-state.npz';metadata_path=folder/'diagnostic-qp'/'metadata.json'
+    source_state_path=folder/'diagnostic-source-state.npz'
+    if (sha(state_path)!=report['diagnostic_solver_state_sha256']
+        or sha(metadata_path)!=report['diagnostic_qp_metadata_sha256']
+        or sha(source_state_path)!=report['diagnostic_source_state_sha256']):
+        raise ValueError('frozen first-round solver state or QP metadata changed')
+    source_state=np.load(source_state_path)
+    if not np.array_equal(source_state['mapping'],problem['mapping']):
+        raise ValueError('reused source variable mapping differs')
+    metadata=read(metadata_path);bindings={str(path):sha(path),str(state_path):sha(state_path),str(metadata_path):sha(metadata_path),
+                                         str(source_state_path):sha(source_state_path)}
+    for name,digest in metadata['files_sha256'].items():
+        file=metadata_path.parent/name
+        if sha(file)!=digest:raise ValueError('frozen first-round complete QP file changed')
+        bindings[str(file)]=digest
+    p=load_npz(metadata_path.parent/'P.npz');a=load_npz(metadata_path.parent/'A.npz')
+    vectors=np.load(metadata_path.parent/'vectors.npz')
+    fingerprint=qp_fingerprint(p,vectors['q'],a,vectors['b'],metadata['cones'])
+    if (fingerprint!=metadata['sha256'] or fingerprint!=report['refinement'][0]['subproblem_sha256']
+        or metadata['scalar_variables']!=problem['hessian'].shape[0]):
+        raise ValueError('complete frozen first-round QP fingerprint or scalar dimension changed')
+    state={key:value.copy() for key,value in np.load(state_path).items()}
+    if not np.array_equal(source_state['scalar_solution'],state['primal_vector'][:metadata['scalar_variables']]):
+        raise ValueError('reused source solution differs from the full frozen primal state')
+    return {'source_report':str(path),'subproblem_sha256':fingerprint,'state':state,
+            'row':report['refinement'][0],'prior_elapsed_seconds':report['total_source_solve_seconds']},bindings
 
 
 def polygon_oracle(result,z):
@@ -46,7 +84,9 @@ def polygon_oracle(result,z):
             'nonjaw_area_cancellation_does_not_prove_no_motion':True}
 
 
-def run(references,interface_path,soft_protocol_path,output):
+def run(references,interface_path,soft_protocol_path,output,*,interface_bend_band=None,allow_strict_polish=True,
+        regularize_interface_displacement=False,comparison_source_root=None,regularize_jaw_start=False,
+        constrain_jaw_start_intent=False,reuse_first_round_source_root=None):
     output=Path(output).resolve();interface_path=Path(interface_path).resolve()
     soft_protocol_path=Path(soft_protocol_path).resolve()
     if output.exists():raise FileExistsError('refusing to overwrite frozen joint diagnostic')
@@ -77,7 +117,15 @@ def run(references,interface_path,soft_protocol_path,output):
     aggregate={'experiment':'joint-jaw-full-visible-interface-source-diagnostic-v1',
         'new_target_distribution':True,'executable':False,'no_render':True,'no_parameter_scan':True,
         'inputs_sha256':inputs,'executed_code_manifest':str(manifest),'cases':[],
-        'runtime':{'python':platform.python_version(),'numpy':np.__version__,'clarabel':version('clarabel')}}
+        'runtime':{'python':platform.python_version(),'numpy':np.__version__,'clarabel':version('clarabel')},
+        'interface_source_relative_bend_band':interface_bend_band,
+        'interface_shape_constraint_change':interface_bend_band is not None,
+        'interface_displacement_bending_enabled':bool(regularize_interface_displacement),
+        'jaw_start_displacement_regularization_enabled':bool(regularize_jaw_start),
+        'jaw_start_intent_constraints_enabled':bool(constrain_jaw_start_intent),
+        'reuse_first_round_source_root':str(Path(reuse_first_round_source_root).resolve()) if reuse_first_round_source_root else None,
+        'comparison_source_root':str(Path(comparison_source_root).resolve()) if comparison_source_root is not None else None,
+        'same_subproblem_strict_polish_enabled':bool(allow_strict_polish)}
     for reference in references:
         reference=Path(reference).resolve();protocol_path=reference/'protocol.json'
         protocol,evidence=check_protocol(protocol_path);profile_path=Path(protocol['frozen_target_profile'])
@@ -110,16 +158,52 @@ def run(references,interface_path,soft_protocol_path,output):
         case=output/('user-plus100' if amount>0 else 'user-minus100');case.mkdir()
         bound={**inputs,**evidence,str(protocol_path):sha(protocol_path),str(profile_path):sha(profile_path),
                str(reference/'fixed-source.png'):sha(reference/'fixed-source.png')}
+        reuse=None
+        if reuse_first_round_source_root is not None:
+            reuse,reuse_bindings=load_first_round_reuse(Path(reuse_first_round_source_root)/case.name,
+                problem,geometry,amount,bound)
+            bound.update(reuse_bindings)
         result=solve_joint_field(problem,geometry,amount,interface['segments'],neck['segments'],
             smoothing_length_px=profile['parameters']['smoothing_length_px'],
             jaw_radius_px=profile['parameters']['window_radius_px'],
-            neck_density=soft['density_per_source_px'],neck_fade_px=soft['fade_length_px'])
+            neck_density=soft['density_per_source_px'],neck_fade_px=soft['fade_length_px'],
+            interface_bend_band=interface_bend_band,allow_strict_polish=allow_strict_polish,
+            regularize_interface_displacement=regularize_interface_displacement,
+            regularize_jaw_start=regularize_jaw_start,constrain_jaw_start_intent=constrain_jaw_start_intent,
+            reuse_first_round=reuse)
         report=result['report'];report.update(inputs_sha256=bound,grid=problem['grid'],
             fixed_source_pixels=int(fixed.sum()),free_scalar_variables=problem['hessian'].shape[0],
             source_geometry=geometry,reference_profile=str(profile_path),reference_profile_sha256=sha(profile_path),
             original_fixed_mask_exactly_reconstructed=True,original_crop_reconstructed=True,
             executed_code_manifest=str(manifest),executed_code_manifest_sha256=sha(manifest))
         z=result['diagnostic_solution']
+        if z is not None and comparison_source_root is not None:
+            baseline_folder=Path(comparison_source_root).resolve()/case.name
+            baseline_report_path=baseline_folder/'report.json';baseline=read(baseline_report_path)
+            baseline_state_path=baseline_folder/'diagnostic-source-state.npz'
+            if (baseline['grid']!=problem['grid'] or baseline['source_geometry']!=geometry
+                or baseline['amount']!=amount
+                or baseline['inputs_sha256'].get(str(interface_path))!=sha(interface_path)
+                or baseline['diagnostic_source_state_sha256']!=sha(baseline_state_path)):
+                raise ValueError('comparison must bind the same source, geometry, amount and frozen scalar state')
+            baseline_state=np.load(baseline_state_path)
+            if not np.array_equal(baseline_state['mapping'],problem['mapping']):
+                raise ValueError('comparison must use the unchanged source variable mapping')
+            baseline_z=baseline_state['scalar_solution']
+            if baseline_z.shape!=z.shape or not np.isfinite(baseline_z).all():
+                raise ValueError('comparison requires finite complete source variables')
+            metric=interface_displacement_bending_energy(result['interface_displacement_regularizers'],baseline_z)
+            bound.update({str(baseline_report_path):sha(baseline_report_path),str(baseline_state_path):sha(baseline_state_path)})
+            report['interface_displacement_bending']['comparison']={
+                'source_report':str(baseline_report_path),'source_report_sha256':sha(baseline_report_path),
+                'same_operator_and_weights':True,**metric}
+            report['jaw_start_displacement_regularization']['comparison']={
+                'source_report':str(baseline_report_path),'source_report_sha256':sha(baseline_report_path),
+                'same_operator_and_weights':True,
+                **jaw_start_displacement_energy(result['jaw_start_regularizers'],baseline_z)}
+            report['jaw_start_intent_constraints']['comparison']={
+                'source_report':str(baseline_report_path),'source_report_sha256':sha(baseline_report_path),
+                'same_operator_and_caps':True,**check_jaw_prefix_intent(result['jaw_start_intent_blocks'],baseline_z)}
         if result.get('diagnostic_solver_state') is not None:
             np.savez_compressed(case/'diagnostic-solver-state.npz',**result['diagnostic_solver_state'])
             report['diagnostic_solver_state_sha256']=sha(case/'diagnostic-solver-state.npz')
@@ -158,5 +242,17 @@ def run(references,interface_path,soft_protocol_path,output):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--reference',type=Path,action='append',required=True)
+    parser.add_argument('--interface-bend-band',type=float,nargs=2,default=None,metavar=('LOWER','UPPER'))
+    parser.add_argument('--no-strict-polish',action='store_true')
+    parser.add_argument('--regularize-interface-displacement',action='store_true')
+    parser.add_argument('--regularize-jaw-start',action='store_true')
+    parser.add_argument('--constrain-jaw-start-intent',action='store_true')
+    parser.add_argument('--comparison-source-root',type=Path)
+    parser.add_argument('--reuse-first-round-source-root',type=Path)
     for key in ['interface','soft-protocol','output']:parser.add_argument('--'+key,type=Path,required=True)
-    args=parser.parse_args();run(args.reference,args.interface,args.soft_protocol,args.output)
+    args=parser.parse_args();run(args.reference,args.interface,args.soft_protocol,args.output,
+        interface_bend_band=args.interface_bend_band,allow_strict_polish=not args.no_strict_polish,
+        regularize_interface_displacement=args.regularize_interface_displacement,
+        comparison_source_root=args.comparison_source_root,regularize_jaw_start=args.regularize_jaw_start,
+        constrain_jaw_start_intent=args.constrain_jaw_start_intent,
+        reuse_first_round_source_root=args.reuse_first_round_source_root)
