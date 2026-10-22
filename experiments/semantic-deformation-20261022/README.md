@@ -59,6 +59,25 @@ The 6x6 footprint, encoded RGB domain, potential loss of extrema, and unresolved
 anisotropic minification remain limitations. This established reconstruction
 method is a focused comparison, not a claim of a new or state-of-the-art algorithm.
 
+The Rust controller's optional `regional_profile` creates an explicit new
+`regional_contour_v1` edit. `prepare_regional_profiles.py` builds the first
+source-height hypothesis and a uniform control matching its requested polygon
+area. The uniform control is explicitly weaker than the original whole-width
+operation. It does not silently reinterpret an old strength as a new target.
+
+`prepare_regional_input.py --parent <source-input> --audit <source-audit.json>
+--profile <profile.json> --output <new-directory>` binds the new controller to
+an original woman/hair source input. It regenerates 128 face targets and scales
+each declared neck arc from the same profile at its source entry, retaining the
+original arc fade. Nonzero accessory position priors and unsupported material
+roles are rejected. Original mappings, fixed pixels, material, weights, Hessian,
+and background equalities remain unchanged. An independent SciPy PCHIP reference
+checks Rust face targets and the neck rule before the unchanged solver runs.
+This adapter deliberately rejects the signed-user format and nested variants.
+See `doc/research/regional-face-target-experiment-20261022.md` for the exploratory
+comparison and its limitations. The cached source polygons are not anatomical
+ground truth or prescribed beauty ratios.
+
 The local photo renderer used for historical comparisons is the existing binary
 at `.run/face-current-20261019-target3/release/examples/face-photo-transport`.
 Its source is in `core/image-core/examples/face-photo-transport.rs`, with the

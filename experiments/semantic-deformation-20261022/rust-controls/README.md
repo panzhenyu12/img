@@ -82,6 +82,61 @@ no automatic strength, hard/soft priority or inferred fixed background. A dense
 solver must respect the **whole part rule** over the actual material; protecting
 a few points alone does not guarantee texture protection between them.
 
+## Explicit regional contour variant
+
+An optional `regional_profile` creates a **different editing intent**, identified
+as `regional_contour_v1`. Omitting the field retains `whole_face_width_v1` and its
+existing targets. A profile with every gain equal to one reproduces those targets
+exactly, including part translations; it still has the new controller identity.
+
+```json
+"regional_profile": {
+  "knots": [
+    {"height": 0.0, "gain": 1.0},
+    {"height": 0.35, "gain": 1.0},
+    {"height": 0.60, "gain": 0.65},
+    {"height": 0.82, "gain": 1.0},
+    {"height": 1.0, "gain": 1.0}
+  ]
+}
+```
+
+This is an arithmetic example, **not a validated face preset or anatomical
+calibration**. Heights are normalized in the unchanged source frame. The first
+height must be exactly 0, the last exactly 1, and all heights must be finite and
+strictly increasing. Gains must be finite and nonnegative, and every
+`max_radius_fraction * gain` must be at most 0.45. Invalid profiles are rejected;
+they are never sorted, clipped, normalized or rescaled to a target area.
+
+The gain uses shape-preserving piecewise cubic Hermite interpolation (PCHIP):
+weighted harmonic slopes on monotone interiors, zero slopes at local extrema,
+and one-sided monotonicity-limited endpoint slopes. It multiplies the existing
+source-radius displacement and chin fade. Only the displacement gain is
+interpolated; the source contour itself is never smoothed. Anchors are honored
+exactly and monotone intervals introduce no gain overshoot. The profile is C1
+at internal knots; outside `[0,1]` it extends the endpoint gain as a constant,
+so endpoint derivatives need not join. None of this proves C1 continuity,
+nonfolding, beauty or feasibility of the later dense image warp.
+
+Shape-preserving part translation evaluates **the same regional profile** at its
+source anchor. Fixed parts stay fixed. Connections and occlusions remain explicit
+evidence and do not silently override these roles. A caller changing this profile
+must update attachments using the same controller and profile; carrying over an
+old whole-width attachment drive is a separate, potentially inconsistent ablation.
+
+Changing gains changes the distribution and total amount of requested editing.
+A `+60` regional request is not automatically comparable to a `+60` whole-width
+request. Downstream experiments must record the actual per-region motion and
+whole-contour edit amount; this crate does not claim to preserve either one.
+
+Seven additional behavior checks cover the real JSON interface, exact unity
+equivalence, a localized dip with unchanged outer plateaus, monotone interval
+bounds and internal derivative continuity, source sign/zero and similarity
+equivariance, shared part-anchor behavior, and invalid-profile rejection. The
+CLI regression was observed failing on the previous unknown-field rejection and
+passing with the new implementation. These tests establish target behavior,
+not photographic quality.
+
 ## Connections and occlusion are explicit evidence
 
 Optional `relations` refer to two declared parts. Supported shapes are:

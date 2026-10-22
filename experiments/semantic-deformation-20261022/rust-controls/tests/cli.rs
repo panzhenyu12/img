@@ -59,3 +59,20 @@ fn cli_generates_json_and_rejects_unknown_motion_fields() {
         serde_json::from_slice::<serde_json::Value>(&rejected.stderr).unwrap()["error"].is_string()
     );
 }
+
+#[test]
+fn cli_accepts_an_explicit_regional_profile_without_changing_legacy_targets() {
+    let mut input: serde_json::Value =
+        serde_json::from_str(include_str!("../examples/whole-width.json")).unwrap();
+    let legacy = invoke(&input.to_string());
+    let legacy: serde_json::Value = serde_json::from_slice(&legacy.stdout).unwrap();
+    input["regional_profile"] = serde_json::json!({"knots": [
+        {"height": 0.0, "gain": 1.0}, {"height": 1.0, "gain": 1.0}
+    ]});
+    let result = invoke(&input.to_string());
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    let output: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(output["controller"], "regional_contour_v1");
+    assert_eq!(output["targets"], legacy["targets"]);
+    assert_eq!(output["part_rules"], legacy["part_rules"]);
+}

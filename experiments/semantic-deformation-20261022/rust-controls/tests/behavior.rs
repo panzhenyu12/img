@@ -30,6 +30,7 @@ fn request() -> Request {
             chin_fade_start: 0.88,
         },
         amount: 100.,
+        regional_profile: None,
         contour: vec![
             ContourPoint {
                 id: "upper".into(),

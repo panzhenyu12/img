@@ -17,6 +17,7 @@ from source_forward_input import line_constraints
 
 
 RUST_CONTROLLER_VARIANT = 'rust-whole-face-width-controller-v1'
+REGIONAL_CONTROLLER_VARIANT = 'regional-contour-source-v1'
 
 
 def require_same_signed_amount(parent_amount, requested_amount):
@@ -51,6 +52,69 @@ def _hashes(record, base, checked):
         if not path.is_file() or sha(path) != digest:
             raise ValueError('frozen input hash differs: ' + str(path))
         checked[str(path.resolve())] = digest
+
+
+def _validate_regional(inp, c, source, intent, data, checked):
+    """Check the new editing intent against its untouched same-amount parent."""
+    from prepare_regional_input import (expected_targets, check_target_variant, controller_request,
+                                       profile_digest, input_artifacts)
+    descriptor = c['regional_variant']
+    if source.get('regional_variant') != descriptor or intent.get('regional_variant') != descriptor:
+        raise ValueError('regional profile/parent/controller descriptors differ')
+    parent = Path(descriptor['parent_input']).resolve()
+    if parent == inp or read(parent/'contract.json').get('target_definition') == REGIONAL_CONTROLLER_VARIANT:
+        raise ValueError('regional parent must be original source input, not recursive variant')
+    parent_validation = validate_input(parent)
+    if parent_validation['input_kind'] != 'source_input':
+        raise ValueError('regional parent must be original source_input')
+    checked.update(parent_validation['verified_input_hashes'])
+    if sha(parent/'contract.json') != descriptor['parent_contract_sha256']:
+        raise ValueError('regional parent contract differs')
+    pc, ps = read(parent/'contract.json'), read(parent/'source-contract.json')
+    require_same_signed_amount(pc['requested_amount'], c['requested_amount'])
+    for key in ('source_photo', 'source_photo_sha256', 'baseline', 'grid', 'crop', 'target_count',
+                'scalar_variables', 'inverse_geometry_gate', 'hard_line_rows', 'background_line_count'):
+        if c[key] != pc[key]: raise ValueError('regional original contract changed: '+key)
+    for key in ('groups', 'background_lines', 'source_fixed_masks'):
+        if source[key] != ps[key]: raise ValueError('regional source role changed: '+key)
+    pd = dict(np.load(parent/'data.npz', allow_pickle=False))
+    if set(pd) != set(data): raise ValueError('regional original data fields changed')
+    for key in pd:
+        if key not in ('target_destinations', 'target_deltas'):
+            _same(data[key], pd[key], 'regional original '+key)
+    mutable = {'contract.json', 'source-contract.json', 'target-intent.json', 'data.npz',
+               'target_deltas.npy', 'quadratic/rhs.npy'}
+    for name in input_artifacts(parent):
+        if name not in mutable and sha(inp/name) != sha(parent/name):
+            raise ValueError('regional static source artifact differs: '+name)
+    audit_path = Path(descriptor['source_audit']); audit = read(audit_path)
+    if (sha(audit_path) != descriptor['source_audit_sha256'] or audit['name'] not in ['hair', 'woman']
+            or audit['input_sha256'][audit['source_image']] != pc['source_photo_sha256']):
+        raise ValueError('regional source audit identity differs')
+    _hashes(audit['input_sha256'], inp, checked)
+    checked[str(audit_path)] = sha(audit_path)
+    profile = descriptor['profile']
+    if profile_digest(profile) != descriptor['profile_sha256']:
+        raise ValueError('regional profile digest differs')
+    request = controller_request(pd, audit, profile, c['requested_amount'])
+    if request != descriptor['controller_request']:
+        raise ValueError('regional controller request differs from source/frame/profile')
+    binary = Path(descriptor['controller_binary'])
+    if sha(binary) != descriptor['controller_binary_sha256']:
+        raise ValueError('regional controller binary changed')
+    checked[str(binary)] = sha(binary)
+    expected, neck = expected_targets(pd, ps, read(Path(pc['baseline'])/'provenance.json'),
+                                      audit, profile, c['requested_amount'])
+    check_target_variant(data['target_destinations'], expected, neck, descriptor['neck_arcs'])
+    output = descriptor['controller_output']
+    if output['controller'] != 'regional_contour_v1' or len(output['targets']) != 128:
+        raise ValueError('regional controller output identity differs')
+    _same(np.asarray([t['source'] for t in output['targets']]), pd['target_sources'][:128], 'regional output sources')
+    _same(np.asarray([t['target'] for t in output['targets']]), data['target_destinations'][:128], 'regional output destinations')
+    _same(np.asarray(intent['requested']), data['target_destinations'][:128], 'regional intent face targets')
+    allowed = set(range(128)) | {i for arc in neck for i in arc['source_rows']}
+    untouched = [i for i in range(len(expected)) if i not in allowed]
+    _same(data['target_destinations'][untouched], pd['target_destinations'][untouched], 'regional nonedited target rows')
 
 
 def _validate_input(inp):
@@ -121,6 +185,10 @@ def _validate_input(inp):
     if intent['amount'] != amount or sha(inp / 'target-intent.json') != c['target_intent_sha256']:
         raise ValueError('target intent differs')
     variant_names = (c.get('target_definition'), source.get('target_definition'), intent.get('name'))
+    if REGIONAL_CONTROLLER_VARIANT in variant_names:
+        if kind != 'source_input' or any(name != REGIONAL_CONTROLLER_VARIANT for name in variant_names):
+            raise ValueError('regional controller variant declarations differ')
+        _validate_regional(inp, c, source, intent, data, checked)
     if RUST_CONTROLLER_VARIANT in variant_names:
         if kind != 'signed_user_input' or any(name != RUST_CONTROLLER_VARIANT for name in variant_names):
             raise ValueError('controller variant declarations differ')
