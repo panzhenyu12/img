@@ -48,6 +48,17 @@ Because the historical RGB audit referenced by its provenance is missing, it
 explicitly freezes new source polygon masks bound to a later existing same-photo
 audit. It never presents these masks as recovered historical ground truth.
 
+`run_resampling.py --case <geometry-passing-photo-case> --output <new-directory>`
+isolates reconstruction quality on the **unchanged** float32 inverse. Its Python
+bilinear baseline must reproduce the existing Rust photograph byte for byte.
+The candidate uses bounded Lanczos3 in opaque interiors; surrounding 2x2 sample
+limits suppress overshoot, with bilinear alpha and boundary/transparency fallback.
+No fixed-pixel repair is applied. This is a separate sampling contract: the
+historical bilinear material oracle is not treated as its acceptance test.
+The 6x6 footprint, encoded RGB domain, potential loss of extrema, and unresolved
+anisotropic minification remain limitations. This established reconstruction
+method is a focused comparison, not a claim of a new or state-of-the-art algorithm.
+
 The local photo renderer used for historical comparisons is the existing binary
 at `.run/face-current-20261019-target3/release/examples/face-photo-transport`.
 Its source is in `core/image-core/examples/face-photo-transport.rs`, with the
