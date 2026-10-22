@@ -15,6 +15,7 @@ from scipy.linalg import block_diag
 from scipy.optimize import Bounds, LinearConstraint, linprog, minimize
 
 from jaw_collocation import _prepare
+from jaw_bilateral import build_bilateral_coupling
 
 
 def _geometry_hash(geometry):
@@ -189,7 +190,7 @@ class _Problem:
 
 def solve_jaw_curve_profile(geometry, amount, *, max_radius_fraction=.13,
                             node_spacing_px=2., smoothing_length_px=4.,
-                            window_radius_px=16.):
+                            window_radius_px=16., bilateral_weight=0.):
     """Return hash-bound piecewise-linear targets and a numerical report.
 
     Positive amount shrinks toward the reviewed frame's midline. The signed
@@ -198,10 +199,10 @@ def solve_jaw_curve_profile(geometry, amount, *, max_radius_fraction=.13,
     monotone finite-chord windows receive no-new-reversal constraints. A failed
     solve returns no executable profiles, not a relaxed or attenuated edit.
     """
-    values = [amount, max_radius_fraction, node_spacing_px, smoothing_length_px, window_radius_px]
+    values = [amount, max_radius_fraction, node_spacing_px, smoothing_length_px, window_radius_px, bilateral_weight]
     if (not np.isfinite(values).all() or abs(amount) > 100. or not 0. <= max_radius_fraction <= .45
-            or node_spacing_px <= 0. or smoothing_length_px < 0. or window_radius_px <= 0.):
-        raise ValueError('finite amount/radius bounds and positive spacing/window, nonnegative smoothing required')
+            or node_spacing_px <= 0. or smoothing_length_px < 0. or window_radius_px <= 0. or bilateral_weight < 0.):
+        raise ValueError('finite amount/radius bounds and positive spacing/window, nonnegative smoothing/bilateral weight required')
     problem = _Problem(geometry, node_spacing_px, window_radius_px)
     arcs = problem.arcs
     offset = np.r_[0, np.cumsum([len(a['nodes']) for a in arcs])]; size = int(offset[-1])
@@ -223,6 +224,9 @@ def solve_jaw_curve_profile(geometry, amount, *, max_radius_fraction=.13,
     matrix = np.vstack(rows) if rows else np.empty((0, size))
     bounds_rhs = np.concatenate(rhs) if rhs else np.array([])
     hessian = block_diag(*hessians); linear = -np.concatenate(weights)*beta
+    pairing = build_bilateral_coupling(problem, _basis) if bilateral_weight > 0. else None
+    if pairing is not None:
+        hessian += bilateral_weight*pairing.hessian
     normalization = sum(a['length'] for a in arcs)
     lower, upper = np.where(beta > 0., 0., -np.inf), np.where(beta < 0., 0., np.inf)
     lower[beta == 0.] = upper[beta == 0.] = 0.
@@ -243,6 +247,11 @@ def solve_jaw_curve_profile(geometry, amount, *, max_radius_fraction=.13,
               'area_quadrature': '4-point Gauss on every original edge; exact degree-seven beta integrand',
               'constraints': 'continuous beta area; endpoints; edit sign; no new reverse finite-chord slope only on source-convex height-monotone windows',
               'refinement': []}
+    if pairing is not None:
+        report['bilateral_coupling'] = pairing.describe()
+        report['bilateral_coupling'].update(weight=float(bilateral_weight),
+            reference_kind='piecewise-linear beta control preference; not a lambda-zero solution',
+            reference_mismatch=pairing.mismatch(beta))
     output = {'schema': 'jaw-arclength-piecewise-linear-profile-v1',
               'controller': 'equal-area-source-convex-window-qp-v4',
               'amount': float(amount), 'max_radius_fraction': float(max_radius_fraction),
@@ -250,6 +259,8 @@ def solve_jaw_curve_profile(geometry, amount, *, max_radius_fraction=.13,
               'source_geometry_sha256': _geometry_hash(geometry), 'source_geometry': copy.deepcopy(geometry),
               'geometry_hash_encoding': "UTF-8 json.dumps(source_geometry, sort_keys=True, separators=(',', ':')); default ensure_ascii=True",
               'across_axis': problem.across.tolist(), 'profiles': [], 'report': report}
+    if pairing is not None:
+        output['controller'] = 'equal-area-source-convex-window-bilateral-qp-v1'
     if not feasible.success:
         return output
     objective = lambda x: float((x@hessian@x+2.*linear@x)/normalization)
@@ -281,6 +292,26 @@ def solve_jaw_curve_profile(geometry, amount, *, max_radius_fraction=.13,
     candidate_area = float(area@x)
     report['solver_success'] = solver_success
     report['signed_area_error_px2'] = candidate_area-wanted
+    if pairing is not None:
+        coupling_report = report['bilateral_coupling']
+        coupling_report['result_mismatch'] = pairing.mismatch(x)
+        coupling_report['per_side'] = []
+        for j, arc in enumerate(arcs):
+            nodes = np.unique(np.r_[arc['knots'], arc['nodes']])
+            source = problem.source(arc, nodes)
+            row = {'arc_id': arc['id']}
+            for name, vector in [('reference', beta), ('result', x)]:
+                local = vector[offset[j]:offset[j+1]]
+                displacement = _basis(arc['nodes'], nodes)@local
+                peak = int(np.argmax(np.abs(displacement)))
+                row[name] = {'signed_area_delta_px2': float(problem.area_row(arc)@local),
+                    'peak_across_displacement_px': float(displacement[peak]),
+                    'peak_source_arclength_px': float(nodes[peak]),
+                    'peak_source_down_height_px': float((source[peak]-problem.origin)@problem.down),
+                    'peak_source_xy_px': source[peak].tolist()}
+            row['peak_down_change_from_reference_px'] = (row['result']['peak_source_down_height_px']
+                                                       -row['reference']['peak_source_down_height_px'])
+            coupling_report['per_side'].append(row)
     profile_rows = []
     for j, arc in enumerate(arcs):
         nodes = np.unique(np.r_[arc['knots'], arc['nodes']]); local = x[offset[j]:offset[j+1]]

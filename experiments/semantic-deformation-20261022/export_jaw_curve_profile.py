@@ -41,7 +41,7 @@ def snapshot_code(output):
     folder = output/'executed-code'; folder.mkdir()
     original = Path(__file__).resolve().parent
     records = []
-    for name in ['export_jaw_curve_profile.py', 'jaw_curve_qp.py', 'jaw_collocation.py', 'jaw_target_profile.py']:
+    for name in ['export_jaw_curve_profile.py', 'jaw_curve_qp.py', 'jaw_collocation.py', 'jaw_target_profile.py', 'jaw_bilateral.py']:
         source, target = original/name, folder/name
         digest = sha(source); shutil.copy2(source, target)
         if sha(target) != digest:
@@ -94,7 +94,7 @@ def verify_interfaces_and_area(geometry, profile):
             'adapter_contour_shape': list(contour.shape), 'no_image_render': True}
 
 
-def export(protocol_path, amount, smoothing, output, *, node_spacing=2., window_radius=16., radius_fraction=.13):
+def export(protocol_path, amount, smoothing, output, *, node_spacing=2., window_radius=16., radius_fraction=.13, bilateral_weight=0.):
     output = Path(output).resolve(); protocol_path = Path(protocol_path).resolve()
     if output.exists():
         raise FileExistsError('refusing to overwrite frozen candidate directory')
@@ -107,12 +107,14 @@ def export(protocol_path, amount, smoothing, output, *, node_spacing=2., window_
     if sha(frozen_protocol) != protocol_hash:
         raise ValueError('source protocol changed during snapshot')
     parameters = {'amount': amount, 'max_radius_fraction': radius_fraction, 'node_spacing_px': node_spacing,
-                  'smoothing_length_px': smoothing, 'window_radius_px': window_radius}
+                  'smoothing_length_px': smoothing, 'window_radius_px': window_radius, 'bilateral_weight': bilateral_weight}
     provenance = {'source_protocol': str(frozen_protocol), 'source_protocol_sha256': protocol_hash,
         'original_source_protocol': str(protocol_path),
         'qp_source_path': str(code_folder/'jaw_curve_qp.py'), 'qp_source_sha256': sha(code_folder/'jaw_curve_qp.py'),
         'export_source_path': str(code_folder/'export_jaw_curve_profile.py'),
         'export_source_sha256': sha(code_folder/'export_jaw_curve_profile.py'),
+        'bilateral_source_path': str(code_folder/'jaw_bilateral.py'),
+        'bilateral_source_sha256': sha(code_folder/'jaw_bilateral.py'),
         'executed_code_manifest': str(code_folder/'manifest.json'),
         'executed_code_manifest_sha256': sha(code_folder/'manifest.json'),
         'runtime': {'python': platform.python_version(), 'numpy': np.__version__, 'scipy': scipy.__version__,
@@ -151,11 +153,12 @@ def main():
     parser.add_argument('--node-spacing', type=float, default=2.)
     parser.add_argument('--window-radius', type=float, default=16.)
     parser.add_argument('--radius-fraction', type=float, default=.13)
+    parser.add_argument('--bilateral-weight', type=float, default=0., help='soft equal-height fractional-motion weight; zero preserves the original QP')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     print(json.dumps(export(args.protocol, args.amount, args.smoothing, args.output,
         node_spacing=args.node_spacing, window_radius=args.window_radius,
-        radius_fraction=args.radius_fraction), indent=2, allow_nan=False))
+        radius_fraction=args.radius_fraction, bilateral_weight=args.bilateral_weight), indent=2, allow_nan=False))
 
 
 if __name__ == '__main__':

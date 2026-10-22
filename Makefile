@@ -11,7 +11,7 @@ SEMANTIC_PYTHON ?= $(QUALITY_PYTHON)
 	rust-test api-test web-build e2e health stop clean models quality quality-face quality-body quality-clothing quality-semantic quality-semantic-local lint
 
 .PHONY: background-setup background-models background background-test client-models quality-skin quality-film body-setup body-models rust-photo-test
-.PHONY: quality-jaw-curve
+.PHONY: quality-jaw-curve quality-jaw-bilateral
 
 help:
 	@echo "make dev          启动 Go API 和 Vite Web 开发服务器"
@@ -25,6 +25,7 @@ help:
 	@echo "make quality-semantic 运行语义形变隔离测试，不构建 Web/Go，不读取本地照片"
 	@echo "make quality-semantic-local 另验本地照片输入合同；照片及数组缺失时跳过"
 	@echo "make quality-jaw-curve 只验下颌曲线与强度传递算法，无照片/系统构建"
+	@echo "make quality-jaw-bilateral 只验双侧下颌目标、导出与独立指标，无系统构建"
 	@echo "make background   启动可选 LaMa 本地去人模型 (8091)"
 	@echo "make background-models 安装可选模型环境并下载校验权重"
 	@echo "make client-models 下载校验浏览器去人 ONNX 模型"
@@ -91,6 +92,9 @@ quality-semantic-local:
 
 quality-jaw-curve:
 	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_curve_qp.py test_jaw_target_profile.py test_export_jaw_curve_profile.py test_jaw_collocation.py test_source_boundary_soft_targets.py test_boundary_curve_qp.py test_export_boundary_curve.py test_audit_interface_chord_field.py
+
+quality-jaw-bilateral:
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_jaw_bilateral.py test_jaw_curve_qp.py test_jaw_target_profile.py test_export_jaw_curve_profile.py test_audit_jaw_bilateral_field.py
 
 # Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
 quality-film: native

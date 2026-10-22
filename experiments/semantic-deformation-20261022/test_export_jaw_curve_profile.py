@@ -24,7 +24,7 @@ class ExportJawCurveTests(unittest.TestCase):
             output = root/'candidate'
             command = [sys.executable, str(Path(__file__).with_name('export_jaw_curve_profile.py')),
                        '--protocol', str(protocol), '--amount', '60', '--smoothing', '8',
-                       '--node-spacing', '5', '--window-radius', '8', '--output', str(output)]
+                       '--node-spacing', '5', '--window-radius', '8', '--bilateral-weight', '1', '--output', str(output)]
             completed = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(completed.returncode, 0, completed.stdout+completed.stderr)
             summary = json.loads(completed.stdout)
@@ -32,13 +32,18 @@ class ExportJawCurveTests(unittest.TestCase):
             self.assertEqual(summary['profile_sha256'], sha(output/'profile.json'))
             self.assertLess(abs(profile['verification']['closed_polygon_area_error_px2']), 1e-8)
             self.assertEqual(profile['verification']['adapter_max_target_error_px'], 0.)
-            for field in ['qp_source', 'qp_report', 'export_source']:
+            for field in ['qp_source', 'qp_report', 'export_source', 'bilateral_source']:
                 path = Path(profile[field+'_path'])
                 self.assertTrue(path.is_relative_to(output.resolve()))
                 self.assertEqual(profile[field+'_sha256'], sha(path))
             self.assertEqual(profile['source_protocol_sha256'], sha(profile['source_protocol']))
             self.assertEqual(profile['source_protocol_sha256'], sha(protocol))
             self.assertEqual(profile['parameters']['smoothing_length_px'], 8.)
+            self.assertEqual(profile['parameters']['bilateral_weight'], 1.)
+            self.assertEqual(profile['report']['bilateral_coupling']['weight'], 1.)
+            manifest = json.loads(Path(profile['executed_code_manifest']).read_text())
+            helper = next(row for row in manifest if Path(row['snapshot']).name == 'jaw_bilateral.py')
+            self.assertEqual(helper['sha256'], sha(profile['bilateral_source_path']))
             again = subprocess.run(command, capture_output=True, text=True)
             self.assertNotEqual(again.returncode, 0)
             self.assertIn('refusing to overwrite', again.stderr)
