@@ -80,7 +80,7 @@ quality-skin:
 # Install experiments/semantic-deformation-20261022/requirements.txt into the
 # chosen SEMANTIC_PYTHON environment. No Web/Go/native-image build is needed.
 quality-semantic:
-	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_reduced_field.py test_reduced_constrained.py test_focused_correction.py test_prepare_hair_inputs.py test_resampling.py test_regional_input.py test_source_regions.py test_jaw_input.py
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_reduced_field.py test_reduced_constrained.py test_focused_correction.py test_prepare_hair_inputs.py test_resampling.py test_regional_input.py test_source_regions.py test_jaw_input.py test_portable_field.py test_portable_jaw.py test_portable_result_gate.py test_resolution_field.py test_jaw_collocation.py test_source_boundary_support.py
 	cargo test --offline --manifest-path experiments/semantic-deformation-20261022/rust-controls/Cargo.toml
 
 # This optional target reads ignored source arrays and photo bytes (hash only).

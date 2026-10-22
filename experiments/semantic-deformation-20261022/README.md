@@ -122,5 +122,70 @@ standalone implementation in `core/image-core/src/face_photo_transport.rs`.
 A clean checkout needs local photo evidence and a renderer before replaying
 photos. The unit-test target needs neither.
 
+## Portable source-field experiment
+
+`portable_field.py` constructs a new source problem directly from image size,
+source/target points, fixed source pixels, a 2px ROI and optional background
+lines. It reuses the reduced solver, physical bending/membrane energies and
+continuous inverse evaluation. It does not need historical native traces or
+silently reuse another photograph's roles. Full fixed sampling neighborhoods
+and a zero boundary collar are built into the field; output pixels are not
+patched afterward. Fixed-domain, duplicate-target and hard-line conflicts are
+explicit errors. This initial interface does not provide moving rigid materials.
+
+`portable_jaw.py` uses the cached detector contour in its original row order
+(133 points in the new bearded portrait). Canonical landmarks locate the edit's
+mouth plane and chin projection; they do not replace the detector contour.
+The beard contour is a geometric proxy, not a verified physical alpha boundary.
+The first source-role rule protects the upper face, nose/lips, declared ear and
+accessory coverage, and pixels beyond a bounded jaw neighborhood. Neck and
+nearby background inside that neighborhood can deform continuously. Source
+review remains explicit; this is not an automatic visibility detector.
+
+`run_portable_jaw.py --evidence <cached-detector.json> --proof <source-proof.json>
+--review <source-review.json> --binary <jaw-arc-targets> --output <new-directory>`
+runs zero and both signed edits with source, final f32, pixel and target-response
+checks. The independent numerical gate rejects missing/incorrect motion even
+if fixed pixels stayed unchanged. Each active target (>0.5px) must reach
+90–110% of its projected request and all target errors must be at most 0.25px;
+these execution bounds do not supply a beauty score. Loaded local algorithm
+sources are snapshotted with each new result.
+
+`compare_portable_sampling.py --case <passing-case> --output <new-directory>`
+reproduces bilinear pixels exactly before comparing bounded Lanczos3 on the
+same f32 inverse. Geometry is not recomputed. It checks all fixed bytes and
+alpha separately; the wider kernel still has the limitations described above.
+See `doc/func/FUNC-029-portable-jaw-field.md` for actual photo evidence and limits.
+
+`resolution_field.py` transfers a frozen inverse map between aligned isotropic
+image sizes using pixel-center coordinates; it samples the original native image,
+never an enlarged low-resolution edit. Native pixel nodes agree with the reference
+map up to float32 rounding; native-cell reconstruction still needs inspection.
+`run_resolution_jaw.py --reference-case <case> --native-case <case> --output <new>`
+checks the same original image and contour request, final geometry, target execution,
+exact fixed native displacement and fixed image bytes. The independent native
+solve remains a comparison, not the output geometry.
+
+The first transfer was rejected because independently rasterized protection masks
+disagreed. `prepare_shared_protection.py --reference <run> --native <run> --output
+<new>` conservatively unions both masks in reference coordinates. Pass the resulting
+`protocol.json` as `run_portable_jaw.py --additional-protection` **before** solving a
+new reference field. This keeps all original protection, including full interpolation
+supports; no output pixel patch or displacement mask hides the conflict.
+
+`jaw_collocation.py` evaluates the original jaw intent continuously along the
+unchanged detector polyline. `--collocation-spacing 2` uses source arc-length
+quadrature, with total target weight proportional to length instead of detector
+point count. The runner checks separate midpoint probes at <=0.5px pitch even
+without collocation: the old sparse user +100 now fails this check despite passing
+at the original landmarks. This is a new target energy, not old-weight equivalence.
+`--field-stride 1` retains all original grid variables; this resolved small-motion
+response errors exposed by native-resolution checks in the man sample.
+
+`source_boundary_support.py` constructs an explicit source-reviewed boundary band
+before solving. The user-neck experiment preserved the selected pixels but introduced
+a visible shoulder at the upper transition, and -100 failed final geometry. It is
+retained as a rejected experiment, not an approved neck-preservation algorithm.
+
 See `rust-controls/README.md` for target behavior and
 `doc/func/FUNC-028-semantic-deformation-20261022.md` for acceptance limits.
