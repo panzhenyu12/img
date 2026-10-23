@@ -67,9 +67,14 @@ def validate_review_boundaries(geometry,review):
 def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.),
         additional_protection=None, collocation_spacing=None, field_stride=4,
         target_profile=None, soft_source_boundary=None,
-        soft_boundary_density=.05, soft_boundary_fade=16., boundary_motion=None):
+        soft_boundary_density=.05, soft_boundary_fade=16., boundary_motion=None,
+        curve_correspondence='source-arclength'):
     started=time.perf_counter()
     if output.exists(): raise FileExistsError('refusing to overwrite portable jaw results')
+    if curve_correspondence not in ['source-arclength','uniform-target-arclength']:
+        raise ValueError('explicit source or uniform target arclength correspondence required')
+    if curve_correspondence!='source-arclength' and (target_profile is None or boundary_motion is not None or soft_source_boundary is not None):
+        raise ValueError('sliding diagnostic requires a frozen jaw profile and a free outer interface')
     proof,review=read(proof_path),read(review_path)
     source_path=Path(proof['source_image']); source=Image.open(source_path).convert('RGBA')
     size=source.size; rgba=np.asarray(source)
@@ -104,6 +109,9 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         if len(amounts)!=1 or collocation_spacing is None:
             raise ValueError('one signed amount and continuous collocation required for a frozen profile')
         profile=load_profile(target_profile,geometry,amounts[0])
+        if curve_correspondence=='uniform-target-arclength':
+            from jaw_curve_correspondence import (apply_arclength_samples as apply_profile_samples,
+                arclength_contour_targets as profile_contour_targets)
         bound_inputs=read(Path(profile['source_protocol']))['inputs_sha256']
         if any(bound_inputs.get(str(path.resolve()))!=sha(path)
                for path in [source_path,evidence,proof_path,review_path]):
@@ -184,6 +192,12 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         'target_weight':4.,'bending_weight':.05,'membrane_weight':.001,
         'collocation_spacing':collocation_spacing,
         'target_controller':profile['controller'] if profile else 'jaw_arc_v1',
+        'curve_correspondence':curve_correspondence,
+        'correspondence_scope':('same frozen jaw target polyline set and endpoints; source material pairs by normalized target arclength; two-component displacement, outer interface remains free'
+            if curve_correspondence=='uniform-target-arclength' else 'original source-arclength pairing'),
+        'target_optimization_accepted':profile.get('accepted_target_constraints',profile.get('report',{}).get('accepted_numerically')) if profile else None,
+        'target_solver_status':profile.get('solver_status') if profile else None,
+        'diagnostic_only':bool(profile and profile.get('diagnostic_only')),
         'frozen_target_profile':str(target_profile) if profile else None,
         'profile_amount_already_baked':True if profile else None,
         'soft_source_boundary':soft['report'] if soft is not None else None,
@@ -213,7 +227,8 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
             request={'source_geometry':geometry,'amount':amount,
                      'frozen_profile':str(target_profile),'profile_sha256':sha(target_profile)}
             controller={'controller':profile['controller'],'amount_already_baked':True,
-                        'targets':target.tolist(),'aesthetic_approval':False}
+                        'targets':target.tolist(),'aesthetic_approval':False,
+                        'curve_correspondence':curve_correspondence}
         save(case/'request.json',request);save(case/'controller.json',controller)
         controls=None
         if collocation_spacing is not None:
@@ -311,7 +326,11 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         panel.save(output/(name+'.png'))
     if any(sha(p)!=digest for p,digest in hashes.items()):raise ValueError('frozen inputs changed during run')
     save(output/'report.json',{'cases':results,'source':str(source_path),'inputs_sha256':hashes,
-                             'aesthetic_approval':False,'elapsed_seconds':time.perf_counter()-started})
+                             'aesthetic_approval':False,'elapsed_seconds':time.perf_counter()-started,
+                             'curve_correspondence':curve_correspondence,
+                             'target_optimization_accepted':profile.get('accepted_target_constraints',profile.get('report',{}).get('accepted_numerically')) if profile else None,
+                             'target_solver_status':profile.get('solver_status') if profile else None,
+                             'diagnostic_only':bool(profile and profile.get('diagnostic_only'))})
 
 
 if __name__=='__main__':
@@ -326,6 +345,7 @@ if __name__=='__main__':
     p.add_argument('--soft-boundary-density',type=float,default=.05)
     p.add_argument('--soft-boundary-fade',type=float,default=16.)
     p.add_argument('--boundary-motion',type=Path)
+    p.add_argument('--curve-correspondence',choices=['source-arclength','uniform-target-arclength'],default='source-arclength')
     a=p.parse_args();run(a.evidence.resolve(),a.proof.resolve(),a.review.resolve(),a.binary.resolve(),a.output.resolve(),
                         additional_protection=a.additional_protection.resolve() if a.additional_protection else None,
                         collocation_spacing=a.collocation_spacing,field_stride=a.field_stride,
@@ -333,4 +353,5 @@ if __name__=='__main__':
                         target_profile=a.target_profile.resolve() if a.target_profile else None,
                         soft_source_boundary=a.soft_source_boundary.resolve() if a.soft_source_boundary else None,
                         soft_boundary_density=a.soft_boundary_density,soft_boundary_fade=a.soft_boundary_fade,
-                        boundary_motion=a.boundary_motion.resolve() if a.boundary_motion else None)
+                        boundary_motion=a.boundary_motion.resolve() if a.boundary_motion else None,
+                        curve_correspondence=a.curve_correspondence)
