@@ -66,6 +66,30 @@ class PortableResultGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'exactly two'):
                 validate_review_boundaries(geometry,{'mouth_crossings':incomplete,'chin152_projection':end})
 
+    def test_safe_but_unfinished_nonlinear_field_is_not_render_approved(self):
+        from run_portable_jaw import field_execution_status
+        self.assertEqual(field_execution_status(True, True, {'converged':False}),
+                         'rejected_nonlinear_convergence')
+        self.assertEqual(field_execution_status(True, False, {'converged':True}),
+                         'rejected_numerical_execution')
+        self.assertEqual(field_execution_status(True, True, {}),
+                         'requires_visual_review')
+
+    def test_scope_expansion_cannot_reuse_an_old_geometry_review(self):
+        from run_portable_jaw import validate_scope_review
+        from jaw_target_profile import _geometry_sha
+        from portable_jaw import jaw_geometry
+        from test_portable_jaw import fixture
+        old=jaw_geometry(*fixture());new=jaw_geometry(*fixture(),start_plane='upper-lip')
+        review={'schema':'reviewed-upper-lip-jaw-scope-v1','source_image_sha256':'source',
+            'source_geometry_sha256':_geometry_sha(new),'mode':'model_source_visual_review_only',
+            'visibility_status':'unknown','automatic_edit_authorized':False}
+        validate_scope_review(new,review,'source')
+        with self.assertRaisesRegex(ValueError,'source-only review'):
+            validate_scope_review(old,review,'source')
+        with self.assertRaisesRegex(ValueError,'source-only review'):
+            validate_scope_review(new,review,'other-image')
+
 
 if __name__ == '__main__':
     unittest.main()

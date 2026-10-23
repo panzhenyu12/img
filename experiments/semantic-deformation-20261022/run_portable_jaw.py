@@ -23,6 +23,35 @@ def read(path): return json.loads(Path(path).read_text())
 def save(path, value): Path(path).write_text(json.dumps(value, indent=2)+'\n')
 
 
+def field_solver(name):
+    """Explicit experimental energy; import before the execution snapshot."""
+    if name == 'membrane':
+        return solve_problem
+    if name == 'graph-arap':
+        from arap_field import solve_problem as solve_arap
+        return solve_arap
+    raise ValueError('unknown source field energy')
+
+
+def field_execution_status(contour_passed, dense_passed, solver_report):
+    """Finite safe fields from unfinished nonlinear solves are diagnostics."""
+    if solver_report.get('converged') is False:
+        return 'rejected_nonlinear_convergence'
+    return ('requires_visual_review' if contour_passed and dense_passed
+            else 'rejected_numerical_execution')
+
+
+def validate_scope_review(geometry, review, source_digest):
+    from jaw_target_profile import _geometry_sha
+    if (review.get('schema')!='reviewed-upper-lip-jaw-scope-v1'
+            or review.get('source_image_sha256')!=source_digest
+            or review.get('source_geometry_sha256')!=_geometry_sha(geometry)
+            or review.get('mode')!='model_source_visual_review_only'
+            or review.get('visibility_status')!='unknown'
+            or review.get('automatic_edit_authorized') is not False):
+        raise ValueError('expanded scope requires its own source-only review bound to the source image and new geometry')
+
+
 def snapshot_local_code(output):
     """Retain the loaded local Python implementation, not mutable paths alone."""
     root=Path(__file__).resolve().parents[2]
@@ -68,8 +97,19 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         additional_protection=None, collocation_spacing=None, field_stride=4,
         target_profile=None, soft_source_boundary=None,
         soft_boundary_density=.05, soft_boundary_fade=16., boundary_motion=None,
-        curve_correspondence='source-arclength'):
+        curve_correspondence='source-arclength', field_energy='membrane',
+        jaw_scope='mouth-center', scope_review=None):
     started=time.perf_counter()
+    solve_field=field_solver(field_energy)
+    if jaw_scope not in ['mouth-center','upper-lip']:
+        raise ValueError('explicit mouth-center or upper-lip scope required')
+    if jaw_scope=='upper-lip' and (scope_review is None or target_profile is None
+            or field_energy!='membrane' or curve_correspondence!='source-arclength'
+            or soft_source_boundary is not None or boundary_motion is not None
+            or additional_protection is not None):
+        raise ValueError('scope diagnostic requires its own source review, frozen profile and unchanged membrane executor')
+    if jaw_scope=='mouth-center' and scope_review is not None:
+        raise ValueError('scope review only belongs to an explicit expanded-scope experiment')
     if output.exists(): raise FileExistsError('refusing to overwrite portable jaw results')
     if curve_correspondence not in ['source-arclength','uniform-target-arclength']:
         raise ValueError('explicit source or uniform target arclength correspondence required')
@@ -103,6 +143,7 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
     lips=pixels(params['semanticMasks']['lips']['points'],size)
     geometry=jaw_geometry(contour,oval,eyes,lips)
     validate_review_boundaries(geometry,review)
+    original_geometry=geometry
     profile=None
     if target_profile is not None:
         from jaw_target_profile import load_profile, apply_profile_samples, profile_contour_targets
@@ -121,6 +162,13 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
             path=profile.get(key+'_path',profile.get(key))
             if path:
                 hashes[str(Path(path).resolve())]=profile[key+'_sha256']
+    if jaw_scope=='upper-lip':
+        from jaw_scope_transport import extend_profile_scope
+        geometry=jaw_geometry(contour,oval,eyes,lips,start_plane='upper-lip')
+        scope_record=read(scope_review)
+        validate_scope_review(geometry,scope_record,sha(source_path))
+        hashes[str(scope_review.resolve())]=sha(scope_review)
+        profile=extend_profile_scope(profile,original_geometry,geometry)
     soft=None
     if soft_source_boundary is not None and boundary_motion is not None:
         raise ValueError('compare boundary controllers separately before combining objectives')
@@ -163,7 +211,7 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
                 or np.any(soft['weights']<=0.)):
             raise ValueError('finite boundary source/target/positive weights with matching rows required')
         soft['report']=boundary['report']
-    fixed,crop,roles,radius=fixed_support(size,params,geometry)
+    fixed,crop,roles,radius=fixed_support(size,params,geometry,support_geometry=original_geometry)
     refinement=None
     if additional_protection is not None:
         refinement=read(additional_protection)
@@ -186,6 +234,11 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         hashes[str(mask_path.resolve())]=sha(mask_path)
     yy,xx=np.where(fixed);fixed_points=np.column_stack([xx,yy])
     output.mkdir(parents=True)
+    effective_profile_path=None
+    if jaw_scope!='mouth-center':
+        effective_profile_path=output/'effective-target-profile.json'
+        save(effective_profile_path,profile)
+        hashes[str(effective_profile_path.resolve())]=sha(effective_profile_path)
     code_manifest,code_hashes=snapshot_local_code(output);hashes.update(code_hashes)
     save(output/'protocol.json',{'inputs_sha256':hashes,'source_geometry':geometry,'crop':crop,
         'amounts':list(amounts),'max_radius_fraction':.13,'support_radius_px':radius,
@@ -193,6 +246,11 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         'collocation_spacing':collocation_spacing,
         'target_controller':profile['controller'] if profile else 'jaw_arc_v1',
         'curve_correspondence':curve_correspondence,
+        'jaw_scope':jaw_scope,
+        'scope_review':str(scope_review) if scope_review is not None else None,
+        'effective_target_profile':str(effective_profile_path) if effective_profile_path else None,
+        'scope_transport':profile.get('transport_report') if profile else None,
+        'original_support_geometry':original_geometry if jaw_scope!='mouth-center' else None,
         'correspondence_scope':('same frozen jaw target polyline set and endpoints; source material pairs by normalized target arclength; two-component displacement, outer interface remains free'
             if curve_correspondence=='uniform-target-arclength' else 'original source-arclength pairing'),
         'target_optimization_accepted':profile.get('accepted_target_constraints',profile.get('report',{}).get('accepted_numerically')) if profile else None,
@@ -204,8 +262,10 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         'soft_source_boundary_evidence':str(soft_source_boundary) if soft_source_boundary is not None else None,
         'boundary_motion_evidence':str(boundary_motion) if boundary_motion is not None else None,
         'field_reduction_stride':field_stride,
+        'field_energy':field_energy,
         'continuous_arc_probe_spacing_px':.5,
-        'problem':'new portable source quadratic; not the historical whole-face objective',
+        'problem':('portable graph SO(2) ARAP local/global diagnostic' if field_energy=='graph-arap'
+                   else 'new portable source quadratic; not the historical whole-face objective'),
         'rendering':'bilinear, no fixed-mask pixel replacement, no solved-field taper',
         'execution_code_snapshot':str(code_manifest),
         'additional_protection':refinement,
@@ -226,6 +286,9 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
             target=profile_contour_targets(geometry,profile)
             request={'source_geometry':geometry,'amount':amount,
                      'frozen_profile':str(target_profile),'profile_sha256':sha(target_profile)}
+            if effective_profile_path:
+                request.update(effective_profile=str(effective_profile_path),
+                               effective_profile_sha256=sha(effective_profile_path))
             controller={'controller':profile['controller'],'amount_already_baked':True,
                         'targets':target.tolist(),'aesthetic_approval':False,
                         'curve_correspondence':curve_correspondence}
@@ -245,7 +308,7 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
             target_weights=fit_weights,stride=field_stride)
         if controls is not None:
             save(case/'collocation.json',controls['report'])
-        result=solve_problem(problem)
+        result=solve_field(problem)
         np.save(case/'source-forward.npy',result['source_displacement'])
         decision={'amount':amount,'problem':problem['diagnostics'],'solver':result['report'],
             'source_geometry':result['geometry'],'target_max_error_source_px':result['target_max_error_px'],
@@ -301,7 +364,9 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
                 fixed_changed_pixels=fixed_changed,whole_image_changed_pixels=total_changed)
             decision['boundary_motion_execution_gate']=boundary_gate
             passed=passed and boundary_gate['passed']
-        decision.update(status='requires_visual_review' if passed else 'rejected_numerical_execution',
+        status=field_execution_status(passed,dense_execution['passed'],result['report'])
+        passed=passed and status=='requires_visual_review'
+        decision.update(status=status,
             fixed_pixels=int(fixed.sum()),fixed_changed_pixels=fixed_changed,
             role_changed_pixels=role_changes,whole_image_changed_pixels=total_changed,
             zero_image_exact=bool(not changed.any()) if amount==0 else None,
@@ -346,6 +411,9 @@ if __name__=='__main__':
     p.add_argument('--soft-boundary-fade',type=float,default=16.)
     p.add_argument('--boundary-motion',type=Path)
     p.add_argument('--curve-correspondence',choices=['source-arclength','uniform-target-arclength'],default='source-arclength')
+    p.add_argument('--field-energy',choices=['membrane','graph-arap'],default='membrane')
+    p.add_argument('--jaw-scope',choices=['mouth-center','upper-lip'],default='mouth-center')
+    p.add_argument('--scope-review',type=Path)
     a=p.parse_args();run(a.evidence.resolve(),a.proof.resolve(),a.review.resolve(),a.binary.resolve(),a.output.resolve(),
                         additional_protection=a.additional_protection.resolve() if a.additional_protection else None,
                         collocation_spacing=a.collocation_spacing,field_stride=a.field_stride,
@@ -354,4 +422,5 @@ if __name__=='__main__':
                         soft_source_boundary=a.soft_source_boundary.resolve() if a.soft_source_boundary else None,
                         soft_boundary_density=a.soft_boundary_density,soft_boundary_fade=a.soft_boundary_fade,
                         boundary_motion=a.boundary_motion.resolve() if a.boundary_motion else None,
-                        curve_correspondence=a.curve_correspondence)
+                        curve_correspondence=a.curve_correspondence,field_energy=a.field_energy,
+                        jaw_scope=a.jaw_scope,scope_review=a.scope_review.resolve() if a.scope_review else None)

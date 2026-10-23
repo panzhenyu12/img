@@ -13,6 +13,37 @@ def fixture():
 
 
 class PortableJawTests(unittest.TestCase):
+    def test_upper_lip_scope_expands_only_the_source_arc_start(self):
+        args=fixture();old=jaw_geometry(*args)
+        new=jaw_geometry(*args,start_plane='upper-lip')
+        self.assertEqual(new['start_height'],48.)
+        self.assertEqual(new['mouth_height'],old['mouth_height'])
+        self.assertEqual(new['contour'],old['contour'])
+        self.assertEqual(new['frame'],old['frame'])
+        self.assertTrue(set(old['selected_rows']).issubset(new['selected_rows']))
+        for a,b in zip(old['arcs'],new['arcs']):
+            self.assertEqual(a['end'],b['end'])
+            self.assertNotEqual(a['start'],b['start'])
+        self.assertFalse(new['automatic_edit_authorized'])
+
+    def test_scope_release_keeps_original_neighborhood_and_feature_protection(self):
+        args=fixture();old=jaw_geometry(*args)
+        new=jaw_geometry(*args,start_plane='upper-lip')
+        normalized=lambda p:[{'x':(x+.5)/201,'y':(y+.5)/201} for x,y in p]
+        zero={'shape':'raster','width':1,'height':1,'data':[0]}
+        params={'semanticMasks':{'nose':{'points':normalized(args[3]-[0,18])},
+            'lips':{'points':normalized(args[3])},'ears':zero,'accessories':zero}}
+        old_fixed,old_crop,old_roles,_=fixed_support((201,201),params,old)
+        new_fixed,new_crop,new_roles,_=fixed_support((201,201),params,new,support_geometry=old)
+        self.assertEqual(old_crop,new_crop)
+        self.assertTrue(np.any(old_fixed & ~new_fixed))
+        self.assertFalse(np.any(new_fixed & ~old_fixed))
+        for name in ['outside_geometric_neighborhood','nose','lips','ears','accessories']:
+            np.testing.assert_array_equal(new_roles[name],old_roles[name])
+            self.assertTrue(np.all(new_fixed[new_roles[name]]))
+        released_y=np.where(old_fixed & ~new_fixed)[0]
+        self.assertTrue(np.all((released_y>=124)&(released_y<126)))
+
     def test_visible_contour_is_not_replaced_by_the_inner_anatomical_oval(self):
         p, oval, eyes, lips = fixture(); before = p.copy()
         g = jaw_geometry(p, oval, eyes, lips)

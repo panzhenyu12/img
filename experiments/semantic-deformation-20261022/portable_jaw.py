@@ -25,7 +25,9 @@ def pixels(rows, size):
     return p
 
 
-def jaw_geometry(contour, oval, eyes, lips):
+def jaw_geometry(contour, oval, eyes, lips, *, start_plane='mouth-center'):
+    if start_plane not in ['mouth-center','upper-lip']:
+        raise ValueError('explicit mouth-center or upper-lip source start plane required')
     p = simple_path(contour, 'source detector contour')
     oval = simple_path(oval, 'source canonical oval')
     if len(oval) != len(FACE_OVAL):
@@ -44,18 +46,19 @@ def jaw_geometry(contour, oval, eyes, lips):
     frame = {'origin': origin.tolist(), 'across': across.tolist(), 'down': down.tolist(),
              'bounds': np.r_[uv.min(0), uv.max(0)].tolist(), 'midline_u': 0.}
     q = local(p, frame); mouth_height = float(local(lips, frame)[:, 1].mean())
+    start_height = mouth_height if start_plane=='mouth-center' else float(local(lips,frame)[:,1].min())
     nxt = np.roll(q, -1, axis=0); edge = np.roll(p, -1, axis=0)-p
     lengths = np.linalg.norm(edge, axis=1); cumulative = np.r_[0., lengths.cumsum()]
     total = cumulative[-1]
-    if np.any((abs(q[:, 1]-mouth_height)<1e-9)&(abs(nxt[:, 1]-mouth_height)<1e-9)):
+    if np.any((abs(q[:, 1]-start_height)<1e-9)&(abs(nxt[:, 1]-start_height)<1e-9)):
         raise ValueError('source segment coincides with mouth plane')
-    crossing = np.flatnonzero(((q[:, 1]<=mouth_height)&(nxt[:, 1]>mouth_height))|
-                             ((nxt[:, 1]<=mouth_height)&(q[:, 1]>mouth_height)))
+    crossing = np.flatnonzero(((q[:, 1]<=start_height)&(nxt[:, 1]>start_height))|
+                             ((nxt[:, 1]<=start_height)&(q[:, 1]>start_height)))
     if len(crossing) != 2:
         raise ValueError('exactly two unambiguous source mouth crossings required')
     boundaries = []
     for i in crossing:
-        t = float((mouth_height-q[i, 1])/(nxt[i, 1]-q[i, 1]))
+        t = float((start_height-q[i, 1])/(nxt[i, 1]-q[i, 1]))
         boundaries.append({'edge': int(i), 't': t})
     at = lambda b: p[b['edge']]+b['t']*edge[b['edge']]
     s = lambda b: float((cumulative[b['edge']]+b['t']*lengths[b['edge']])%total)
@@ -76,7 +79,7 @@ def jaw_geometry(contour, oval, eyes, lips):
             length = (direction*(s(end)-s(start)))%total
             d = (direction*(cumulative[:-1]-s(start)))%total
             inside = (d > 0)&(d < length)
-            if length > 0 and inside.any() and np.all(q[inside, 1] >= mouth_height-1e-8):
+            if length > 0 and inside.any() and np.all(q[inside, 1] >= start_height-1e-8):
                 candidates.append((direction, inside))
         if len(candidates) != 1:
             raise ValueError('one lower source path to chin is required per side')
@@ -85,26 +88,31 @@ def jaw_geometry(contour, oval, eyes, lips):
             raise ValueError('left and right lower source paths overlap')
         selected |= inside
         arcs.append({'id': side+'-jaw', 'start': start, 'end': end, 'direction': direction})
-    return {'frame': frame, 'arcs': arcs, 'contour': p.tolist(),
+    scope = ({'start_plane':start_plane,'start_height':start_height,
+              'operation_scope':'diagnostic_lower_face_from_upper_lip'} if start_plane!='mouth-center' else {})
+    return {**scope, 'frame': frame, 'arcs': arcs, 'contour': p.tolist(),
             'selected_rows': np.flatnonzero(selected).tolist(), 'mouth_height': mouth_height,
             'chin_projection_distance_px': float(distance[i]),
             'source_definition': 'unchanged cached detector contour, normalized image coordinates converted once to pixel indices',
             'visibility_status': 'unknown', 'automatic_edit_authorized': False}
 
 
-def fixed_support(size, params, geometry, support_radius_fraction=.24):
+def fixed_support(size, params, geometry, support_radius_fraction=.24, *, support_geometry=None):
     """Select a geometric neighborhood, then exactly constrain protected pixels.
 
     This mask constrains source nodes. It is never multiplied into a solved field
     or used to replace output pixels. Background inside the neighborhood is free.
     """
+    support_geometry = geometry if support_geometry is None else support_geometry
+    if (support_geometry['contour']!=geometry['contour'] or support_geometry['frame']!=geometry['frame']):
+        raise ValueError('support geometry must use the exact same original contour and frame')
     w, h = size; p = np.asarray(geometry['contour']); frame = geometry['frame']
     if not np.isfinite(support_radius_fraction) or support_radius_fraction <= 0:
         raise ValueError('positive finite source support radius required')
-    selected = geometry['selected_rows']; uv = local(p, frame)
+    selected = support_geometry['selected_rows']; uv = local(p, frame)
     radius = support_radius_fraction*float(np.ptp(uv[:, 0]))
     band = Image.new('L', size); draw = ImageDraw.Draw(band)
-    for arc in geometry['arcs']:
+    for arc in support_geometry['arcs']:
         a, b = arc['start'], arc['end']
         at = lambda x: p[x['edge']]+x['t']*(p[(x['edge']+1)%len(p)]-p[x['edge']])
         # The path order follows the original source; no shortcut across chin.
@@ -120,7 +128,7 @@ def fixed_support(size, params, geometry, support_radius_fraction=.24):
     yy, xx = np.mgrid[:h, :w]
     v = (xx-frame['origin'][0])*frame['down'][0]+(yy-frame['origin'][1])*frame['down'][1]
     # The endpoint gain vanishes cubically; preserve the source upper face.
-    upper = v < geometry['mouth_height']-4.
+    upper = v < geometry.get('start_height',geometry['mouth_height'])-4.
     protect = upper.copy(); roles = {'upper_face': upper}
     for key in ['nose', 'lips']:
         mask = Image.new('L', size)
