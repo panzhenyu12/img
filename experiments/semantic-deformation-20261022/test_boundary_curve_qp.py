@@ -10,6 +10,46 @@ FRAME = {'across': [1., 0.], 'down': [0., 1.]}
 
 
 class BoundaryCurveTests(unittest.TestCase):
+    def test_transport_only_fairing_does_not_add_a_neck_return_to_zero(self):
+        y=np.arange(0.,121.,2.)
+        source=np.column_stack([.002*y*y,y]);unchanged=source.copy()
+        preferred=2.+4.*np.sin(np.pi*y/120.)**2;original_preferred=preferred.copy()
+        options=dict(preserve_through_down=30.,neck_start_down=60.,neck_end_down=112.,
+                     smoothing_length_px=16.,node_spacing_px=8.,spacing_px=.2)
+        return_to_zero=solve_boundary_curve(source,preferred,FRAME,
+            controller='gradient_bounded_motion_fairing',neck_weight=4.,**options)
+        transport=solve_boundary_curve(source,preferred,FRAME,
+            controller='transport_only_motion_fairing',neck_weight=0.,**options)
+        for result in [return_to_zero,transport]:
+            self.assertTrue(result['report']['accepted_numerically'],result['report'])
+        low=(transport['source'][:,1]>=65.)&(transport['source'][:,1]<=100.)
+        recovery_u=(return_to_zero['target']-return_to_zero['source'])[:,0]
+        transport_u=(transport['target']-transport['source'])[:,0]
+        self.assertGreater(np.mean(transport_u[low]-recovery_u[low]),.1)
+        np.testing.assert_array_equal(source,unchanged)
+        np.testing.assert_array_equal(preferred,original_preferred)
+        knots=np.r_[0.,np.linalg.norm(np.diff(source,axis=0),axis=1).cumsum()]
+        ids=np.searchsorted(transport['arclength_px'],knots)
+        np.testing.assert_array_equal(transport['source'][ids],source)
+        reference=PchipInterpolator(knots,preferred)
+        held=(transport['source'][:,1]<=30.)|(transport['arclength_px']>=knots[-1]-8.)
+        np.testing.assert_allclose(transport_u[held],reference(transport['arclength_px'][held]),rtol=0.,atol=1e-12)
+        np.testing.assert_array_equal((transport['target']-transport['source'])[:,1],np.zeros(len(transport_u)))
+        self.assertFalse(transport['report']['neck_zero_preference_used'])
+        self.assertFalse(transport['report']['source_turn_signs_are_hard_constraints'])
+        self.assertFalse(transport['report']['aesthetic_approval'])
+
+    def test_zero_neck_weight_requires_explicit_transport_only_controller(self):
+        y=np.arange(0.,121.,2.);source=np.column_stack([np.zeros_like(y),y])
+        preferred=2.+np.sin(np.pi*y/120.)**2
+        options=dict(preserve_through_down=30.,neck_start_down=60.,neck_end_down=112.)
+        for controller,weight in [('source_turn_preserving',0.),
+                                  ('gradient_bounded_motion_fairing',0.),
+                                  ('transport_only_motion_fairing',4.),
+                                  ('transport_only_motion_fairing',-1.)]:
+            with self.subTest(controller=controller,weight=weight),self.assertRaises(ValueError):
+                solve_boundary_curve(source,preferred,FRAME,controller=controller,neck_weight=weight,**options)
+
     def test_local_chord_custom_limit_is_sign_and_rigid_frame_invariant(self):
         y=np.arange(0.,121.,2.)
         source=np.column_stack([8*np.sin((y-30.)/35.),y])

@@ -11,7 +11,7 @@ SEMANTIC_PYTHON ?= $(QUALITY_PYTHON)
 	rust-test api-test web-build e2e health stop clean models quality quality-face quality-body quality-clothing quality-semantic quality-semantic-local lint
 
 .PHONY: background-setup background-models background background-test client-models quality-skin quality-film body-setup body-models rust-photo-test
-.PHONY: quality-jaw-curve quality-jaw-bilateral quality-jaw-retained quality-jaw-joint
+.PHONY: quality-jaw-curve quality-jaw-bilateral quality-jaw-retained quality-jaw-joint quality-jaw-target
 
 help:
 	@echo "make dev          启动 Go API 和 Vite Web 开发服务器"
@@ -26,6 +26,7 @@ help:
 	@echo "make quality-semantic-local 另验本地照片输入合同；照片及数组缺失时跳过"
 	@echo "make quality-jaw-curve 只验下颌曲线与强度传递算法，无照片/系统构建"
 	@echo "make quality-jaw-bilateral 只验双侧下颌目标、导出与独立指标，无系统构建"
+	@echo "make quality-jaw-target 只验下颌目标、起始预算与源图绑定，无照片/系统构建"
 	@echo "make background   启动可选 LaMa 本地去人模型 (8091)"
 	@echo "make background-models 安装可选模型环境并下载校验权重"
 	@echo "make client-models 下载校验浏览器去人 ONNX 模型"
@@ -101,6 +102,9 @@ quality-jaw-retained:
 
 quality-jaw-joint:
 	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_joint_jaw_boundary_field.py test_rank_one_inverse_contract.py test_interval_polynomial_cones.py test_inverse_field_linearization.py test_joint_inverse_feedback.py test_interface_bend_oracle.py test_joint_diagnostic_render.py test_jaw_start_oracle.py test_measure_jaw_preference_start.py test_jaw_prefix_intent.py test_joint_source_constraints.py test_joint_inverse_feedback_loop.py test_curve_grid_continuity.py test_curve_curvature_variance.py test_all_source_skew_constraints.py test_source_interval_exchange.py test_localize_chord_uncertainty.py
+
+quality-jaw-target:
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_source_affine_bending_reference.py test_jaw_prefix_budget_1d.py test_probe_source_affine_binding.py test_low_rank_energy_projection.py
 
 # Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
 quality-film: native

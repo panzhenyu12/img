@@ -104,7 +104,8 @@ def run(interface_path, baseline_case, profile_path, output, *,
             'preferred_forward_closure':closure,
             'preferred_discarded_down_max_px':float(abs(preferred_down).max()),
             'preserve_through_source_y':preserve_through_y,
-            'low_boundary_preference_review':str(neck_path)})
+            'low_boundary_preference_review':None if controller=='transport_only_motion_fairing' else str(neck_path),
+            'legacy_low_boundary_identity_review':str(neck_path)})
         cases.append(result['report'])
         np.savez_compressed(output/(segment['id']+'-source-preferred.npz'),
             source=source,preferred_across=preferred,preferred_down=preferred_down)
@@ -126,6 +127,13 @@ def run(interface_path, baseline_case, profile_path, output, *,
         'source_image_sha256':interface['source_image_sha256'],
         'source_size':interface['source_size'],'amount':decision['amount'],
         'jaw_profile_sha256':sha(profile_path),'inputs_sha256':hashes,'report':report}
+    if profile.get('diagnostic_only'):
+        # Boundary-target convergence cannot promote a separately supplied,
+        # rejected jaw optimization request or grant photographic approval.
+        report.update(jaw_target_solver_status=profile.get('solver_status'),
+            jaw_target_optimization_accepted=profile.get('accepted_target_constraints') is True,
+            diagnostic_only=True,image_approval=False,executable=False)
+        artifact.update(diagnostic_only=True,image_approval=False,executable=False)
     if report['accepted_numerically']:
         artifact.update({'source':np.vstack(sources).tolist(),'target':np.vstack(targets).tolist(),
                          'weights':np.concatenate(weights).tolist()})
@@ -150,7 +158,8 @@ if __name__=='__main__':
         help='pointwise correction chord-slope difference limit; not a true angle bound')
     p.add_argument('--preferred-audit',type=Path,required=True)
     p.add_argument('--controller',choices=['source_turn_preserving','gradient_bounded_motion_fairing',
-        'chord_bounded_motion_fairing','local_chord_motion_fairing'],default='source_turn_preserving')
+        'chord_bounded_motion_fairing','local_chord_motion_fairing',
+        'transport_only_motion_fairing'],default='source_turn_preserving')
     a=p.parse_args()
     result=run(a.interface,a.baseline,a.profile,a.output,
         preserve_through_y=a.preserve_through_y,smoothing_length_px=a.smoothing_length,

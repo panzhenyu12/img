@@ -68,8 +68,10 @@ def solve_boundary_curve(source, preferred_across, frame, *,
 
     Down coordinates never change. The upper preserved interval must be chosen
     from the edit's actual moving source region, not merely a stationary end.
-    Lower known-neck preference is soft; both end neighborhoods retain the
-    frozen preferred displacement. Source finite-chord signs are geometric
+    Lower known-neck preference is soft in the existing controllers. Explicit
+    transport-only fairing has no neck-to-zero preference and requires zero
+    neck weight; both end neighborhoods retain the frozen preferred displacement.
+    Source finite-chord signs are geometric
     proxies; unknown anatomy is not inferred or relabelled.
 
     Curve-sign and displacement-bound constraints are linear at each location.
@@ -90,14 +92,18 @@ def solve_boundary_curve(source, preferred_across, frame, *,
     options = [preserve_through_down, neck_start_down, neck_end_down,
         preserve_suffix_px, node_spacing_px, smoothing_length_px, neck_weight,
         neck_ramp_px, window_radius_px, spacing_px, target_density, source_sign_threshold]
-    if not np.isfinite(options).all() or min(options[3:]) <= 0.:
+    if not np.isfinite(options).all() or min(options[3:6]+options[7:]) <= 0.:
         raise ValueError('finite heights and strictly positive solver scales required')
     uv = p@np.array([across, down]).T
     if upper_preservation not in ['pointwise','integral_and_anchor']:
         raise ValueError('explicit pointwise or integral_and_anchor upper preservation required')
     if controller not in ['source_turn_preserving','gradient_bounded_motion_fairing',
-                          'chord_bounded_motion_fairing','local_chord_motion_fairing']:
+                          'chord_bounded_motion_fairing','local_chord_motion_fairing',
+                          'transport_only_motion_fairing']:
         raise ValueError('explicit isolated curve controller required')
+    transport_only=controller=='transport_only_motion_fairing'
+    if (transport_only and neck_weight!=0.) or (not transport_only and neck_weight<=0.):
+        raise ValueError('transport-only requires zero neck weight; existing controllers require positive neck weight')
     motion_fairing=controller!='source_turn_preserving'
     local_chord_bounded=controller=='local_chord_motion_fairing'
     chord_bounded=controller in ['chord_bounded_motion_fairing','local_chord_motion_fairing']
@@ -167,7 +173,8 @@ def solve_boundary_curve(source, preferred_across, frame, *,
     b, d2 = basis(q), basis(q, 2)
     pref, pref2 = preferred_spline(q), preferred_spline(q, 2)
     qdown = source_at(q)@down
-    neck = _smoothstep((qdown-neck_start_down)/neck_ramp_px)*(qdown <= neck_end_down)
+    neck = (np.zeros_like(q) if transport_only else
+            _smoothstep((qdown-neck_start_down)/neck_ramp_px)*(qdown <= neck_end_down))
     hessian = b.T@((w*(1+neck_weight*neck))[:, None]*b)
     hessian += smoothing_length_px**4*d2.T@(w[:, None]*d2)
     linear = b.T@(w*neck_weight*neck*pref)+smoothing_length_px**4*d2.T@(w*pref2)
@@ -322,11 +329,14 @@ def solve_boundary_curve(source, preferred_across, frame, *,
         'upper_preferred_integral_px2':upper_integral,
         'upper_preferred_anchor_px':float(preferred_spline(upper_end)),
         'preserved_lower_arclength_interval_px': [active_end, length],
-        'known_neck_down_interval': [float(neck_start_down), float(neck_end_down)],
+        'known_neck_down_interval': None if transport_only else [float(neck_start_down), float(neck_end_down)],
         'known_source_turn_subintervals':len(known), 'window_radius_px':r,
         'source_sign_threshold_px2':source_sign_threshold,
         'source_contour_unmodified':True, 'down_displacement_exact_zero':True,
         'neck_is_hard_fixed':False, 'edit_attenuation_allowed':False,
+        'neck_zero_preference_used':not transport_only,
+        'motion_objective':('integral (u-preferred)^2 + ell^4*(d2u/ds2)^2; no neck zero term'
+                            if transport_only else 'preferred deviation, motion bending and soft neck-to-zero preference'),
         'smoothing_length_px':smoothing_length_px, 'neck_weight':neck_weight,
         'node_spacing_px':node_spacing_px, 'target_density':target_density,
         'refinement':[]}
