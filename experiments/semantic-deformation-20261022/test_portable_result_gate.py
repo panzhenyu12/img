@@ -90,6 +90,17 @@ class PortableResultGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'source-only review'):
             validate_scope_review(new,review,'other-image')
 
+    def test_curve_shape_prior_requires_the_reviewed_original_image(self):
+        from run_portable_jaw import validate_field_interface
+        review={'schema':'reviewed-visible-source-interface-v1',
+            'source_image_sha256':'original','source_size':[101,201],
+            'mode':'model_source_visual_review_only','visibility_status':'unknown',
+            'automatic_edit_authorized':False}
+        validate_field_interface(review,'original',(101,201))
+        for digest,size in [('edited',(101,201)),('original',(201,101))]:
+            with self.assertRaisesRegex(ValueError,'source-reviewed visible'):
+                validate_field_interface(review,digest,size)
+
 
 if __name__ == '__main__':
     unittest.main()

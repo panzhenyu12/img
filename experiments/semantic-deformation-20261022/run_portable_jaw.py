@@ -1,5 +1,6 @@
 """Run a reviewed new-photo jaw experiment without old native trace inputs."""
 import argparse
+from functools import partial
 import hashlib
 import json
 from pathlib import Path
@@ -23,13 +24,37 @@ def read(path): return json.loads(Path(path).read_text())
 def save(path, value): Path(path).write_text(json.dumps(value, indent=2)+'\n')
 
 
-def field_solver(name):
+def field_solver(name, interface=None, *, curve_half_windows=None, curve_density=None,
+                 curve_endpoint_reference='free'):
     """Explicit experimental energy; import before the execution snapshot."""
+    if name != 'curve-similarity' and (curve_half_windows is not None or curve_density is not None
+                                      or curve_endpoint_reference!='free'):
+        raise ValueError('curve options require the explicit curve-similarity field')
     if name == 'membrane':
         return solve_problem
     if name == 'graph-arap':
         from arap_field import solve_problem as solve_arap
         return solve_arap
+    if name == 'curve-similarity':
+        if interface is None:
+            raise ValueError('curve shape energy requires a source-reviewed interface')
+        from curve_similarity_field import solve_problem as solve_curve
+        options={}
+        if curve_endpoint_reference not in ['free','membrane-jet']:
+            raise ValueError('curve endpoint reference must be free or membrane-jet')
+        if curve_endpoint_reference!='free':
+            options['endpoint_reference']=curve_endpoint_reference
+        if curve_half_windows is not None:
+            radii=np.asarray(curve_half_windows,dtype=float)
+            if (radii.ndim!=1 or not len(radii) or not np.isfinite(radii).all()
+                    or np.any(radii<=0) or len(set(radii))!=len(radii)):
+                raise ValueError('curve windows must be distinct finite positive radii')
+            options['half_windows_px']=tuple(radii)
+        if curve_density is not None:
+            if not np.isfinite(curve_density) or curve_density<0:
+                raise ValueError('curve density must be finite and nonnegative')
+            options['density']=float(curve_density)
+        return partial(solve_curve,interface=interface,**options)
     raise ValueError('unknown source field energy')
 
 
@@ -50,6 +75,16 @@ def validate_scope_review(geometry, review, source_digest):
             or review.get('visibility_status')!='unknown'
             or review.get('automatic_edit_authorized') is not False):
         raise ValueError('expanded scope requires its own source-only review bound to the source image and new geometry')
+
+
+def validate_field_interface(record, source_digest, size):
+    if (record.get('schema')!='reviewed-visible-source-interface-v1'
+            or record.get('source_image_sha256')!=source_digest
+            or record.get('source_size')!=list(size)
+            or record.get('mode')!='model_source_visual_review_only'
+            or record.get('visibility_status')!='unknown'
+            or record.get('automatic_edit_authorized') is not False):
+        raise ValueError('curve shape prior requires an unchanged source-reviewed visible interface')
 
 
 def snapshot_local_code(output):
@@ -98,16 +133,20 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         target_profile=None, soft_source_boundary=None,
         soft_boundary_density=.05, soft_boundary_fade=16., boundary_motion=None,
         curve_correspondence='source-arclength', field_energy='membrane',
-        jaw_scope='mouth-center', scope_review=None):
+        jaw_scope='mouth-center', scope_review=None, field_interface=None,
+        curve_half_windows=None, curve_density=None, curve_endpoint_reference='free'):
     started=time.perf_counter()
-    solve_field=field_solver(field_energy)
+    if field_energy not in ['membrane','graph-arap','curve-similarity']:
+        raise ValueError('unknown source field energy')
+    if (field_energy=='curve-similarity') != (field_interface is not None):
+        raise ValueError('a source interface is required only for the explicit curve-similarity field')
     if jaw_scope not in ['mouth-center','upper-lip']:
         raise ValueError('explicit mouth-center or upper-lip scope required')
     if jaw_scope=='upper-lip' and (scope_review is None or target_profile is None
-            or field_energy!='membrane' or curve_correspondence!='source-arclength'
+            or field_energy not in ['membrane','curve-similarity'] or curve_correspondence!='source-arclength'
             or soft_source_boundary is not None or boundary_motion is not None
             or additional_protection is not None):
-        raise ValueError('scope diagnostic requires its own source review, frozen profile and unchanged membrane executor')
+        raise ValueError('scope diagnostic requires its own source review, frozen profile and explicit supported field')
     if jaw_scope=='mouth-center' and scope_review is not None:
         raise ValueError('scope review only belongs to an explicit expanded-scope experiment')
     if output.exists(): raise FileExistsError('refusing to overwrite portable jaw results')
@@ -169,6 +208,13 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         validate_scope_review(geometry,scope_record,sha(source_path))
         hashes[str(scope_review.resolve())]=sha(scope_review)
         profile=extend_profile_scope(profile,original_geometry,geometry)
+    interface=None
+    if field_interface is not None:
+        interface=read(field_interface)
+        validate_field_interface(interface,sha(source_path),size)
+        hashes[str(field_interface.resolve())]=sha(field_interface)
+    solve_field=field_solver(field_energy,interface,curve_half_windows=curve_half_windows,
+                             curve_density=curve_density,curve_endpoint_reference=curve_endpoint_reference)
     soft=None
     if soft_source_boundary is not None and boundary_motion is not None:
         raise ValueError('compare boundary controllers separately before combining objectives')
@@ -263,8 +309,17 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         'boundary_motion_evidence':str(boundary_motion) if boundary_motion is not None else None,
         'field_reduction_stride':field_stride,
         'field_energy':field_energy,
+        'field_interface':str(field_interface) if field_interface else None,
+        'curve_shape_options':({'half_windows_px':list(curve_half_windows) if curve_half_windows is not None else [12.],
+            'density_per_scale':.05 if curve_density is None else curve_density,
+            'reference_half_window_px':12.,'center_spacing_px':2.,
+            'endpoint_reference':curve_endpoint_reference,
+            'scale_normalization_enabled':curve_half_windows is not None,
+            'aggregation':'sum of independent per-scale energies; center domains differ'}
+            if field_energy=='curve-similarity' else None),
         'continuous_arc_probe_spacing_px':.5,
-        'problem':('portable graph SO(2) ARAP local/global diagnostic' if field_energy=='graph-arap'
+        'problem':('portable observed-curve complex-similarity prior' if field_energy=='curve-similarity' else
+                   'portable graph SO(2) ARAP local/global diagnostic' if field_energy=='graph-arap'
                    else 'new portable source quadratic; not the historical whole-face objective'),
         'rendering':'bilinear, no fixed-mask pixel replacement, no solved-field taper',
         'execution_code_snapshot':str(code_manifest),
@@ -411,7 +466,11 @@ if __name__=='__main__':
     p.add_argument('--soft-boundary-fade',type=float,default=16.)
     p.add_argument('--boundary-motion',type=Path)
     p.add_argument('--curve-correspondence',choices=['source-arclength','uniform-target-arclength'],default='source-arclength')
-    p.add_argument('--field-energy',choices=['membrane','graph-arap'],default='membrane')
+    p.add_argument('--field-energy',choices=['membrane','graph-arap','curve-similarity'],default='membrane')
+    p.add_argument('--field-interface',type=Path)
+    p.add_argument('--curve-half-windows',type=float,nargs='+')
+    p.add_argument('--curve-density',type=float)
+    p.add_argument('--curve-endpoint-reference',choices=['free','membrane-jet'],default='free')
     p.add_argument('--jaw-scope',choices=['mouth-center','upper-lip'],default='mouth-center')
     p.add_argument('--scope-review',type=Path)
     a=p.parse_args();run(a.evidence.resolve(),a.proof.resolve(),a.review.resolve(),a.binary.resolve(),a.output.resolve(),
@@ -423,4 +482,7 @@ if __name__=='__main__':
                         soft_boundary_density=a.soft_boundary_density,soft_boundary_fade=a.soft_boundary_fade,
                         boundary_motion=a.boundary_motion.resolve() if a.boundary_motion else None,
                         curve_correspondence=a.curve_correspondence,field_energy=a.field_energy,
-                        jaw_scope=a.jaw_scope,scope_review=a.scope_review.resolve() if a.scope_review else None)
+                        jaw_scope=a.jaw_scope,scope_review=a.scope_review.resolve() if a.scope_review else None,
+                        field_interface=a.field_interface.resolve() if a.field_interface else None,
+                        curve_half_windows=a.curve_half_windows,curve_density=a.curve_density,
+                        curve_endpoint_reference=a.curve_endpoint_reference)

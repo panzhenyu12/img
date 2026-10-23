@@ -29,6 +29,7 @@ help:
 	@echo "make quality-jaw-target 只验下颌目标、起始预算与源图绑定，无照片/系统构建"
 	@echo "make quality-jaw-energy 只验局部旋转形变及执行门禁，无照片/系统构建"
 	@echo "make quality-jaw-scope 只验下半脸范围、面积匹配与保护，无系统构建"
+	@echo "make quality-jaw-curve-shape 只验可见曲线形状先验及源图绑定，无系统构建"
 	@echo "make background   启动可选 LaMa 本地去人模型 (8091)"
 	@echo "make background-models 安装可选模型环境并下载校验权重"
 	@echo "make client-models 下载校验浏览器去人 ONNX 模型"
@@ -115,6 +116,10 @@ quality-jaw-energy:
 .PHONY: quality-jaw-scope
 quality-jaw-scope:
 	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_portable_jaw.py test_jaw_scope_transport.py test_portable_result_gate.py
+
+.PHONY: quality-jaw-curve-shape
+quality-jaw-curve-shape:
+	cd experiments/semantic-deformation-20261022 && $(abspath $(SEMANTIC_PYTHON)) -m unittest test_curve_similarity_field.py test_portable_result_gate.py
 
 # Requires Pillow/numpy; override QUALITY_PYTHON to use another environment.
 quality-film: native
