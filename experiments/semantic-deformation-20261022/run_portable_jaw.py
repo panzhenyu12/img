@@ -40,8 +40,8 @@ def field_solver(name, interface=None, *, curve_half_windows=None, curve_density
             raise ValueError('curve shape energy requires a source-reviewed interface')
         from curve_similarity_field import solve_problem as solve_curve
         options={}
-        if curve_endpoint_reference not in ['free','membrane-jet']:
-            raise ValueError('curve endpoint reference must be free or membrane-jet')
+        if curve_endpoint_reference not in ['free','membrane-jet','membrane-interface']:
+            raise ValueError('curve endpoint reference must be free, membrane-jet or membrane-interface')
         if curve_endpoint_reference!='free':
             options['endpoint_reference']=curve_endpoint_reference
         if curve_half_windows is not None:
@@ -144,7 +144,7 @@ def run(evidence, proof_path, review_path, binary, output, amounts=(0.,60.,-60.)
         raise ValueError('explicit mouth-center or upper-lip scope required')
     if jaw_scope=='upper-lip' and (scope_review is None or target_profile is None
             or field_energy not in ['membrane','curve-similarity'] or curve_correspondence!='source-arclength'
-            or soft_source_boundary is not None or boundary_motion is not None
+            or soft_source_boundary is not None
             or additional_protection is not None):
         raise ValueError('scope diagnostic requires its own source review, frozen profile and explicit supported field')
     if jaw_scope=='mouth-center' and scope_review is not None:
@@ -470,7 +470,7 @@ if __name__=='__main__':
     p.add_argument('--field-interface',type=Path)
     p.add_argument('--curve-half-windows',type=float,nargs='+')
     p.add_argument('--curve-density',type=float)
-    p.add_argument('--curve-endpoint-reference',choices=['free','membrane-jet'],default='free')
+    p.add_argument('--curve-endpoint-reference',choices=['free','membrane-jet','membrane-interface'],default='free')
     p.add_argument('--jaw-scope',choices=['mouth-center','upper-lip'],default='mouth-center')
     p.add_argument('--scope-review',type=Path)
     a=p.parse_args();run(a.evidence.resolve(),a.proof.resolve(),a.review.resolve(),a.binary.resolve(),a.output.resolve(),

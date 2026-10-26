@@ -59,7 +59,8 @@ def curve_windows(points, *, half_window_px=12., center_spacing_px=2.):
             'actual_center_spacing_px': float(span/intervals)}
 
 
-def assemble_curve_operator(problem, interface, *, half_window_px=12., center_spacing_px=2.):
+def assemble_curve_operator(problem, interface, *, half_window_px=12., center_spacing_px=2.,
+                            allow_zero_operator_rows=False):
     """Assemble complex C on the original source-grid fixed-node mapping."""
     from portable_field import point_operators
 
@@ -100,6 +101,10 @@ def assemble_curve_operator(problem, interface, *, half_window_px=12., center_sp
                        for j in range(3)).tocsc()
         operator.sum_duplicates(); operator.eliminate_zeros()
         count = len(windows['weights'])
+        zero_operator_rows = int(np.count_nonzero(np.asarray(operator.getnnz(axis=1)).ravel() == 0))
+        if zero_operator_rows and not allow_zero_operator_rows:
+            raise ValueError(
+                f'reviewed curve {name!r} has {zero_operator_rows} samples without field support')
         operators.append(operator); weights.append(windows['weights'])
         harmonic_lengths.append(windows['harmonic_chord_px'])
         reports.append({'id': name, 'source_point_count': len(points),
@@ -108,7 +113,7 @@ def assemble_curve_operator(problem, interface, *, half_window_px=12., center_sp
             'center_arclength_px': windows['centers_s'].tolist(),
             'actual_center_spacing_px': windows['actual_center_spacing_px'],
             'center_measure_px': float(windows['weights'].sum()),
-            'zero_operator_rows': int(np.count_nonzero(np.asarray(operator.getnnz(axis=1)).ravel() == 0))})
+            'zero_operator_rows': zero_operator_rows})
         offset += count
     return {'operator': vstack(operators, format='csc'), 'weights': np.concatenate(weights),
             'harmonic_chord_px': np.concatenate(harmonic_lengths), 'curves': reports,
@@ -190,6 +195,58 @@ def assemble_endpoint_jet_operator(problem, interface):
     return {'operator': operator, 'rows': reports}
 
 
+def assemble_interface_operator(problem, interface):
+    """Sample a reviewed interface displacement at every source vertex.
+
+    This is an explicit diagnostic Dirichlet boundary operator. It does not
+    infer anatomy or claim that the observed front/background edge is a hard
+    physical boundary; the caller must bind the reference displacement to a
+    separately solved baseline field.
+    """
+    if interface.get('schema') != 'reviewed-visible-source-interface-v1':
+        raise ValueError('reviewed visible source interface required')
+    segments = interface.get('segments')
+    if not isinstance(segments, list) or not segments:
+        raise ValueError('at least one complete reviewed source polyline required')
+    from portable_field import point_operators
+    grid, mapping = problem['grid'], problem['mapping']
+    n = problem['hessian'].shape[0]
+    rows, cols, values, reports = [], [], [], []
+    names = set(); row = 0
+    for segment in segments:
+        name = segment.get('id')
+        points = np.asarray(segment.get('source_points'), dtype=float)
+        if not isinstance(name, str) or not name or name in names:
+            raise ValueError('distinct reviewed curve identities required')
+        names.add(name)
+        if (points.ndim != 2 or points.shape[1] != 2 or len(points) < 2
+                or not np.isfinite(points).all() or np.any(np.linalg.norm(np.diff(points, axis=0), axis=1) <= 0)):
+            raise ValueError('finite nondegenerate source polyline required')
+        ih, iw = problem['image_shape']
+        if np.any(points < 0.) or np.any(points > [iw-1, ih-1]):
+            raise ValueError('reviewed source curve lies outside the source photograph')
+        uv = (points-np.asarray(grid['origin']))/grid['spacing']
+        inside = np.all((uv >= 0)&(uv <= [grid['width']-1, grid['height']-1]), axis=1)
+        if not np.all(inside):
+            raise ValueError(f'reviewed interface {name!r} has samples outside the field ROI')
+        sampled, _, _ = point_operators(points, grid, mapping, n)
+        sampled = sampled.tocoo()
+        for local_row in range(len(points)):
+            selected = sampled.row == local_row
+            cols.extend(sampled.col[selected]); values.extend(sampled.data[selected])
+            rows.extend([row+local_row]*int(selected.sum()))
+        reports.append({'id': name, 'source_point_count': len(points),
+                        'row_start': row, 'row_end': row+len(points),
+                        'zero_operator_rows': int(np.count_nonzero(~np.isin(np.arange(len(points)), sampled.row)))})
+        row += len(points)
+    operator = coo_matrix((values, (rows, cols)), shape=(row, n)).tocsc()
+    operator.sum_duplicates(); operator.eliminate_zeros(); operator.sort_indices()
+    zero_rows = int(np.count_nonzero(np.asarray(operator.getnnz(axis=1)).ravel() == 0))
+    if zero_rows:
+        raise ValueError(f'reviewed interface has {zero_rows} samples without field support')
+    return {'operator': operator, 'rows': reports}
+
+
 def _solve_jet_equalities(factor, free_solution, operator, reference):
     """Small Schur solve after numerical row-rank reduction; audit every row."""
     e = csc_matrix(operator, dtype=float)
@@ -254,8 +311,8 @@ def solve_problem(problem, interface, *, half_window_px=12., center_spacing_px=2
     from portable_field import evaluate_motion, source_geometry
 
     started = time.perf_counter()
-    if endpoint_reference not in ('free', 'membrane-jet'):
-        raise ValueError("endpoint_reference must be 'free' or 'membrane-jet'")
+    if endpoint_reference not in ('free', 'membrane-jet', 'membrane-interface'):
+        raise ValueError("endpoint_reference must be 'free', 'membrane-jet' or 'membrane-interface'")
     if not np.isfinite(density) or density < 0.:
         raise ValueError('finite nonnegative source-arclength density required')
     if not np.isfinite(reference_half_window_px) or reference_half_window_px <= 0.:
@@ -282,7 +339,8 @@ def solve_problem(problem, interface, *, half_window_px=12., center_spacing_px=2
     scales = []
     for radius in radii:
         assembled = assemble_curve_operator(problem, interface, half_window_px=radius,
-                                             center_spacing_px=center_spacing_px)
+                                             center_spacing_px=center_spacing_px,
+                                             allow_zero_operator_rows=(endpoint_reference == 'membrane-jet'))
         normalization = 1. if half_windows_px is None else (reference_half_window_px/radius)**2
         scales.append({'radius': float(radius), 'normalization': float(normalization), 'assembled': assembled})
     # Avoid even a multiply-by-one or one-element sparse stack in the legacy
@@ -308,7 +366,7 @@ def solve_problem(problem, interface, *, half_window_px=12., center_spacing_px=2
     endpoint_report = None
     factorization_count = 1
     constraint_force = np.zeros_like(z)
-    if endpoint_reference == 'membrane-jet':
+    if endpoint_reference in ('membrane-jet', 'membrane-interface'):
         baseline_started = time.perf_counter()
         baseline_factor = splu(original_h.astype(complex))
         factor_seconds += time.perf_counter()-baseline_started
@@ -324,22 +382,29 @@ def solve_problem(problem, interface, *, half_window_px=12., center_spacing_px=2
             baseline_denominator, np.finfo(float).tiny)
         if not np.isfinite(baseline_backward).all() or np.any(baseline_backward > 1e-10):
             raise ValueError('original membrane baseline stationarity failed')
-        jet = assemble_endpoint_jet_operator(problem, interface)
-        e = jet['operator']
+        constraints = (assemble_endpoint_jet_operator(problem, interface)
+                       if endpoint_reference == 'membrane-jet'
+                       else assemble_interface_operator(problem, interface))
+        e = constraints['operator']
         z, multipliers, equality = _solve_jet_equalities(factor, z, e, e @ baseline)
         constraint_force = e.conjugate().T @ multipliers
         physical = equality.pop('physical_residual')
         reference = equality.pop('reference')
-        value_rows = np.array([row['kind'] == 'value' for row in jet['rows']])
+        value_rows = (np.array([row['kind'] == 'value' for row in constraints['rows']])
+                      if endpoint_reference == 'membrane-jet'
+                      else np.ones(e.shape[0], dtype=bool))
         endpoint_report = {**equality, 'reference': 'original unchanged membrane quadratic solution',
             'baseline_backward_error_by_component': baseline_backward.tolist(),
-            'derivative': 'source-interior one-sided unit tangent at the original endpoint on the C0 bilinear grid',
+            'derivative': ('source-interior one-sided unit tangent at the original endpoint on the C0 bilinear grid'
+                           if endpoint_reference == 'membrane-jet'
+                           else 'full reviewed source-interface displacement at original source vertices'),
             'normal_derivative_constrained': False, 'global_C1_continuity': False,
             'value_max_residual_px': float(abs(physical[value_rows]).max(initial=0.)),
-            'tangent_max_residual': float(abs(physical[~value_rows]).max(initial=0.)),
+            'tangent_max_residual': (float(abs(physical[~value_rows]).max(initial=0.))
+                                     if endpoint_reference == 'membrane-jet' else None),
             'physical_residual_real_imag': np.column_stack([physical.real, physical.imag]).tolist(),
             'reference_real_imag': np.column_stack([reference.real, reference.imag]).tolist(),
-            'rows': jet['rows'],
+            'rows': constraints['rows'],
             'baseline_augmented_objective_without_constant': float(np.vdot(baseline, augmented @ baseline).real-2*np.vdot(baseline, rhs).real)}
     linear_residual = augmented @ z-rhs+constraint_force
     # Equivalent real blocks are [Re H,-Im H; Im H,Re H]. Certify both
@@ -413,6 +478,12 @@ def solve_problem(problem, interface, *, half_window_px=12., center_spacing_px=2
         'density_per_source_px': float(density), 'half_window_px': float(half_window_px),
         'half_windows_px': [float(r) for r in radii],
         'scale_normalization_enabled': half_windows_px is not None,
+        'shape_support_complete': all(curve['zero_operator_rows'] == 0
+                                      for scale in scales for curve in scale['assembled']['curves']),
+        'shape_support_policy': ('zero-support rows are explicitly reported and contribute zero only for the '
+                                 'endpoint-jet diagnostic; free curve solves reject them'
+                                 if endpoint_reference == 'membrane-jet'
+                                 else 'every reviewed shape sample must have field support'),
         'reference_half_window_px': float(reference_half_window_px),
         'scale_aggregation': 'sum; density applies independently to every scale, never averaged',
         'shape_residual_component_meaning': 'real/imag source-chord relative-similarity components, not image-coordinate displacement',

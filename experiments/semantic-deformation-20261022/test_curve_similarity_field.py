@@ -4,7 +4,8 @@ import unittest
 import numpy as np
 
 from curve_similarity_field import (curve_windows, assemble_curve_operator,
-                                    assemble_endpoint_jet_operator, _solve_jet_equalities, solve_problem)
+                                    assemble_endpoint_jet_operator, assemble_interface_operator,
+                                    _solve_jet_equalities, solve_problem)
 from portable_field import build_problem, evaluate_motion, solve_problem as solve_membrane
 
 
@@ -77,6 +78,22 @@ class CurveWindowTests(unittest.TestCase):
             curve_windows([[0., 0.], [4., 0.]], half_window_px=2.)
         with self.assertRaisesRegex(ValueError, 'degenerate window chord'):
             curve_windows([[0., 0.], [2., 0.], [0., 0.], [0., 8.]], half_window_px=4.)
+
+    def test_sin2_bump_has_zero_endpoint_values_and_slopes(self):
+        from smooth_jaw_profile import sin2_bump
+        s = np.linspace(0., 100., 1001)
+        v = sin2_bump(s, 100.)
+        self.assertEqual(v[0], 0.)
+        self.assertAlmostEqual(v[-1], 0., places=14)
+        self.assertLess(abs((v[1]-v[0])/(s[1]-s[0])), 1e-3)
+        self.assertLess(abs((v[-1]-v[-2])/(s[-1]-s[-2])), 1e-3)
+        self.assertAlmostEqual(float(v.max()), 1., places=14)
+
+    def test_sin2_bump_rejects_out_of_arc_coordinates(self):
+        from smooth_jaw_profile import sin2_bump
+        for values in [([-1.], 100.), ([101.], 100.), ([0.], 0.)]:
+            with self.assertRaises(ValueError):
+                sin2_bump(np.asarray(values[0]), values[1])
 
     def test_reference_radius_normalization_matches_quadratic_but_detects_single_radius_null_mode(self):
         for radius in [4., 12.]:
@@ -172,6 +189,18 @@ class CurveFieldTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'no background line equalities'):
             solve_problem(problem, interface, half_window_px=2.)
 
+    def test_curve_samples_without_field_support_are_rejected(self):
+        problem, interface = self.make(delta=(.8, -.2))
+        # The source image is larger than the solved crop in this variant.
+        from portable_field import build_problem
+        source = np.array([[12., 10.], [12., 12.], [16., 12.]])
+        problem = build_problem((50, 50), source, source+(.8, -.2), [[6., 16.]],
+            crop=[0, 0, 25, 25], target_weights=1000., stride=1)
+        interface['segments'] = [{'id': 'outside-crop',
+            'source_points': [[30., 30.], [34., 34.], [38., 30.]]}]
+        with self.assertRaisesRegex(ValueError, 'without field support'):
+            assemble_curve_operator(problem, interface, half_window_px=2.)
+
     def test_single_scale_is_bitwise_legacy_and_multiscale_uses_sum_of_normalized_grams(self):
         problem, interface = self.make(delta=(.8, -.2))
         interface['segments'] = [{'id': 'long-observed',
@@ -240,6 +269,22 @@ class CurveFieldTests(unittest.TestCase):
         np.testing.assert_allclose(augmented @ z-rhs+e.T @ result['multipliers'], 0., atol=1e-9, rtol=0.)
         self.assertGreater(float(abs(augmented @ z-rhs).max()), 1e-5)
 
+    def test_membrane_interface_reference_preserves_full_reviewed_boundary(self):
+        problem, interface = self.make(delta=(.8, -.2))
+        baseline = solve_membrane(problem)
+        operator = assemble_interface_operator(problem, interface)['operator']
+        result = solve_problem(problem, interface, half_window_px=2.,
+                               endpoint_reference='membrane-interface')
+        z = complex_points(result['solution'])
+        reference = operator @ complex_points(baseline['solution'])
+        np.testing.assert_allclose(operator @ z, reference, atol=1e-9, rtol=0.)
+        report = result['report']['endpoint_constraints']
+        self.assertEqual(report['original_complex_rows'], operator.shape[0])
+        self.assertLess(report['value_max_residual_px'], 1e-9)
+        self.assertIsNone(report['tangent_max_residual'])
+        self.assertEqual(result['report']['endpoint_reference'], 'membrane-interface')
+        self.assertFalse(result['aesthetic_approval'])
+
     def test_jets_allow_fixed_and_repeated_rows_and_zero_density_matches_baseline(self):
         problem, interface = self.make(delta=(.8, -.2))
         interface['segments'].append({**interface['segments'][0], 'id': 'same-curve'})
@@ -252,8 +297,12 @@ class CurveFieldTests(unittest.TestCase):
         baseline = solve_membrane(problem)
         zero = solve_problem(problem, interface, half_window_px=2., density=0., endpoint_reference='membrane-jet')
         np.testing.assert_allclose(zero['solution'], baseline['solution'], atol=1e-10, rtol=0.)
-        legacy = solve_problem(problem, interface, half_window_px=2.)
-        explicit = solve_problem(problem, interface, half_window_px=2., endpoint_reference='free')
+        # The free curve prior now rejects the deliberately unsupported fixed
+        # segment; compare its compatibility on the two supported segments.
+        supported_interface = {'schema': interface['schema'],
+            'segments': interface['segments'][:2]}
+        legacy = solve_problem(problem, supported_interface, half_window_px=2.)
+        explicit = solve_problem(problem, supported_interface, half_window_px=2., endpoint_reference='free')
         np.testing.assert_array_equal(legacy['source_displacement'], explicit['source_displacement'])
 
     def test_jet_operator_uses_incident_cell_at_grid_lines_not_an_offset_point(self):
