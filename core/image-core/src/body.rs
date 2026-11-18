@@ -11,6 +11,18 @@ use serde_json::Value;
 
 type Point = (f32, f32);
 
+#[cfg(test)]
+#[path = "body_internal_aperture_regression.rs"]
+mod internal_aperture_regression;
+
+#[path = "body_source_layers.rs"]
+mod source_layers;
+pub use source_layers::SourceLayers;
+
+#[cfg(test)]
+#[path = "body_source_layers_regression.rs"]
+mod source_layers_regression;
+
 fn sample_with_alpha(image: &RgbaImage, x: f32, y: f32) -> ([u8; 4], f32) {
     let x = x.clamp(0.0, image.width as f32 - 1.0);
     let y = y.clamp(0.0, image.height as f32 - 1.0);
@@ -460,6 +472,40 @@ fn subject_radius(axis: Axis, subject: &[f32], width: usize, height: usize, cent
 /// One guessed half-width freezes a wide shirt edge or sends a touching arm's
 /// displacement through the torso. The subject layer supplies contour data;
 /// image background never participates in the deformation.
+fn exterior_contour_support(alpha: &[f32], width: usize, height: usize) -> Vec<f32> {
+    // This is a geometry-only view. An enclosed aperture (or an internal
+    // semantic exclusion) is not the exterior silhouette. Stopping each ray
+    // at that aperture made the measured radius jump between two unrelated
+    // boundaries and cut otherwise opaque material to zero displacement.
+    // Keep the original optical alpha and every explicit protection intact.
+    let mut exterior = vec![false; alpha.len()];
+    let mut queue = std::collections::VecDeque::new();
+    for i in 0..alpha.len() {
+        let (x, y) = (i % width, i / width);
+        if (x == 0 || x + 1 == width || y == 0 || y + 1 == height) && alpha[i] < 0.5 {
+            exterior[i] = true;
+            queue.push_back(i);
+        }
+    }
+    while let Some(i) = queue.pop_front() {
+        let (x, y) = (i % width, i / width);
+        // Eight-connected scene background conservatively preserves even a
+        // diagonal opening; a one-pixel gap must not become a closed aperture.
+        for yy in y.saturating_sub(1)..=(y + 1).min(height - 1) {
+            for xx in x.saturating_sub(1)..=(x + 1).min(width - 1) {
+                let n = yy * width + xx;
+                if !exterior[n] && alpha[n] < 0.5 {
+                    exterior[n] = true;
+                    queue.push_back(n);
+                }
+            }
+        }
+    }
+    alpha.iter().enumerate().map(|(i, &a)| {
+        if a < 0.5 && !exterior[i] { 1.0 } else { a }
+    }).collect()
+}
+
 #[derive(Clone)]
 struct ContourProfile {
     warp: Warp,
@@ -478,11 +524,12 @@ impl ContourProfile {
     ) -> Self {
         let axis = warp.axis;
         let normal = axis.normal();
-        let read = |p: Point| {
+        let contour_alpha = exterior_contour_support(alpha, width, height);
+        let read = |values: &[f32], p: Point| {
             if p.0 < 0.0 || p.1 < 0.0 || p.0 >= width as f32 || p.1 >= height as f32 {
                 0.0
             } else {
-                sample_coverage(alpha, width, height, p.0 - 0.5, p.1 - 0.5)
+                sample_coverage(values, width, height, p.0 - 0.5, p.1 - 0.5)
             }
         };
         let mut sections = Vec::with_capacity(65);
@@ -493,14 +540,16 @@ impl ContourProfile {
                 axis.origin.1 + axis.direction.1 * axis.length * t,
             );
             let mut sides = [0.0f32; 2];
-            if read(center) >= 0.5 {
+            // A missing bone core still anchors the section. Only the
+            // exterior ray measurement crosses enclosed off-axis apertures.
+            if read(alpha, center) >= 0.5 {
                 for (side, sign) in [-1.0f32, 1.0].into_iter().enumerate() {
                     let limit = (axis.radius * 2.0 + 8.0)
                         .min(width.max(height) as f32 * 0.6)
                         .ceil() as usize;
-                    let mut previous = read(center);
+                    let mut previous = read(&contour_alpha, center);
                     for d in 1..=limit {
-                        let value = read((
+                        let value = read(&contour_alpha, (
                             center.0 + normal.0 * sign * d as f32,
                             center.1 + normal.1 * sign * d as f32,
                         ));
@@ -1002,21 +1051,11 @@ fn body_layer_colors(source: &RgbaImage, alpha: &[f32]) -> Option<(RgbaImage, Rg
         colors
     })
 }
-fn separated_adjust(
-    source: &RgbaImage,
-    params: &Value,
-    region: Region,
-    warps: &[Warp],
-    subject_mask: &Value,
-) -> Result<RgbaImage, ImageError> {
-    let width = source.width as usize;
-    let height = source.height as usize;
-    let count = width * height;
+fn geometry_target(source: &RgbaImage, params: &Value, subject_mask: &Value) -> Vec<f32> {
     let subject = crate::face_matting::refine_alpha(
         source,
         &rasterize_mask(subject_mask, source.width, source.height),
     );
-    let has_part_mask = params.get("partMask").is_some_and(Value::is_object);
     let mut target = params
         .get("partMask")
         .filter(|m| m.is_object())
@@ -1026,6 +1065,27 @@ fn separated_adjust(
         *alpha = alpha.min(subject[i]);
     }
     target = crate::face_matting::refine_alpha(source, &target);
+    target
+}
+
+struct BodyMotionControls {
+    selected: Vec<f32>,
+    user_protected: Vec<bool>,
+    measured: Vec<ContourProfile>,
+    protect_fade: Vec<f32>,
+}
+
+fn motion_controls(
+    source: &RgbaImage,
+    params: &Value,
+    warps: &[Warp],
+    subject_mask: &Value,
+    target: &[f32],
+) -> BodyMotionControls {
+    let width = source.width as usize;
+    let height = source.height as usize;
+    let count = width * height;
+    let has_part_mask = params.get("partMask").is_some_and(Value::is_object);
     let selected = params
         .get("mask")
         .map(|m| rasterize_mask(m, source.width, source.height))
@@ -1039,19 +1099,6 @@ fn separated_adjust(
                 .collect()
         })
         .unwrap_or_else(|| vec![false; count]);
-    let matte_layers = body_layer_colors(source, &target);
-    let mut foreground = matte_layers
-        .as_ref()
-        .map(|layers| layers.0.clone())
-        .unwrap_or_else(|| source.clone());
-    for (i, &alpha) in target.iter().enumerate() {
-        // Only the selected semantic part is sampled. The underlying torso,
-        // the other leg and the backdrop remain a fixed context layer.
-        if alpha >= 1.0 - 1e-6 {
-            foreground.pixels[i * 4..i * 4 + 3].copy_from_slice(&source.pixels[i * 4..i * 4 + 3]);
-        }
-        foreground.pixels[i * 4 + 3] = byte(source.pixels[i * 4 + 3] as f32 * alpha);
-    }
     let alpha_mask = params
         .get("partMask")
         .filter(|m| m.is_object())
@@ -1077,7 +1124,7 @@ fn separated_adjust(
         .map(|&warp| {
             ContourProfile::new(
                 warp,
-                &target,
+                target,
                 width,
                 height,
                 warp.limb && !has_part_mask,
@@ -1103,6 +1150,59 @@ fn separated_adjust(
         height,
         (max_shift * 1.8 + 3.0).max(8.0),
     );
+    BodyMotionControls { selected, user_protected, measured, protect_fade }
+}
+
+fn finish_body_blend(source: &RgbaImage, result: &mut RgbaImage, params: &Value) {
+    let count = source.width as usize * source.height as usize;
+    let opacity = number(params, "opacity", 100.0);
+    let blend = params
+        .get("blendMode")
+        .and_then(Value::as_str)
+        .unwrap_or("normal");
+    if opacity != 100.0 || blend != "normal" {
+        let mut settings = params.clone();
+        if let Some(object) = settings.as_object_mut() {
+            object.remove("mask");
+            object.remove("protectMask");
+        }
+        let composed = crate::mask::composite(source, result, &settings);
+        // Non-normal blend modes must not change the untouched context just
+        // because it lies inside the support rectangle.
+        for i in 0..count {
+            if result.pixels[i * 4..i * 4 + 4] != source.pixels[i * 4..i * 4 + 4] {
+                result.pixels[i * 4..i * 4 + 4].copy_from_slice(&composed.pixels[i * 4..i * 4 + 4]);
+            }
+        }
+    }
+}
+
+fn separated_adjust(
+    source: &RgbaImage,
+    params: &Value,
+    region: Region,
+    warps: &[Warp],
+    subject_mask: &Value,
+) -> Result<RgbaImage, ImageError> {
+    let width = source.width as usize;
+    let height = source.height as usize;
+    let count = width * height;
+    let target = geometry_target(source, params, subject_mask);
+    let BodyMotionControls { selected, user_protected, measured, protect_fade } =
+        motion_controls(source, params, warps, subject_mask, &target);
+    let matte_layers = body_layer_colors(source, &target);
+    let mut foreground = matte_layers
+        .as_ref()
+        .map(|layers| layers.0.clone())
+        .unwrap_or_else(|| source.clone());
+    for (i, &alpha) in target.iter().enumerate() {
+        // Only the selected semantic part is sampled. The underlying torso,
+        // the other leg and the backdrop remain a fixed context layer.
+        if alpha >= 1.0 - 1e-6 {
+            foreground.pixels[i * 4..i * 4 + 3].copy_from_slice(&source.pixels[i * 4..i * 4 + 3]);
+        }
+        foreground.pixels[i * 4 + 3] = byte(source.pixels[i * 4 + 3] as f32 * alpha);
+    }
     let mut warped = foreground.clone();
     let mut warped_alpha = vec![0.0; count];
     let mut warped_subject = target.clone();
@@ -1210,32 +1310,21 @@ fn separated_adjust(
         }
         result.pixels[i * 4 + 3] = byte(alpha * 255.0);
     }
-    let opacity = number(params, "opacity", 100.0);
-    let blend = params
-        .get("blendMode")
-        .and_then(Value::as_str)
-        .unwrap_or("normal");
-    if opacity != 100.0 || blend != "normal" {
-        let mut settings = params.clone();
-        if let Some(object) = settings.as_object_mut() {
-            object.remove("mask");
-            object.remove("protectMask");
-        }
-        let composed = crate::mask::composite(source, &result, &settings);
-        // Non-normal blend modes must not change the untouched context just
-        // because it lies inside the support rectangle.
-        for i in 0..count {
-            if result.pixels[i * 4..i * 4 + 4] != source.pixels[i * 4..i * 4 + 4] {
-                result.pixels[i * 4..i * 4 + 4].copy_from_slice(&composed.pixels[i * 4..i * 4 + 4]);
-            }
-        }
-    }
+    finish_body_blend(source, &mut result, params);
     Ok(result)
 }
 
 /// Width adjustments act only on their semantic region and add independently.
 /// Height/legLength are deliberately not interpreted as width controls.
 pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, ImageError> {
+    adjust_impl(source, params, None)
+}
+
+fn adjust_impl(
+    source: &RgbaImage,
+    params: &Value,
+    layers: Option<&source_layers::PreparedSourceLayers<'_>>,
+) -> Result<RgbaImage, ImageError> {
     let region = Region::read(params.get("region"));
     let values = params.get("adjustments").unwrap_or(params);
     let part = params
@@ -1266,7 +1355,22 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         return Ok(source.clone());
     }
     let subject_mask=params.get("subjectMask").filter(|mask|mask.is_object()).ok_or_else(||ImageError::InvalidOperation("body contour edits require a real subjectMask; detect the person or draw the foreground silhouette manually".into()))?;
-    separated_adjust(source, params, region, &warps, subject_mask)
+    if let Some(layers) = layers {
+        source_layers::render(source, params, region, &warps, subject_mask, layers)
+    } else {
+        separated_adjust(source, params, region, &warps, subject_mask)
+    }
+}
+
+/// Internal memory-only entry point. Optical source layers never replace the
+/// anatomical driver or grant motion outside its selection/protection policy.
+pub(crate) fn adjust_with_source_layers(
+    source: &RgbaImage,
+    params: &Value,
+    layers: &SourceLayers<'_>,
+) -> Result<RgbaImage, ImageError> {
+    let prepared = layers.prepare(source)?;
+    adjust_impl(source, params, Some(&prepared))
 }
 
 #[cfg(test)]

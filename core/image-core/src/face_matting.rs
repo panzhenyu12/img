@@ -88,10 +88,13 @@ fn refine_alpha_with_border(source: &RgbaImage, alpha: &[f32], border: usize) ->
         for yy in y.saturating_sub(1)..=(y + 1).min(h - 1) {
             for xx in x.saturating_sub(1)..=(x + 1).min(w - 1) {
                 let j = yy * w + xx;
+                // Keep the same eroded donor contract while averaging. Raw
+                // confidence alone can reintroduce the very mixed boundary
+                // texels that erosion removed, biasing physical opacity.
                 if if foreground {
-                    alpha[j] >= 0.98
+                    foreground_distance[j] == 0
                 } else {
-                    alpha[j] <= 0.02
+                    background_distance[j] == 0
                 } {
                     for (c, value) in mean.iter_mut().enumerate() {
                         *value += source.pixels[j * 4 + c] as f32;
@@ -314,6 +317,54 @@ fn resize<T: Copy>(input: &[T], iw: usize, ih: usize, w: usize, h: usize) -> Vec
         .collect()
 }
 
+/// Minimize one channel's strictly convex F/B quadratic over the physical
+/// colour box. The previous implementation solved the unconstrained system
+/// and clipped F and B independently; after one variable crossed a bound that
+/// pair was generally no longer stationary on the active boundary. Enumerating
+/// the four box edges is constant time and gives the constrained local
+/// minimizer up to floating-point rounding.
+fn bounded_pair(aa: f32, ab: f32, bb: f32, rhs_f: f32, rhs_b: f32) -> (f32, f32) {
+    // Coefficients are accumulated by the existing f32 estimator, but solving
+    // and comparing the local candidates in f32 can erase an O(delta^2)
+    // improvement while its O(delta) free-variable gradient remains visible.
+    // Promote the supplied problem exactly; round only the selected result.
+    let (aa, ab, bb, rhs_f, rhs_b) = (aa as f64, ab as f64, bb as f64, rhs_f as f64, rhs_b as f64);
+    let determinant = aa * bb - ab * ab;
+    debug_assert!(determinant > 0.0 && determinant.is_finite());
+    let unconstrained = (
+        (bb * rhs_f - ab * rhs_b) / determinant,
+        (aa * rhs_b - ab * rhs_f) / determinant,
+    );
+    if unconstrained.0.is_finite()
+        && unconstrained.1.is_finite()
+        && (0.0..=1.0).contains(&unconstrained.0)
+        && (0.0..=1.0).contains(&unconstrained.1)
+    {
+        return (unconstrained.0 as f32, unconstrained.1 as f32);
+    }
+    let objective = |f: f64, b: f64| {
+        aa * f * f + 2.0 * ab * f * b + bb * b * b - 2.0 * rhs_f * f - 2.0 * rhs_b * b
+    };
+    // Every candidate minimizes its box edge. An independently clipped
+    // unconstrained solution is not an additional valid stationary candidate.
+    let candidates = [
+        (0.0, (rhs_b / bb).clamp(0.0, 1.0)),
+        (1.0, ((rhs_b - ab) / bb).clamp(0.0, 1.0)),
+        ((rhs_f / aa).clamp(0.0, 1.0), 0.0),
+        (((rhs_f - ab) / aa).clamp(0.0, 1.0), 1.0),
+    ];
+    let mut best = candidates[0];
+    let mut best_value = objective(best.0, best.1);
+    for candidate in candidates.into_iter().skip(1) {
+        let value = objective(candidate.0, candidate.1);
+        if value < best_value {
+            best = candidate;
+            best_value = value;
+        }
+    }
+    (best.0 as f32, best.1 as f32)
+}
+
 pub(crate) fn estimate(source: &RgbaImage, alpha: &[f32]) -> Option<(RgbaImage, RgbaImage)> {
     if source.pixels.chunks_exact(4).any(|p| p[3] != 255) {
         return None;
@@ -388,10 +439,10 @@ pub(crate) fn estimate(source: &RgbaImage, alpha: &[f32]) -> Option<(RgbaImage, 
                             rhs_b[c] += weight * b[j][c];
                         }
                     }
-                    let determinant = (aa * bb - ab * ab).max(1e-15);
                     for c in 0..3 {
-                        f[i][c] = ((bb * rhs_f[c] - ab * rhs_b[c]) / determinant).clamp(0.0, 1.0);
-                        b[i][c] = ((aa * rhs_b[c] - ab * rhs_f[c]) / determinant).clamp(0.0, 1.0);
+                        let (foreground, background) = bounded_pair(aa, ab, bb, rhs_f[c], rhs_b[c]);
+                        f[i][c] = foreground;
+                        b[i][c] = background;
                     }
                 }
             }
@@ -420,6 +471,94 @@ pub(crate) fn estimate(source: &RgbaImage, alpha: &[f32]) -> Option<(RgbaImage, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bounded_pair_re_solves_the_active_face_or_background_bound() {
+        // The unconstrained minimizer is approximately (-0.088889, 0.411111).
+        // Independent clipping would return (0, 0.411111), whose gradient on
+        // the active f=0 edge is non-zero. The box solution is (0, 0.34).
+        let aa = 1.0;
+        let ab = 0.8;
+        let bb = 1.0;
+        let rhs_f = 0.24;
+        let rhs_b = 0.34;
+        let (f, b) = bounded_pair(aa, ab, bb, rhs_f, rhs_b);
+        assert!((f - 0.0).abs() < 1e-6);
+        assert!((b - 0.34).abs() < 1e-6);
+        let clipped = (0.0, 37.0 / 90.0);
+        let objective = |pair: (f32, f32)| {
+            aa * pair.0 * pair.0 + 2.0 * ab * pair.0 * pair.1 + bb * pair.1 * pair.1
+                - 2.0 * rhs_f * pair.0
+                - 2.0 * rhs_b * pair.1
+        };
+        assert!(objective((f, b)) < objective(clipped));
+        // KKT stationarity on the active f=0 edge: the free b derivative is 0.
+        assert!((ab * f + bb * b - rhs_b).abs() < 1e-6);
+    }
+
+    #[test]
+    fn bounded_pair_does_not_keep_a_nonstationary_clip_after_objective_rounding() {
+        // This valid SPD problem has a near-boundary unconstrained minimum.
+        // In f32 its clipped (0, .5) and true edge minimum have equal rounded
+        // objective values, although the clipped free-B gradient is 2.5e-5.
+        // It is a local update, not a demand for additional global iterations.
+        let (aa, ab, bb, rhs_f, rhs_b) = (0.35_f32, 0.25_f32, 0.35_f32, 0.124965_f32, 0.174975_f32);
+        let (f, b) = bounded_pair(aa, ab, bb, rhs_f, rhs_b);
+        let expected_b = (rhs_b as f64 / bb as f64) as f32;
+        assert_eq!(f, 0.0);
+        assert_eq!(b, expected_b);
+        let free_gradient = ab as f64 * f as f64 + bb as f64 * b as f64 - rhs_b as f64;
+        let lower_bound_gradient = aa as f64 * f as f64 + ab as f64 * b as f64 - rhs_f as f64;
+        assert!(
+            free_gradient.abs() < 1e-8,
+            "free B gradient={free_gradient}"
+        );
+        assert!(lower_bound_gradient >= 0.0);
+        assert!(
+            b < 0.49999,
+            "the nonstationary independent clip survived: {b}"
+        );
+    }
+
+    #[test]
+    fn eroded_donor_averages_do_not_reintroduce_mixed_boundary_pixels() {
+        let (w, h) = (24, 12);
+        let foreground = [220.0, 155.0, 100.0];
+        let background = [20.0, 40.0, 60.0];
+        let mut pixels = Vec::new();
+        let mut confidence = Vec::new();
+        let mut truth = Vec::new();
+        for _y in 0..h {
+            for x in 0..w {
+                let a = match x {
+                    0..=7 => 0.0,
+                    8 => 0.1,
+                    9 => 0.45,
+                    10 => 0.8,
+                    _ => 1.0,
+                };
+                truth.push(a);
+                confidence.push(if a >= 0.5 { 1.0 } else { 0.0 });
+                for c in 0..3 {
+                    pixels.push(byte(a * foreground[c] + (1.0 - a) * background[c]));
+                }
+                pixels.push(255);
+            }
+        }
+        let source = RgbaImage::new(w as u32, h as u32, pixels).unwrap();
+        let refined = refine_portrait_alpha(&source, &confidence);
+        for i in 0..truth.len() {
+            assert!(
+                (refined[i] - truth[i]).abs() < 0.01,
+                "physical edge opacity biased by a mixed donor at {},{}: {} vs {}",
+                i % w,
+                i / w,
+                refined[i],
+                truth[i]
+            );
+        }
+    }
+
     #[test]
     fn recovered_known_alpha_edge_transports_to_background_without_skin_islands() {
         // Independent physical ground truth: a three-pixel parser omission at

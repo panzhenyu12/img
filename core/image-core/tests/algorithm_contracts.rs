@@ -200,16 +200,28 @@ fn feature_params(key: &str, amount: i32, mask_name: &str) -> Value {
 }
 
 #[test]
+fn ocular_occlusion_controls_do_not_export_the_generic_iris_stretch() {
+    let src = grid();
+    for key in ["eyeHeight", "eyelid"] {
+        assert_eq!(run(&src, "feature.adjust", feature_params(key, 0, "leftEye")), src);
+        for amount in [-30, 30, -60, 60] {
+            let graph = json!({"operations":[{"type":"feature.adjust",
+                "params":feature_params(key, amount, "leftEye")}]}).to_string();
+            let error = apply_graph_json(&src, &graph).unwrap_err();
+            assert!(error.to_string().contains(&format!("feature.adjust.{key} has no validated algorithm")));
+        }
+    }
+}
+
+#[test]
 fn all_published_feature_geometries_stay_local_and_reversible_at_zero() {
     let src = grid();
     let cases = [
         ("eyeSize", "leftEye"),
         ("eyeWidth", "leftEye"),
-        ("eyeHeight", "leftEye"),
         ("eyeSpacing", "leftEye"),
         ("eyeTilt", "leftEye"),
         ("eyeCorner", "leftEye"),
-        ("eyelid", "leftEye"),
         ("eyeInnerCorner", "leftEye"),
         ("eyeOuterCorner", "leftEye"),
         ("browLength", "leftBrow"),

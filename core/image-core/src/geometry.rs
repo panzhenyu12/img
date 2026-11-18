@@ -3,6 +3,10 @@ use crate::mask::{PreparedMask, Region};
 use crate::{ImageError, RgbaImage};
 use serde_json::Value;
 
+#[cfg(test)]
+#[path = "eye_material_admission.rs"]
+mod eye_material_admission;
+
 fn invalid(message: &str) -> ImageError {
     ImageError::InvalidOperation(message.to_owned())
 }
@@ -685,7 +689,291 @@ fn feature_frame(p: &Value, name: &str, source: &RgbaImage) -> Option<FeatureFra
     })
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
+struct FeatureBrowAnchor {
+    points: Vec<(f32, f32)>,
+    bounds: [f32; 4],
+}
+impl FeatureBrowAnchor {
+    fn new(points: Vec<(f32, f32)>) -> Self {
+        let mut bounds = [
+            f32::INFINITY,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NEG_INFINITY,
+        ];
+        for &(x, y) in &points {
+            bounds[0] = bounds[0].min(x);
+            bounds[1] = bounds[1].min(y);
+            bounds[2] = bounds[2].max(x);
+            bounds[3] = bounds[3].max(y);
+        }
+        Self { points, bounds }
+    }
+    fn surrounding_motion(&self, point: (f32, f32)) -> f32 {
+        let (x, y) = point;
+        if x < self.bounds[0] - 3.5
+            || y < self.bounds[1] - 3.5
+            || x > self.bounds[2] + 3.5
+            || y > self.bounds[3] + 3.5
+        {
+            return 1.0;
+        }
+        let mut inside = false;
+        let mut distance = f32::INFINITY;
+        for (a, b) in self
+            .points
+            .iter()
+            .zip(self.points.iter().cycle().skip(1))
+            .take(self.points.len())
+        {
+            if (a.1 > y) != (b.1 > y) && x < (b.0 - a.0) * (y - a.1) / (b.1 - a.1) + a.0 {
+                inside = !inside;
+            }
+            let edge = (b.0 - a.0, b.1 - a.1);
+            let length = edge.0 * edge.0 + edge.1 * edge.1;
+            let t = if length > 0.0 {
+                ((x - a.0) * edge.0 + (y - a.1) * edge.1) / length
+            } else {
+                0.0
+            }
+            .clamp(0.0, 1.0);
+            distance = distance.min((x - a.0 - edge.0 * t).hypot(y - a.1 - edge.1 * t));
+        }
+        if inside {
+            0.0
+        } else {
+            smoothstep(1.5, 3.5, distance)
+        }
+    }
+}
+
+const EYE_WIDTH_LOG_SCALE: f32 = 0.3;
+
+const EYE_SIZE_LOG_SCALE: f32 = 0.3;
+const EYE_TILT_RADIANS: f32 = 0.3;
+
+// A cos(t) + B sin(t) has absolute maxima at phase + k*pi.
+// Include interior extrema, not just the endpoints of the requested sweep.
+fn angular_component_extent(a: f32, b: f32, angle: f32) -> f32 {
+    let lo = angle.min(0.0);
+    let hi = angle.max(0.0);
+    let at = |t: f32| (a * t.cos() + b * t.sin()).abs();
+    let phase = b.atan2(a);
+    let period = std::f32::consts::PI;
+    let critical = phase + ((lo - phase) / period).ceil() * period;
+    let mut result = at(lo).max(at(hi));
+    if critical <= hi {
+        result = result.max(a.hypot(b));
+    }
+    result
+}
+
+// For an anisotropic ellipse, squared normalized radius is
+// A + B*cos(2t) + C*sin(2t). Its maxima have period pi.
+fn rotated_eye_extent(point: (f32, f32), radius: (f32, f32), angle: f32) -> f32 {
+    let (u, v) = point;
+    let ix = 1.0 / radius.0.powi(2);
+    let iy = 1.0 / radius.1.powi(2);
+    let b = 0.5 * (u * u - v * v) * (ix - iy);
+    let c = u * v * (iy - ix);
+    let lo = angle.min(0.0);
+    let hi = angle.max(0.0);
+    let at = |t: f32| {
+        let (sn, cs) = t.sin_cos();
+        ((u * cs - v * sn) / radius.0).powi(2) + ((u * sn + v * cs) / radius.1).powi(2)
+    };
+    let phase = 0.5 * c.atan2(b);
+    let period = std::f32::consts::PI;
+    let critical = phase + ((lo - phase) / period).ceil() * period;
+    let mut maximum = at(lo).max(at(hi));
+    if critical <= hi {
+        maximum = maximum.max(at(critical));
+    }
+    maximum.sqrt()
+}
+
+#[derive(Clone)]
+struct EyeWidthMaterial {
+    center: (f32, f32),
+    inverse: [f32; 4],
+    minimum_radius: f32,
+    aperture: Vec<(f32, f32)>,
+    support_inner: f32,
+    transition_end: f32,
+}
+
+fn feature_polygon_signed_distance(points: &[(f32, f32)], point: (f32, f32)) -> f32 {
+    let (x, y) = point;
+    let mut inside = false;
+    let mut distance = f32::INFINITY;
+    for (a, b) in points
+        .iter()
+        .zip(points.iter().cycle().skip(1))
+        .take(points.len())
+    {
+        if (a.1 > y) != (b.1 > y) && x < (b.0 - a.0) * (y - a.1) / (b.1 - a.1) + a.0 {
+            inside = !inside;
+        }
+        let edge = (b.0 - a.0, b.1 - a.1);
+        let length = edge.0 * edge.0 + edge.1 * edge.1;
+        let t = if length > 0.0 {
+            ((x - a.0) * edge.0 + (y - a.1) * edge.1) / length
+        } else {
+            0.0
+        }
+        .clamp(0.0, 1.0);
+        distance = distance.min((x - a.0 - edge.0 * t).hypot(y - a.1 - edge.1 * t));
+    }
+    if inside {
+        -distance
+    } else {
+        distance
+    }
+}
+impl EyeWidthMaterial {
+    fn ellipse_coordinate(&self, p: (f32, f32)) -> (f32, f32) {
+        let d = (p.0 - self.center.0, p.1 - self.center.1);
+        (
+            self.inverse[0] * d.0 + self.inverse[1] * d.1,
+            self.inverse[2] * d.0 + self.inverse[3] * d.1,
+        )
+    }
+    fn ellipse_distance(&self, p: (f32, f32)) -> f32 {
+        let q = self.ellipse_coordinate(p);
+        (q.0.hypot(q.1) - 1.0) * self.minimum_radius
+    }
+    fn surrounding_motion(&self, p: (f32, f32)) -> f32 {
+        let ellipse = self.ellipse_distance(p);
+        if ellipse >= self.transition_end {
+            return 1.0;
+        }
+        // The observation is the iris projection intersected with the
+        // actually visible source aperture. Hidden top/bottom arcs do not
+        // become protected eyelid material. The 1.5px halo is sampling guard.
+        let distance = ellipse.max(feature_polygon_signed_distance(&self.aperture, p));
+        smoothstep(1.5, self.transition_end, distance)
+    }
+}
+
+fn eye_width_material(
+    p: &Value,
+    name: &str,
+    source: &RgbaImage,
+    frame: FeatureFrame,
+    radius: (f32, f32),
+    forward_scale: f32,
+) -> Result<Option<(EyeWidthMaterial, (f32, f32))>, String> {
+    let Some(raw) = p
+        .get("eyeGeometry")
+        .and_then(|g| g.get(name))
+        .and_then(|g| g.get("iris"))
+    else {
+        return Ok(None);
+    };
+    let point = |v: &Value| -> Option<(f32, f32)> {
+        let x = v.get("x")?.as_f64()?;
+        let y = v.get("y")?.as_f64()?;
+        (x.is_finite() && y.is_finite() && (0.0..=1.0).contains(&x) && (0.0..=1.0).contains(&y))
+            .then_some((
+                x as f32 * source.width as f32,
+                y as f32 * source.height as f32,
+            ))
+    };
+    let center =
+        point(&raw["center"]).ok_or_else(|| format!("{name}: missing measured iris center"))?;
+    let ring = raw["boundary"]
+        .as_array()
+        .ok_or_else(|| format!("{name}: iris boundary must contain four model points"))?;
+    if ring.len() != 4 {
+        return Err(format!(
+            "{name}: iris boundary must contain four model points"
+        ));
+    }
+    let points: Vec<_> = ring
+        .iter()
+        .map(point)
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| format!("{name}: invalid iris boundary coordinate"))?;
+    let u = (
+        (points[0].0 - points[2].0) * 0.5,
+        (points[0].1 - points[2].1) * 0.5,
+    );
+    let v = (
+        (points[3].0 - points[1].0) * 0.5,
+        (points[3].1 - points[1].1) * 0.5,
+    );
+    let det = u.0 * v.1 - u.1 * v.0;
+    let trace = u.0 * u.0 + u.1 * u.1 + v.0 * v.0 + v.1 * v.1;
+    let minimum_radius = ((trace - (trace * trace - 4.0 * det * det).max(0.0).sqrt()) * 0.5)
+        .max(0.0)
+        .sqrt();
+    if !minimum_radius.is_finite() || minimum_radius < 0.5 || det.abs() < 0.01 {
+        return Err(format!("{name}: degenerate iris projection"));
+    }
+    let aperture = symmetry_feature(p, name, source)
+        .ok_or_else(|| format!("{name}: missing source aperture"))?;
+    let mut material = EyeWidthMaterial {
+        center,
+        inverse: [v.1 / det, -v.0 / det, -u.1 / det, u.0 / det],
+        minimum_radius,
+        aperture,
+        support_inner: 0.0,
+        transition_end: 0.0,
+    };
+    let aligned = |point: (f32, f32)| {
+        let d = (point.0 - frame.center.0, point.1 - frame.center.1);
+        (
+            d.0 * frame.across.0 + d.1 * frame.across.1,
+            -d.0 * frame.across.1 + d.1 * frame.across.0,
+        )
+    };
+    let to_world = |point: (f32, f32)| {
+        (
+            frame.center.0 + point.0 * frame.across.0 - point.1 * frame.across.1,
+            frame.center.1 + point.0 * frame.across.1 + point.1 * frame.across.0,
+        )
+    };
+    let points: Vec<_> = material.aperture.iter().copied().map(aligned).collect();
+    let source_extent = points
+        .iter()
+        .map(|&(x, y)| (x / radius.0).hypot(y / radius.1))
+        .fold(0.0f32, f32::max);
+    let expansion = forward_scale.exp();
+    let requested_extent = points
+        .iter()
+        .map(|&(x, y)| (x * expansion / radius.0).hypot(y / radius.1))
+        .fold(source_extent, f32::max);
+    let outer = requested_extent + (1.0 - source_extent);
+    material.support_inner = (requested_extent / outer).powi(2);
+    let mut clearance = f32::INFINITY;
+    for side in [-1.0, 1.0] {
+        let &canthus = points
+            .iter()
+            .max_by(|a, b| (side * a.0).total_cmp(&(side * b.0)))
+            .unwrap();
+        let from = to_world(canthus);
+        let to = to_world((canthus.0 * expansion, canthus.1));
+        let a = material.ellipse_coordinate(from);
+        let b = material.ellipse_coordinate(to);
+        let d = (b.0 - a.0, b.1 - a.1);
+        let length = d.0 * d.0 + d.1 * d.1;
+        let t = if length > 0.0 {
+            -(a.0 * d.0 + a.1 * d.1) / length
+        } else {
+            0.0
+        }
+        .clamp(0.0, 1.0);
+        clearance = clearance.min(((a.0 + t * d.0).hypot(a.1 + t * d.1) - 1.0) * minimum_radius);
+    }
+    if clearance <= 1.75 {
+        return Err(format!("{name}: requested canthus trajectory conflicts with visible iris sampling guard; requires occlusion reconstruction"));
+    }
+    material.transition_end = 1.5 + (clearance - 1.5) * 0.5;
+    Ok(Some((material, (radius.0 * outer, radius.1 * outer))))
+}
+
+#[derive(Clone)]
 struct LocalWarp {
     center: (f32, f32),
     across: (f32, f32),
@@ -694,6 +982,12 @@ struct LocalWarp {
     translation: (f32, f32),
     angle: f32,
     preserve_eyes: bool,
+    whole_eye_size: bool,
+    whole_eye_tilt: bool,
+    whole_eye_spacing: bool,
+    eye_width_material: Option<std::sync::Arc<EyeWidthMaterial>>,
+    whole_eye_inner: f32,
+    eye_size_brows: Option<std::sync::Arc<Vec<FeatureBrowAnchor>>>,
 }
 
 /// A continuous pixel-space motion domain. Fixed obstruction texels and zero
@@ -812,7 +1106,16 @@ impl FeatureMotionDomain {
 /// Interpret the compact feature edits as a stationary velocity field. A
 /// direct x + v(x) warp can fold where the brow field approaches fixed eyes;
 /// integrating the same requested field changes the geometry continuously.
+#[derive(Clone, Copy, PartialEq)]
+enum FeatureFlowSubset {
+    All,
+    WidthMaterial,
+    Other,
+    EyeSpacing,
+}
+
 fn feature_flow_velocity(
+    subset: FeatureFlowSubset,
     point: (f32, f32),
     changes: &[LocalWarp],
     fixed_eyes: &[FeatureFrame],
@@ -825,6 +1128,13 @@ fn feature_flow_velocity(
         return velocity;
     }
     for warp in changes {
+        if subset == FeatureFlowSubset::WidthMaterial && warp.eye_width_material.is_none()
+            || subset == FeatureFlowSubset::EyeSpacing && !warp.whole_eye_spacing
+            || subset == FeatureFlowSubset::Other
+                && (warp.eye_width_material.is_some() || warp.whole_eye_spacing)
+        {
+            continue;
+        }
         let delta = (point.0 - warp.center.0, point.1 - warp.center.1);
         let u = delta.0 * warp.across.0 + delta.1 * warp.across.1;
         let v = -delta.0 * warp.across.1 + delta.1 * warp.across.0;
@@ -839,7 +1149,31 @@ fn feature_flow_velocity(
         } else {
             1.0
         };
-        let weight = (1.0 - d).powi(2) * selection * eye_motion;
+        // Whole-eye size, tilt and spacing have constant generators over the
+        // detected organ and its requested trajectory. Other feature fields
+        // retain their existing compact support within their ordered stage.
+        let support = if let Some(material) = &warp.eye_width_material {
+            1.0 - smoothstep(material.support_inner, 1.0, d)
+        } else if warp.whole_eye_size || warp.whole_eye_tilt || warp.whole_eye_spacing {
+            1.0 - smoothstep(warp.whole_eye_inner, 1.0, d)
+        } else {
+            (1.0 - d).powi(2)
+        };
+        let brow_motion = warp
+            .eye_size_brows
+            .as_ref()
+            .map(|anchors| {
+                anchors.iter().fold(1.0, |weight, anchor| {
+                    weight * anchor.surrounding_motion(point)
+                })
+            })
+            .unwrap_or(1.0);
+        let iris_motion = warp
+            .eye_width_material
+            .as_ref()
+            .map(|m| m.surrounding_motion(point))
+            .unwrap_or(1.0);
+        let weight = support * selection * eye_motion * brow_motion * iris_motion;
         let a = warp.angle * weight;
         // A stationary field needs the infinitesimal rotation generator.
         // Finite rotation displacement adds radial contraction on integration.
@@ -848,7 +1182,14 @@ fn feature_flow_velocity(
         velocity.0 += du * warp.across.0 - dv * warp.across.1;
         velocity.1 += du * warp.across.1 + dv * warp.across.0;
     }
-    let post = symmetry_inverse(point.0, point.1, post_warps);
+    let post = if matches!(
+        subset,
+        FeatureFlowSubset::WidthMaterial | FeatureFlowSubset::EyeSpacing
+    ) {
+        point
+    } else {
+        symmetry_inverse(point.0, point.1, post_warps)
+    };
     velocity.0 += (post.0 - point.0) * selection;
     velocity.1 += (post.1 - point.1) * selection;
     velocity
@@ -870,12 +1211,28 @@ fn feature_flow_steps(
             let speed = (warp.radius.0 * warp.scale.0.abs() + warp.translation.0.abs())
                 .hypot(warp.radius.1 * warp.scale.1.abs() + warp.translation.1.abs())
                 + warp.radius.0.max(warp.radius.1) * warp.angle.abs();
-            let support_gradient = 1.54 / warp.radius.0.min(warp.radius.1);
+            let support_gradient = (if let Some(material) = &warp.eye_width_material {
+                3.0 / (1.0 - material.support_inner)
+            } else if warp.whole_eye_size || warp.whole_eye_tilt || warp.whole_eye_spacing {
+                3.0 / (1.0 - warp.whole_eye_inner)
+            } else {
+                1.54
+            }) / warp.radius.0.min(warp.radius.1);
             warp.scale.0.abs().max(warp.scale.1.abs())
                 + warp.angle.abs()
                 + speed
                     * (support_gradient
                         + coverage_gradient
+                        + warp
+                            .eye_width_material
+                            .as_ref()
+                            .map(|m| 1.5 / (m.transition_end - 1.5))
+                            .unwrap_or(0.0)
+                        + warp
+                            .eye_size_brows
+                            .as_ref()
+                            .map(|anchors| anchors.len() as f32 * 0.75)
+                            .unwrap_or(0.0)
                         + if warp.preserve_eyes {
                             eye_gradient
                         } else {
@@ -905,7 +1262,59 @@ fn integrate_feature_flow(
     steps: usize,
     direction: f32,
 ) -> (f32, f32) {
-    let velocity = |point| feature_flow_velocity(point, changes, fixed_eyes, post_warps, coverage);
+    if !changes
+        .iter()
+        .any(|w| w.eye_width_material.is_some() || w.whole_eye_spacing)
+    {
+        return integrate_feature_flow_stage(
+            FeatureFlowSubset::All,
+            point,
+            changes,
+            fixed_eyes,
+            post_warps,
+            coverage,
+            steps,
+            direction,
+        );
+    }
+    // Fixed organ order: width reshapes source aperture, size/pose/other
+    // fields transport it, then spacing translates the resulting whole eye.
+    // Reverse sampling undoes those operators in reverse order and samples
+    // the image once. Every stage tends continuously to identity at zero.
+    let order = if direction < 0.0 {
+        [
+            FeatureFlowSubset::WidthMaterial,
+            FeatureFlowSubset::Other,
+            FeatureFlowSubset::EyeSpacing,
+        ]
+    } else {
+        [
+            FeatureFlowSubset::EyeSpacing,
+            FeatureFlowSubset::Other,
+            FeatureFlowSubset::WidthMaterial,
+        ]
+    };
+    let mut result = point;
+    for subset in order {
+        result = integrate_feature_flow_stage(
+            subset, result, changes, fixed_eyes, post_warps, coverage, steps, direction,
+        );
+    }
+    result
+}
+
+fn integrate_feature_flow_stage(
+    subset: FeatureFlowSubset,
+    point: (f32, f32),
+    changes: &[LocalWarp],
+    fixed_eyes: &[FeatureFrame],
+    post_warps: &[SymmetryWarp],
+    coverage: &impl Fn(f32, f32) -> f32,
+    steps: usize,
+    direction: f32,
+) -> (f32, f32) {
+    let velocity =
+        |point| feature_flow_velocity(subset, point, changes, fixed_eyes, post_warps, coverage);
     let initial = velocity(point);
     if initial.0 == 0.0 && initial.1 == 0.0 {
         return point;
@@ -915,13 +1324,26 @@ fn integrate_feature_flow(
         (point.0 + delta.0 * time, point.1 + delta.1 * time)
     };
     let mut current = point;
+    // Photographic coordinates can be hundreds or thousands of pixels while
+    // each RK step is only hundredths of a pixel. Carry the low part lost
+    // by f32 addition instead of accumulating one rounding error per step.
+    let mut carry = (0.0f32, 0.0f32);
     for _ in 0..steps {
         let k1 = velocity(current);
         let k2 = velocity(advance(current, k1, dt * 0.5));
         let k3 = velocity(advance(current, k2, dt * 0.5));
         let k4 = velocity(advance(current, k3, dt));
-        current.0 += dt / 6.0 * (k1.0 + 2.0 * k2.0 + 2.0 * k3.0 + k4.0);
-        current.1 += dt / 6.0 * (k1.1 + 2.0 * k2.1 + 2.0 * k3.1 + k4.1);
+        let step = (
+            dt / 6.0 * (k1.0 + 2.0 * k2.0 + 2.0 * k3.0 + k4.0),
+            dt / 6.0 * (k1.1 + 2.0 * k2.1 + 2.0 * k3.1 + k4.1),
+        );
+        let corrected = (step.0 - carry.0, step.1 - carry.1);
+        let next = (current.0 + corrected.0, current.1 + corrected.1);
+        carry = (
+            (next.0 - current.0) - corrected.0,
+            (next.1 - current.1) - corrected.1,
+        );
+        current = next;
     }
     current
 }
@@ -994,6 +1416,16 @@ pub(crate) fn local_adjust_kind(
     } else {
         Vec::new()
     };
+    let eye_size_brows = std::sync::Arc::new(if semantic_features {
+        ["leftBrow", "rightBrow"]
+            .iter()
+            .filter_map(|name| symmetry_feature(p, name, source))
+            .map(FeatureBrowAnchor::new)
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    });
+    let mut eye_width_error: Option<String> = None;
     let mut changes = Vec::<LocalWarp>::new();
     if kind == "feature.adjust" {
         if let Some(warp) = nose_alignment(p, source, percent(values, "noseStraight")) {
@@ -1074,7 +1506,7 @@ pub(crate) fn local_adjust_kind(
                 width: region.width * source.width as f32,
                 height: region.height * source.height as f32,
             };
-            let (frame, radius, translation) = if semantic_features {
+            let (mut frame, radius, translation) = if semantic_features {
                 if let Some((name, origin_x, origin_y, width, height)) = feature {
                     let Some(mut frame) = feature_frame(p, name, source) else {
                         return;
@@ -1104,6 +1536,123 @@ pub(crate) fn local_adjust_kind(
                     (mx * fallback.width, my * fallback.height),
                 )
             };
+            let mut radius = radius;
+            let whole_eye_inner = if semantic_features && key == "eyeSpacing" {
+                let name = if cx < 0.5 { "leftEye" } else { "rightEye" };
+                let points = symmetry_feature(p, name, source).unwrap();
+                let aligned: Vec<_> = points
+                    .iter()
+                    .map(|&(x, y)| {
+                        let dx = x - frame.center.0;
+                        let dy = y - frame.center.1;
+                        (
+                            dx * frame.across.0 + dy * frame.across.1,
+                            -dx * frame.across.1 + dy * frame.across.0,
+                        )
+                    })
+                    .collect();
+                let source_extent = aligned
+                    .iter()
+                    .map(|&(u, v)| (u / radius.0).hypot(v / radius.1))
+                    .fold(0.0f32, f32::max);
+                // Enclose the preceding organ shape, size and rotation.
+                // Independent coordinate extrema give a conservative bound
+                // for the rotated aperture plus the translation sweep.
+                let width_scale = (EYE_WIDTH_LOG_SCALE * percent(values, "eyeWidth")).exp();
+                let size_scale = (EYE_SIZE_LOG_SCALE * percent(values, "eyeSize"))
+                    .max(0.0)
+                    .exp();
+                let sign = if cx < 0.5 { -1.0 } else { 1.0 };
+                let theta = -sign * EYE_TILT_RADIANS * percent(values, "eyeTilt");
+                let forward = (-translation.0 * amount, -translation.1 * amount);
+                let mut requested_extent = source_extent;
+                for &(u, v) in &aligned {
+                    for width in [1.0, width_scale] {
+                        let x = angular_component_extent(u * width, -v, theta) * size_scale
+                            + forward.0.abs() * 0.5;
+                        let y = angular_component_extent(v, u * width, theta) * size_scale
+                            + forward.1.abs() * 0.5;
+                        requested_extent = requested_extent.max((x / radius.0).hypot(y / radius.1));
+                    }
+                }
+                // The plateau encloses both endpoints of the requested
+                // translation, hence their whole straight swept segment.
+                // Center its support at the trajectory midpoint while the
+                // constant translation generator keeps the original request.
+                frame.center.0 += (forward.0 * frame.across.0 - forward.1 * frame.across.1) * 0.5;
+                frame.center.1 += (forward.0 * frame.across.1 + forward.1 * frame.across.0) * 0.5;
+                let outer = requested_extent + (1.0 - source_extent);
+                radius.0 *= outer;
+                radius.1 *= outer;
+                (requested_extent / outer).powi(2)
+            } else if semantic_features && matches!(key, "eyeSize" | "eyeTilt") {
+                let name = if cx < 0.5 { "leftEye" } else { "rightEye" };
+                let points = symmetry_feature(p, name, source).unwrap();
+                let aligned: Vec<_> = points
+                    .iter()
+                    .map(|&(x, y)| {
+                        let dx = x - frame.center.0;
+                        let dy = y - frame.center.1;
+                        (
+                            dx * frame.across.0 + dy * frame.across.1,
+                            -dx * frame.across.1 + dy * frame.across.0,
+                        )
+                    })
+                    .collect();
+                let source_extent = aligned
+                    .iter()
+                    .map(|&(u, v)| ((u / radius.0).powi(2) + (v / radius.1).powi(2)).sqrt())
+                    .fold(0.0f32, f32::max);
+                let prior_width = if p
+                    .get("eyeGeometry")
+                    .and_then(|g| g.get(name))
+                    .and_then(|g| g.get("iris"))
+                    .is_some()
+                {
+                    (EYE_WIDTH_LOG_SCALE * percent(values, "eyeWidth")).exp()
+                } else {
+                    1.0
+                };
+                let sign = if cx < 0.5 { -1.0 } else { 1.0 };
+                let theta = -sign * EYE_TILT_RADIANS * percent(values, "eyeTilt");
+                let scale = (EYE_SIZE_LOG_SCALE * percent(values, "eyeSize"))
+                    .max(0.0)
+                    .exp();
+                let mut swept_extent = source_extent;
+                for &(u, v) in &aligned {
+                    for width in [1.0, prior_width] {
+                        swept_extent =
+                            swept_extent.max(rotated_eye_extent((u * width, v), radius, theta));
+                    }
+                }
+                // Size and tilt share one source-organ platform, covering
+                // the full requested similarity trajectory. Preserve the
+                // original transition width outside that analytic envelope.
+                let requested_extent = swept_extent * scale;
+                let outer = requested_extent + (1.0 - source_extent);
+                radius.0 *= outer;
+                radius.1 *= outer;
+                (requested_extent / outer).powi(2)
+            } else {
+                0.0
+            };
+            let eye_width_material = if semantic_features && key == "eyeWidth" {
+                let name = if cx < 0.5 { "leftEye" } else { "rightEye" };
+                match eye_width_material(p, name, source, frame, radius, -sx * amount) {
+                    Ok(Some((material, expanded))) => {
+                        radius = expanded;
+                        Some(std::sync::Arc::new(material))
+                    }
+                    Ok(None) => None,
+                    Err(error) => {
+                        eye_width_error = Some(error);
+                        return;
+                    }
+                }
+            } else {
+                None
+            };
+            let protect_width_brows = eye_width_material.is_some();
             changes.push(LocalWarp {
                 center: frame.center,
                 across: frame.across,
@@ -1112,12 +1661,43 @@ pub(crate) fn local_adjust_kind(
                 translation: (translation.0 * amount, translation.1 * amount),
                 angle: angle * amount,
                 preserve_eyes: key.starts_with("brow"),
+                whole_eye_size: semantic_features && key == "eyeSize",
+                whole_eye_tilt: semantic_features && key == "eyeTilt",
+                whole_eye_spacing: semantic_features && key == "eyeSpacing",
+                eye_width_material,
+                whole_eye_inner,
+                eye_size_brows: (semantic_features
+                    && (matches!(key, "eyeSize" | "eyeTilt" | "eyeSpacing")
+                        || protect_width_brows))
+                    .then(|| eye_size_brows.clone()),
             });
         }
     };
     for (cx, sign) in [(0.32, -1.0), (0.68, 1.0)] {
-        add("eyeSize", cx, 0.39, 0.20, 0.13, -0.3, -0.3, 0.0, 0.0, 0.0);
-        add("eyeWidth", cx, 0.39, 0.2, 0.13, -0.3, 0.0, 0.0, 0.0, 0.0);
+        add(
+            "eyeSize",
+            cx,
+            0.39,
+            0.20,
+            0.13,
+            -EYE_SIZE_LOG_SCALE,
+            -EYE_SIZE_LOG_SCALE,
+            0.0,
+            0.0,
+            0.0,
+        );
+        add(
+            "eyeWidth",
+            cx,
+            0.39,
+            0.2,
+            0.13,
+            -EYE_WIDTH_LOG_SCALE,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        );
         add("eyeHeight", cx, 0.39, 0.2, 0.13, 0.0, -0.3, 0.0, 0.0, 0.0);
         add(
             "eyeSpacing",
@@ -1141,7 +1721,7 @@ pub(crate) fn local_adjust_kind(
             0.0,
             0.0,
             0.0,
-            sign * 0.3,
+            sign * EYE_TILT_RADIANS,
         );
         add(
             "eyeCorner",
@@ -1292,8 +1872,13 @@ pub(crate) fn local_adjust_kind(
             0.63,
             0.07,
             0.07,
-            -0.2,
-            -0.15,
+            // Nostrils are a small, high-contrast target.  The previous
+            // coefficients produced only sub-pixel contour travel on the
+            // photographic masks, so the control appeared inert even though
+            // the field was non-zero.  Keep the support local while giving
+            // the bilateral opening a visible, reversible response.
+            -0.4,
+            -0.25,
             0.0,
             0.0,
             0.0,
@@ -1351,6 +1936,10 @@ pub(crate) fn local_adjust_kind(
         0.04,
         0.0,
     );
+
+    if let Some(error) = eye_width_error {
+        return Err(ImageError::InvalidOperation(error));
+    }
 
     // Color-only edits do not need a full-image frozen raster or inverse
     // sampling. Evaluate semantic protection only where local_color changed
@@ -2121,6 +2710,1033 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
+    fn eye_size_scales_aperture_and_inner_texture_together_at_common_settings() {
+        assert_eye_size_similarity_for_polygon(false);
+    }
+    #[test]
+    fn eye_size_oblique_polygon_expands_support_instead_of_clipping_request() {
+        assert_eye_size_similarity_for_polygon(true);
+    }
+    fn assert_eye_size_similarity_for_polygon(slanted: bool) {
+        let width = 256;
+        let height = 160;
+        let pixels = (0..width * height)
+            .flat_map(|i| {
+                [
+                    (i % 251) as u8,
+                    ((i * 7) % 251) as u8,
+                    ((i * 13) % 251) as u8,
+                    255,
+                ]
+            })
+            .collect();
+        let source = RgbaImage::new(width, height, pixels).unwrap();
+        let polygon = |cx: f32, cy: f32, rx: f32, ry: f32| {
+            let points: Vec<_> = (0..16)
+                .map(|i| {
+                    let a = i as f32 * std::f32::consts::TAU / 16.0;
+                    json!({"x":(cx+rx*a.cos())/width as f32,"y":(cy+ry*a.sin())/height as f32})
+                })
+                .collect();
+            let points = if slanted && (rx - 24.0).abs() < 0.1 {
+                [(-24.0, -9.0), (-4.0, -9.0), (24.0, 9.0), (4.0, 9.0)]
+                    .iter()
+                    .map(|&(x, y)| json!({"x":(cx+x)/width as f32,"y":(cy+y)/height as f32}))
+                    .collect()
+            } else {
+                points
+            };
+            json!({"shape":"polygon","points":points,"feather":0})
+        };
+        for amount in [-100.0f32, -30.0, 10.0, 30.0, 100.0] {
+            let params = json!({"adjustments":{"eyeSize":amount},"semanticMasks":{
+                "leftEye":polygon(80.0,76.0,24.0,9.0),"rightEye":polygon(176.0,76.0,24.0,9.0),
+                "leftBrow":polygon(80.0,43.0,31.0,5.0),"rightBrow":polygon(176.0,43.0,31.0,5.0)}});
+            RECORD_MAPPING.set(true);
+            RECORD_FLOW.set(true);
+            let result = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_MAPPING.set(false);
+            RECORD_FLOW.set(false);
+            let mapping = LAST_MAPPING.take().unwrap();
+            let report = LAST_FLOW_REPORT.take().unwrap();
+            let actual_inverse = |x: f32, y: f32| {
+                let x0 = x.floor() as usize;
+                let y0 = y.floor() as usize;
+                let tx = x - x.floor();
+                let ty = y - y.floor();
+                let i = y0 * width as usize + x0;
+                let p = [
+                    mapping[i],
+                    mapping[i + 1],
+                    mapping[i + width as usize],
+                    mapping[i + width as usize + 1],
+                ];
+                (
+                    p[0].0 * (1.0 - tx) * (1.0 - ty)
+                        + p[1].0 * tx * (1.0 - ty)
+                        + p[2].0 * (1.0 - tx) * ty
+                        + p[3].0 * tx * ty,
+                    p[0].1 * (1.0 - tx) * (1.0 - ty)
+                        + p[1].1 * tx * (1.0 - ty)
+                        + p[2].1 * (1.0 - tx) * ty
+                        + p[3].1 * tx * ty,
+                )
+            };
+            let scale = (0.3 * amount / 100.0).exp();
+            for cx in [80.0, 176.0] {
+                // Independent behavioral oracle: aperture, pupil/iris texture,
+                // and intermediate points receive the same requested scale.
+                for (rx, ry) in [(24.0, 9.0), (12.0, 6.0), (4.0, 4.0)] {
+                    for i in 0..32 {
+                        let angle = i as f32 * std::f32::consts::TAU / 32.0;
+                        let point = (cx + rx * angle.cos(), 76.0 + ry * angle.sin());
+                        let target = (cx + (point.0 - cx) * scale, 76.0 + (point.1 - 76.0) * scale);
+                        let back = actual_inverse(target.0, target.1);
+                        let error = (back.0 - point.0).hypot(back.1 - point.1);
+                        assert!(error<0.025,"amount {amount}, source {point:?}, expected target {target:?}, actual inverse {back:?}, error {error}");
+                    }
+                }
+            }
+            for (name, cx) in [("leftEye", 80.0), ("rightEye", 176.0)] {
+                let points = symmetry_feature(&params, name, &source).unwrap();
+                for (a, b) in points
+                    .iter()
+                    .zip(points.iter().cycle().skip(1))
+                    .take(points.len())
+                {
+                    // The oblique extremal vertices are the counterexample:
+                    // checking only an ellipse ring would miss these corners.
+                    for t in [0.0, 0.25, 0.5, 0.75] {
+                        let point = (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
+                        let target = (cx + (point.0 - cx) * scale, 76.0 + (point.1 - 76.0) * scale);
+                        let back = actual_inverse(target.0, target.1);
+                        let error = (back.0 - point.0).hypot(back.1 - point.1);
+                        assert!(error<0.025,"actual polygon amount {amount}, source {point:?}, expected target {target:?}, actual inverse {back:?}, error {error}");
+                    }
+                }
+            }
+            assert_eq!(report["foldPixels"], 0);
+            assert!(report["maxInverseFlowReverseErrorPx"].as_f64().unwrap() < 0.01);
+            // The anatomical eyebrow texture stays put. Expanded support may
+            // legitimately move nearby skin outside the detected brow polygon.
+            let brows: Vec<_> = ["leftBrow", "rightBrow"]
+                .iter()
+                .map(|name| PreparedMask::new(&params["semanticMasks"][name]))
+                .collect();
+            for y in 35..51 {
+                for x in 45..210 {
+                    if brows.iter().any(|mask| {
+                        mask.coverage(
+                            (x as f32 + 0.5) / width as f32,
+                            (y as f32 + 0.5) / height as f32,
+                            width,
+                            height,
+                        ) >= 0.5
+                    }) {
+                        let i = ((y * width + x) * 4) as usize;
+                        assert_eq!(&source.pixels[i..i + 4], &result.pixels[i..i + 4]);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_size_composes_with_existing_eye_fields_without_zero_switch() {
+        let source = RgbaImage::new(
+            256,
+            160,
+            (0..256 * 160)
+                .flat_map(|i| {
+                    [
+                        (i % 251) as u8,
+                        ((i * 7) % 251) as u8,
+                        ((i * 13) % 251) as u8,
+                        255,
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        let eye = |cx: f32| {
+            json!({"shape":"polygon","feather":0,"points":[
+            {"x":(cx-24.0)/256.0,"y":76.0/160.0},{"x":cx/256.0,"y":67.0/160.0},
+            {"x":(cx+24.0)/256.0,"y":76.0/160.0},{"x":cx/256.0,"y":85.0/160.0}]})
+        };
+        for key in ["eyeWidth", "eyeTilt", "browPeak"] {
+            let mut previous: Option<(Vec<(f32, f32)>, RgbaImage)> = None;
+            for extra in [0.0, 0.001, 20.0] {
+                let params = json!({"adjustments":{"eyeSize":30,key:extra},"semanticMasks":{"leftEye":eye(80.0),"rightEye":eye(176.0),"leftBrow":{"shape":"polygon","points":[{"x":0.20,"y":0.25},{"x":0.32,"y":0.21},{"x":0.44,"y":0.25},{"x":0.32,"y":0.26}]},"rightBrow":{"shape":"polygon","points":[{"x":0.56,"y":0.25},{"x":0.68,"y":0.21},{"x":0.80,"y":0.25},{"x":0.68,"y":0.26}]}}});
+                RECORD_MAPPING.set(true);
+                RECORD_FLOW.set(true);
+                let result = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                RECORD_FLOW.set(false);
+                let mapping = LAST_MAPPING.take().unwrap();
+                let report = LAST_FLOW_REPORT.take().unwrap();
+                assert_eq!(report["foldPixels"], 0, "{key}={extra}: {report}");
+                assert!(
+                    report["maxInverseFlowReverseErrorPx"].as_f64().unwrap() < 0.01,
+                    "{key}={extra}: {report}"
+                );
+                if extra == 0.001 {
+                    let (old, old_image) = previous.as_ref().unwrap();
+                    let max = mapping
+                        .iter()
+                        .zip(old)
+                        .map(|(a, b)| (a.0 - b.0).hypot(a.1 - b.1))
+                        .fold(0.0f32, f32::max);
+                    assert!(max < 0.01, "{key}: 0 -> 0.001 map discontinuity {max}");
+                    assert!(
+                        result
+                            .pixels
+                            .iter()
+                            .zip(&old_image.pixels)
+                            .all(|(a, b)| a.abs_diff(*b) <= 1),
+                        "{key}: pixels jump at zero"
+                    );
+                }
+                if extra == 20.0 {
+                    let (old, _) = previous.as_ref().unwrap();
+                    let max = mapping
+                        .iter()
+                        .zip(old)
+                        .map(|(a, b)| (a.0 - b.0).hypot(a.1 - b.1))
+                        .fold(0.0f32, f32::max);
+                    assert!(
+                        max > 0.1,
+                        "{key}: combination must actually respond, max {max}"
+                    );
+                }
+                previous = Some((mapping, result));
+            }
+        }
+    }
+
+    #[test]
+    fn eye_size_manual_fallback_keeps_legacy_rgba_output() {
+        let (width, height) = (72, 60);
+        let source = RgbaImage::new(
+            width,
+            height,
+            (0..width * height)
+                .flat_map(|i| {
+                    let x = i % width;
+                    let y = i / width;
+                    [
+                        ((x * 11 + y * 3) % 251) as u8,
+                        ((x * 7 + y * 13) % 251) as u8,
+                        ((x * 19 + y * 17) % 251) as u8,
+                        (100 + (x + y) % 156) as u8,
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        // Full-RGBA FNV-1a goldens from the unchanged legacy mapper,
+        // captured before this candidate; no semantic masks are supplied.
+        for (amount, expected) in [
+            (-100, 0x7bc22786458aa97eu64),
+            (30, 0x6d454437f5ad82b4u64),
+            (100, 0x43b3bd9dbe721be3u64),
+        ] {
+            let params = json!({"adjustments":{"eyeSize":amount},"region":{"x":0.1,"y":0.1,"width":0.8,"height":0.8}});
+            let result = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            let hash = result.pixels.iter().fold(14695981039346656037u64, |h, b| {
+                (h ^ (*b as u64)).wrapping_mul(1099511628211)
+            });
+            assert_eq!(hash, expected, "manual fallback eyeSize {amount} changed");
+        }
+    }
+
+    #[test]
+    fn eye_width_moves_canthi_without_stretching_observed_iris() {
+        let (width, height) = (256, 160);
+        let source = RgbaImage::new(
+            width,
+            height,
+            (0..width * height)
+                .flat_map(|i| {
+                    [
+                        (i % 251) as u8,
+                        ((i * 7) % 251) as u8,
+                        ((i * 13) % 251) as u8,
+                        255,
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        let eye = |cx: f32| {
+            let points: Vec<_> = (0..32)
+                .map(|i| {
+                    let a = i as f32 * std::f32::consts::TAU / 32.0;
+                    json!({"x":(cx+24.0*a.cos())/width as f32,"y":(76.0+6.0*a.sin())/height as f32})
+                })
+                .collect();
+            json!({"shape":"polygon","points":points,"feather":0})
+        };
+        let iris = |cx: f32| json!({"iris":{"center":{"x":cx/256.0,"y":76.0/160.0},"boundary":[{"x":(cx+9.0)/256.0,"y":76.0/160.0},{"x":cx/256.0,"y":67.0/160.0},{"x":(cx-9.0)/256.0,"y":76.0/160.0},{"x":cx/256.0,"y":85.0/160.0}]}});
+        for amount in [-30.0f32, 30.0] {
+            let params = json!({"adjustments":{"eyeWidth":amount},"semanticMasks":{"leftEye":eye(80.0),"rightEye":eye(176.0)},"eyeGeometry":{"leftEye":iris(75.0),"rightEye":iris(181.0)}});
+            RECORD_MAPPING.set(true);
+            RECORD_FLOW.set(true);
+            let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_MAPPING.set(false);
+            RECORD_FLOW.set(false);
+            let mapping = LAST_MAPPING.take().unwrap();
+            let report = LAST_FLOW_REPORT.take().unwrap();
+            let interpolate = |x: f32, y: f32| {
+                let x0 = x.floor() as usize;
+                let y0 = y.floor() as usize;
+                let tx = x - x.floor();
+                let ty = y - y.floor();
+                let i = y0 * 256 + x0;
+                let v = [
+                    mapping[i],
+                    mapping[i + 1],
+                    mapping[i + 256],
+                    mapping[i + 257],
+                ];
+                (
+                    v[0].0 * (1.0 - tx) * (1.0 - ty)
+                        + v[1].0 * tx * (1.0 - ty)
+                        + v[2].0 * (1.0 - tx) * ty
+                        + v[3].0 * tx * ty,
+                    v[0].1 * (1.0 - tx) * (1.0 - ty)
+                        + v[1].1 * tx * (1.0 - ty)
+                        + v[2].1 * (1.0 - tx) * ty
+                        + v[3].1 * tx * ty,
+                )
+            };
+            for (cx, iris_cx) in [(80.0, 75.0), (176.0, 181.0)] {
+                for sign in [-1.0, 1.0] {
+                    let original = (cx + sign * 24.0, 76.0);
+                    let target = (cx + sign * 24.0 * (amount * 0.3 / 100.0).exp(), 76.0);
+                    let back = interpolate(target.0, target.1);
+                    assert!((back.0-original.0).hypot(back.1-original.1)<0.025,"eyeWidth must move the actual canthus to its requested target: {amount}, {original:?}, {back:?}");
+                }
+                for y in 70..=82 {
+                    for x in (iris_cx - 9.0) as u32..=(iris_cx + 9.0) as u32 {
+                        let dx = x as f32 - iris_cx;
+                        let dy = y as f32 - 76.0;
+                        if dx * dx + dy * dy <= 81.0
+                            && ((x as f32 - cx) / 24.0).powi(2) + (dy / 6.0).powi(2) <= 1.0
+                        {
+                            let i = (y * width + x) as usize;
+                            assert_eq!(
+                                mapping[i],
+                                (x as f32, y as f32),
+                                "visible iris material must remain stationary"
+                            );
+                            assert_eq!(
+                                &output.pixels[i * 4..i * 4 + 4],
+                                &source.pixels[i * 4..i * 4 + 4]
+                            );
+                        }
+                    }
+                }
+            }
+            assert_eq!(report["foldPixels"], 0);
+            assert_eq!(report["fixedDonorImports"], 0);
+            assert!(report["maxInverseFlowReverseErrorPx"].as_f64().unwrap() < 0.01);
+        }
+    }
+
+    fn measured_iris_feature_fixture() -> (RgbaImage, Value) {
+        let source = RgbaImage::new(
+            256,
+            160,
+            (0..256 * 160)
+                .flat_map(|i| {
+                    [
+                        (i % 251) as u8,
+                        ((i * 7) % 251) as u8,
+                        ((i * 13) % 251) as u8,
+                        255,
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        let eye = |cx: f32| {
+            let points: Vec<_> = (0..32)
+                .map(|i| {
+                    let a = i as f32 * std::f32::consts::TAU / 32.0;
+                    json!({"x":(cx+24.0*a.cos())/256.0,"y":(76.0+6.0*a.sin())/160.0})
+                })
+                .collect();
+            json!({"shape":"polygon","points":points,"feather":0})
+        };
+        let iris = |cx: f32| json!({"iris":{"center":{"x":cx/256.0,"y":76.0/160.0},"boundary":[{"x":(cx+9.0)/256.0,"y":76.0/160.0},{"x":cx/256.0,"y":67.0/160.0},{"x":(cx-9.0)/256.0,"y":76.0/160.0},{"x":cx/256.0,"y":85.0/160.0}]}});
+        (
+            source,
+            json!({"adjustments":{"eyeWidth":30},"semanticMasks":{"leftEye":eye(80.0),"rightEye":eye(176.0)},"eyeGeometry":{"leftEye":iris(75.0),"rightEye":iris(181.0)}}),
+        )
+    }
+
+    #[test]
+    fn eye_width_does_not_treat_hidden_iris_projection_as_observed_eyelid() {
+        let (source, params) = measured_iris_feature_fixture();
+        RECORD_MAPPING.set(true);
+        local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+        RECORD_MAPPING.set(false);
+        let mapping = LAST_MAPPING.take().unwrap();
+        // These points are inside the predicted iris ellipse, but above the
+        // actually observed aperture and outside the 1.5px sampling halo.
+        for (x, y) in [(79usize, 68usize), (177, 68)] {
+            let mapped = mapping[y * 256 + x];
+            assert!(
+                (mapped.0 - x as f32).hypot(mapped.1 - y as f32) > 0.001,
+                "hidden predicted iris must not freeze eyelid texture: {mapped:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn eye_width_material_only_receives_the_existing_size_and_pose_targets() {
+        let (source, base) = measured_iris_feature_fixture();
+        for key in ["eyeSize", "eyeSpacing", "eyeTilt"] {
+            let mut params = base.clone();
+            params["adjustments"] = json!({"eyeWidth":30,key:30});
+            RECORD_WIDTH_MATERIAL.set(true);
+            RECORD_FLOW.set(true);
+            RECORD_MAPPING.set(true);
+            local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_WIDTH_MATERIAL.set(false);
+            RECORD_FLOW.set(false);
+            RECORD_MAPPING.set(false);
+            let report = LAST_WIDTH_MATERIAL_REPORT.take().unwrap();
+            let flow = LAST_FLOW_REPORT.take().unwrap();
+            let mapping = LAST_MAPPING.take().unwrap();
+            for eye in report.as_array().unwrap() {
+                assert!(eye["observedIrisSamples"].as_u64().unwrap() > 50);
+                assert_eq!(eye["maxAdditionalMotionFromWidthPx"], 0.0, "{key}: {eye}");
+                assert_eq!(eye["maxAdditionalJacobianColumnNorm"], 0.0, "{key}: {eye}");
+            }
+            for x in [75usize, 181] {
+                let mapped = mapping[76 * 256 + x];
+                assert!(
+                    (mapped.0 - x as f32).hypot(mapped.1 - 76.0) > 0.01,
+                    "{key} must still move/resize the iris"
+                );
+            }
+            assert_eq!(flow["foldPixels"], 0, "{key}: {flow}");
+            assert!(
+                flow["maxInverseFlowReverseErrorPx"].as_f64().unwrap() < 0.01,
+                "{key}: {flow}"
+            );
+        }
+    }
+
+    #[test]
+    fn eye_width_ordered_composition_is_continuous_when_either_control_crosses_zero() {
+        let (source, base) = measured_iris_feature_fixture();
+        for key in ["eyeSize", "eyeSpacing", "eyeTilt"] {
+            for fixed in [-30.0, 30.0] {
+                for changing_width in [false, true] {
+                    let mut previous: Option<(Vec<(f32, f32)>, RgbaImage)> = None;
+                    for tiny in [-0.001, 0.0, 0.001] {
+                        let mut params = base.clone();
+                        params["adjustments"] = if changing_width {
+                            json!({"eyeWidth":tiny,key:fixed})
+                        } else {
+                            json!({"eyeWidth":fixed,key:tiny})
+                        };
+                        RECORD_MAPPING.set(true);
+                        let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                        RECORD_MAPPING.set(false);
+                        let mapping = LAST_MAPPING.take().unwrap();
+                        if let Some((old, old_pixels)) = previous {
+                            let max = mapping
+                                .iter()
+                                .zip(old)
+                                .map(|(a, b)| (a.0 - b.0).hypot(a.1 - b.1))
+                                .fold(0.0f32, f32::max);
+                            assert!(max<0.01,"{key}, fixed={fixed}, changing_width={changing_width}, tiny={tiny}: map jump {max}");
+                            assert!(output.pixels.iter().zip(old_pixels.pixels).all(|(a,b)|a.abs_diff(b)<=1),"{key}, fixed={fixed}, changing_width={changing_width}, tiny={tiny}: pixels jumped");
+                        }
+                        previous = Some((mapping, output));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_width_zero_preserves_existing_size_and_pose_output_exactly() {
+        let (source, base) = measured_iris_feature_fixture();
+        for key in ["eyeSize", "eyeSpacing", "eyeTilt"] {
+            for amount in [-30.0, 30.0] {
+                let mut params = base.clone();
+                params["adjustments"] = json!({"eyeWidth":0,key:amount});
+                RECORD_MAPPING.set(true);
+                let measured = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                let measured_mapping = LAST_MAPPING.take().unwrap();
+                params.as_object_mut().unwrap().remove("eyeGeometry");
+                params["adjustments"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("eyeWidth");
+                RECORD_MAPPING.set(true);
+                let existing = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                assert_eq!(
+                    measured_mapping,
+                    LAST_MAPPING.take().unwrap(),
+                    "{key} {amount}: zero-width must not alter source-coordinate mapping"
+                );
+                assert_eq!(
+                    measured.pixels, existing.pixels,
+                    "{key} {amount}: zero-width must not alter output pixels"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn eye_width_size_composition_moves_canthi_to_full_requested_targets() {
+        let (source, base) = measured_iris_feature_fixture();
+        for width in [-60.0f32, 60.0] {
+            for size in [-60.0f32, 60.0] {
+                let mut params = base.clone();
+                params["adjustments"] = json!({"eyeWidth":width,"eyeSize":size});
+                RECORD_MAPPING.set(true);
+                let _output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                let mapping = LAST_MAPPING.take().unwrap();
+                for cx in [80.0, 176.0] {
+                    for sign in [-1.0, 1.0] {
+                        let original = (cx + sign * 24.0, 76.0);
+                        let target = (
+                            cx + sign * 24.0 * ((width + size) * 0.3 / 100.0).exp(),
+                            76.0,
+                        );
+                        let x0 = target.0.floor() as usize;
+                        let tx = target.0 - target.0.floor();
+                        let a = mapping[76 * 256 + x0];
+                        let b = mapping[76 * 256 + x0 + 1];
+                        let back = (a.0 * (1.0 - tx) + b.0 * tx, a.1 * (1.0 - tx) + b.1 * tx);
+                        let error = (back.0 - original.0).hypot(back.1 - original.1);
+                        assert!(error<0.025,"width={width} size={size}: full canthus target missed: original={original:?} target={target:?} sampled_inverse={back:?} error={error}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_spacing_moves_entire_detected_eye_by_requested_translation() {
+        let (source, base) = measured_iris_feature_fixture();
+        for amount in [-30.0f32, 30.0] {
+            let mut params = base.clone();
+            params["adjustments"] = json!({"eyeSpacing":amount});
+            RECORD_MAPPING.set(true);
+            RECORD_FLOW.set(true);
+            local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_MAPPING.set(false);
+            RECORD_FLOW.set(false);
+            let mapping = LAST_MAPPING.take().unwrap();
+            let report = LAST_FLOW_REPORT.take().unwrap();
+            for (cx, sign) in [(80.0, -1.0), (176.0, 1.0)] {
+                let shift = sign * 0.08 * (48.0 / 0.26) * (amount / 100.0);
+                for (rx, ry) in [(24.0, 6.0), (12.0, 4.0), (4.0, 3.0)] {
+                    for i in 0..32 {
+                        let a = i as f32 * std::f32::consts::TAU / 32.0;
+                        let original = (cx + rx * a.cos(), 76.0 + ry * a.sin());
+                        let target = (original.0 + shift, original.1);
+                        let x0 = target.0.floor() as usize;
+                        let y0 = target.1.floor() as usize;
+                        let tx = target.0 - target.0.floor();
+                        let ty = target.1 - target.1.floor();
+                        let index = y0 * 256 + x0;
+                        let v = [
+                            mapping[index],
+                            mapping[index + 1],
+                            mapping[index + 256],
+                            mapping[index + 257],
+                        ];
+                        let back = (
+                            v[0].0 * (1.0 - tx) * (1.0 - ty)
+                                + v[1].0 * tx * (1.0 - ty)
+                                + v[2].0 * (1.0 - tx) * ty
+                                + v[3].0 * tx * ty,
+                            v[0].1 * (1.0 - tx) * (1.0 - ty)
+                                + v[1].1 * tx * (1.0 - ty)
+                                + v[2].1 * (1.0 - tx) * ty
+                                + v[3].1 * tx * ty,
+                        );
+                        let error = (back.0 - original.0).hypot(back.1 - original.1);
+                        assert!(error<0.025,"spacing={amount}: every aperture/iris point must get requested shift {shift}, source={original:?}, actual_inverse={back:?}, error={error}");
+                    }
+                }
+            }
+            assert_eq!(report["foldPixels"], 0);
+            assert_eq!(report["fixedDonorImports"], 0);
+            assert!(report["maxInverseFlowReverseErrorPx"].as_f64().unwrap() < 0.01);
+        }
+    }
+
+    #[test]
+    fn eye_spacing_carries_width_size_results_without_changing_their_targets() {
+        let (source, base) = measured_iris_feature_fixture();
+        for (width, size) in [
+            (0.0, 30.0),
+            (30.0, 0.0),
+            (30.0, 30.0),
+            (-30.0, -30.0),
+            (60.0, 60.0),
+            (60.0, -60.0),
+        ] {
+            for spacing in [-30.0, 30.0] {
+                let mut params = base.clone();
+                params["adjustments"] =
+                    json!({"eyeWidth":width,"eyeSize":size,"eyeSpacing":spacing});
+                RECORD_SPACING_MATERIAL.set(true);
+                RECORD_FLOW.set(true);
+                local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_SPACING_MATERIAL.set(false);
+                RECORD_FLOW.set(false);
+                let report = LAST_SPACING_MATERIAL_REPORT.take().unwrap();
+                let flow = LAST_FLOW_REPORT.take().unwrap();
+                for eye in report.as_array().unwrap() {
+                    assert!(
+                        eye["maxAdditionalShiftTargetErrorPx"].as_f64().unwrap() < 0.025,
+                        "width={width} size={size} spacing={spacing}: {eye}"
+                    );
+                    assert!(
+                        eye["maxFinalInverseErrorPx"].as_f64().unwrap() < 0.01,
+                        "{eye}"
+                    );
+                }
+                assert_eq!(flow["foldPixels"], 0);
+                assert_eq!(flow["fixedDonorImports"], 0);
+                assert!(
+                    flow["maxInverseFlowReverseErrorPx"].as_f64().unwrap() < 0.01,
+                    "{flow}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn eye_spacing_preserves_brow_material_while_brow_control_still_works() {
+        let (source, mut base) = measured_iris_feature_fixture();
+        let brow = |cx: f32| json!({"shape":"polygon","points":[{"x":(cx-30.0)/256.0,"y":48.0/160.0},{"x":cx/256.0,"y":39.0/160.0},{"x":(cx+30.0)/256.0,"y":48.0/160.0},{"x":cx/256.0,"y":46.0/160.0}],"feather":0});
+        base["semanticMasks"]["leftBrow"] = brow(80.0);
+        base["semanticMasks"]["rightBrow"] = brow(176.0);
+        for peak in [-30.0, 30.0] {
+            for spacing in [-30.0, 30.0] {
+                let mut params = base.clone();
+                params["adjustments"] = json!({"browPeak":peak,"eyeSpacing":spacing});
+                RECORD_SPACING_MATERIAL.set(true);
+                local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_SPACING_MATERIAL.set(false);
+                let report = LAST_SPACING_MATERIAL_REPORT.take().unwrap();
+                for row in report.as_array().unwrap() {
+                    if row["feature"].as_str().unwrap().ends_with("Brow") {
+                        assert!(
+                            row["maxPriorMovementPx"].as_f64().unwrap() > 0.1,
+                            "browPeak must remain active: {row}"
+                        );
+                        assert!(
+                            row["maxAdditionalShiftTargetErrorPx"].as_f64().unwrap() < 0.025,
+                            "browPeak={peak}, spacing={spacing}: {row}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_spacing_composition_is_continuous_from_both_sides_of_zero() {
+        let (source, base) = measured_iris_feature_fixture();
+        for key in ["eyeSize", "eyeWidth", "eyeTilt"] {
+            for fixed in [-30.0, 30.0] {
+                for varying_spacing in [false, true] {
+                    let mut previous: Option<(Vec<(f32, f32)>, RgbaImage)> = None;
+                    for tiny in [-0.001, 0.0, 0.001] {
+                        let mut params = base.clone();
+                        params["adjustments"] = if varying_spacing {
+                            json!({"eyeSpacing":tiny,key:fixed})
+                        } else {
+                            json!({"eyeSpacing":fixed,key:tiny})
+                        };
+                        RECORD_MAPPING.set(true);
+                        let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                        RECORD_MAPPING.set(false);
+                        let mapping = LAST_MAPPING.take().unwrap();
+                        if let Some((old, pixels)) = previous {
+                            let jump = mapping
+                                .iter()
+                                .zip(old)
+                                .map(|(a, b)| (a.0 - b.0).hypot(a.1 - b.1))
+                                .fold(0.0f32, f32::max);
+                            assert!(jump<0.01,"{key}, fixed={fixed}, varying_spacing={varying_spacing}: jump={jump}");
+                            assert!(output
+                                .pixels
+                                .iter()
+                                .zip(pixels.pixels)
+                                .all(|(a, b)| a.abs_diff(b) <= 1));
+                        }
+                        previous = Some((mapping, output));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_spacing_preserves_the_existing_nonzero_tilt_result() {
+        let (source, base) = measured_iris_feature_fixture();
+        for tilt in [-30.0, 30.0] {
+            for spacing in [-30.0, 30.0] {
+                let mut params = base.clone();
+                params["adjustments"] = json!({"eyeTilt":tilt,"eyeSpacing":spacing});
+                RECORD_SPACING_MATERIAL.set(true);
+                local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_SPACING_MATERIAL.set(false);
+                let report = LAST_SPACING_MATERIAL_REPORT.take().unwrap();
+                for row in report.as_array().unwrap() {
+                    assert!(
+                        row["maxPriorMovementPx"].as_f64().unwrap() > 0.1,
+                        "tilt must remain active: {row}"
+                    );
+                    assert!(
+                        row["maxAdditionalShiftTargetErrorPx"].as_f64().unwrap() < 0.005,
+                        "tilt={tilt}, spacing={spacing}: {row}"
+                    );
+                    assert!(
+                        row["maxFinalInverseErrorPx"].as_f64().unwrap() < 0.01,
+                        "{row}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_spacing_zero_keeps_existing_width_size_tilt_output_exactly() {
+        let (source, base) = measured_iris_feature_fixture();
+        for key in ["eyeWidth", "eyeSize", "eyeTilt"] {
+            for amount in [-30.0, 30.0] {
+                let mut params = base.clone();
+                params["adjustments"] = json!({"eyeSpacing":0,key:amount});
+                RECORD_MAPPING.set(true);
+                let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                let mapping = LAST_MAPPING.take().unwrap();
+                params["adjustments"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("eyeSpacing");
+                RECORD_MAPPING.set(true);
+                let reference = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                assert_eq!(mapping, LAST_MAPPING.take().unwrap(), "{key} {amount}");
+                assert_eq!(output.pixels, reference.pixels, "{key} {amount}");
+            }
+        }
+    }
+
+    #[test]
+    fn eye_tilt_rotates_aperture_and_iris_by_the_full_requested_angle() {
+        let (source, base) = measured_iris_feature_fixture();
+        for amount in [-30.0f32, 30.0] {
+            let mut params = base.clone();
+            params["adjustments"] = json!({"eyeTilt":amount});
+            RECORD_MAPPING.set(true);
+            RECORD_FLOW.set(true);
+            local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_MAPPING.set(false);
+            RECORD_FLOW.set(false);
+            let mapping = LAST_MAPPING.take().unwrap();
+            let flow = LAST_FLOW_REPORT.take().unwrap();
+            for (cx, iris_cx, sign) in [(80.0, 75.0, -1.0), (176.0, 181.0, 1.0)] {
+                let theta = -sign * 0.3 * amount / 100.0;
+                let (sn, cs) = theta.sin_cos();
+                for (px, rx, ry) in [(cx, 24.0, 6.0), (cx, 12.0, 4.0), (iris_cx, 4.0, 3.0)] {
+                    for i in 0..32 {
+                        let a = i as f32 * std::f32::consts::TAU / 32.0;
+                        let original = (px + rx * a.cos(), 76.0 + ry * a.sin());
+                        let d = (original.0 - cx, original.1 - 76.0);
+                        let target = (cx + cs * d.0 - sn * d.1, 76.0 + sn * d.0 + cs * d.1);
+                        let x0 = target.0.floor() as usize;
+                        let y0 = target.1.floor() as usize;
+                        let tx = target.0 - target.0.floor();
+                        let ty = target.1 - target.1.floor();
+                        let index = y0 * 256 + x0;
+                        let v = [
+                            mapping[index],
+                            mapping[index + 1],
+                            mapping[index + 256],
+                            mapping[index + 257],
+                        ];
+                        let back = (
+                            v[0].0 * (1.0 - tx) * (1.0 - ty)
+                                + v[1].0 * tx * (1.0 - ty)
+                                + v[2].0 * (1.0 - tx) * ty
+                                + v[3].0 * tx * ty,
+                            v[0].1 * (1.0 - tx) * (1.0 - ty)
+                                + v[1].1 * tx * (1.0 - ty)
+                                + v[2].1 * (1.0 - tx) * ty
+                                + v[3].1 * tx * ty,
+                        );
+                        let error = (back.0 - original.0).hypot(back.1 - original.1);
+                        assert!(error<0.025,"tilt={amount}: whole eye must rotate {theta} radians, source={original:?}, actual_inverse={back:?}, error={error}");
+                    }
+                }
+            }
+            assert_eq!(flow["foldPixels"], 0);
+            assert_eq!(flow["fixedDonorImports"], 0);
+            assert!(flow["maxInverseFlowReverseErrorPx"].as_f64().unwrap() < 0.01);
+        }
+    }
+
+    #[test]
+    fn eye_tilt_sweep_includes_interior_angular_extrema() {
+        let a = 10.0f32.to_radians();
+        for sign in [-1.0, 1.0] {
+            let p = (sign * 10.0 * a.sin(), 10.0 * a.cos());
+            let sweep = sign * 20.0f32.to_radians();
+            // The vector becomes vertical halfway through the sweep. Neither
+            // endpoint attains this known maximum normalized radius of one.
+            assert!((rotated_eye_extent(p, (30.0, 10.0), sweep) - 1.0).abs() < 1e-6);
+            assert!((angular_component_extent(p.1, p.0, sweep) - 10.0).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn eye_tilt_size_width_spacing_obey_one_requested_organ_transform() {
+        let (source, base) = measured_iris_feature_fixture();
+        for (width, size, tilt, spacing) in [
+            (0.0, 30.0, 30.0, 0.0),
+            (0.0, -30.0, -30.0, 0.0),
+            (0.0, 30.0, -30.0, 30.0),
+            (0.0, -30.0, 30.0, -30.0),
+            (30.0, 30.0, 30.0, 30.0),
+            (-30.0, 30.0, -30.0, -30.0),
+            (30.0, -30.0, -30.0, 30.0),
+            (-30.0, -30.0, 30.0, -30.0),
+        ] {
+            let mut params = base.clone();
+            params["adjustments"] =
+                json!({"eyeWidth":width,"eyeSize":size,"eyeTilt":tilt,"eyeSpacing":spacing});
+            RECORD_MAPPING.set(true);
+            local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_MAPPING.set(false);
+            let mapping = LAST_MAPPING.take().unwrap();
+            for (cx, iris_cx, sign) in [(80.0f32, 75.0f32, -1.0f32), (176.0, 181.0, 1.0)] {
+                let theta = -sign * 0.3 * tilt / 100.0;
+                let (sn, cs) = theta.sin_cos();
+                let scale = (0.3f32 * size / 100.0).exp();
+                let width_scale = (0.3f32 * width / 100.0).exp();
+                let shift = sign * 0.08 * (48.0 / 0.26) * spacing / 100.0;
+                let mut points = vec![(cx - 24.0, 76.0, true), (cx + 24.0, 76.0, true)];
+                for i in 0..32 {
+                    let a = i as f32 * std::f32::consts::TAU / 32.0;
+                    points.push((iris_cx + 4.0 * a.cos(), 76.0 + 3.0 * a.sin(), false));
+                    if width == 0.0 {
+                        points.push((cx + 24.0 * a.cos(), 76.0 + 6.0 * a.sin(), false));
+                    }
+                }
+                for (x, y, canthus) in points {
+                    let u = (x - cx) * if canthus { width_scale } else { 1.0 };
+                    let v = y - 76.0;
+                    let target = (
+                        cx + scale * (cs * u - sn * v) + shift,
+                        76.0 + scale * (sn * u + cs * v),
+                    );
+                    let x0 = target.0.floor() as usize;
+                    let y0 = target.1.floor() as usize;
+                    let tx = target.0 - target.0.floor();
+                    let ty = target.1 - target.1.floor();
+                    let i = y0 * 256 + x0;
+                    let q = [
+                        mapping[i],
+                        mapping[i + 1],
+                        mapping[i + 256],
+                        mapping[i + 257],
+                    ];
+                    let back = (
+                        q[0].0 * (1.0 - tx) * (1.0 - ty)
+                            + q[1].0 * tx * (1.0 - ty)
+                            + q[2].0 * (1.0 - tx) * ty
+                            + q[3].0 * tx * ty,
+                        q[0].1 * (1.0 - tx) * (1.0 - ty)
+                            + q[1].1 * tx * (1.0 - ty)
+                            + q[2].1 * (1.0 - tx) * ty
+                            + q[3].1 * tx * ty,
+                    );
+                    let error = (back.0 - x).hypot(back.1 - y);
+                    assert!(error<0.025,"w={width} s={size} t={tilt} spacing={spacing}, source=({x},{y}), target={target:?}, actual_inverse={back:?}, error={error}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_tilt_preserves_source_brows_and_keeps_brow_controls_active() {
+        let (source, mut base) = measured_iris_feature_fixture();
+        let brow = |cx: f32| json!({"shape":"polygon","points":[{"x":(cx-30.0)/256.0,"y":58.0/160.0},{"x":cx/256.0,"y":49.0/160.0},{"x":(cx+30.0)/256.0,"y":58.0/160.0},{"x":cx/256.0,"y":56.0/160.0}],"feather":0});
+        base["semanticMasks"]["leftBrow"] = brow(80.0);
+        base["semanticMasks"]["rightBrow"] = brow(176.0);
+        for tilt in [-30.0, 30.0] {
+            let mut params = base.clone();
+            params["adjustments"] = json!({"eyeTilt":tilt});
+            RECORD_MAPPING.set(true);
+            let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_MAPPING.set(false);
+            let mapping = LAST_MAPPING.take().unwrap();
+            let mut brow_pixels = Vec::new();
+            for name in ["leftBrow", "rightBrow"] {
+                let p = symmetry_feature(&params, name, &source).unwrap();
+                for y in 49..=58 {
+                    for x in 45..=210 {
+                        if feature_polygon_signed_distance(&p, (x as f32, y as f32)) <= 0.0 {
+                            let i = y * 256 + x;
+                            brow_pixels.push(i);
+                            assert_eq!(mapping[i], (x as f32, y as f32));
+                            assert_eq!(
+                                &output.pixels[i * 4..i * 4 + 4],
+                                &source.pixels[i * 4..i * 4 + 4]
+                            );
+                        }
+                    }
+                }
+            }
+            params["adjustments"]["browPeak"] = json!(30);
+            RECORD_MAPPING.set(true);
+            local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+            RECORD_MAPPING.set(false);
+            let changed = LAST_MAPPING.take().unwrap();
+            assert!(
+                brow_pixels
+                    .iter()
+                    .any(|&i| (changed[i].0 - (i % 256) as f32)
+                        .hypot(changed[i].1 - (i / 256) as f32)
+                        > 0.1),
+                "browPeak must not be globally frozen"
+            );
+        }
+    }
+
+    #[test]
+    fn eye_tilt_composition_is_continuous_from_both_sides_of_zero() {
+        let (source, base) = measured_iris_feature_fixture();
+        for key in ["eyeSize", "eyeWidth", "eyeSpacing"] {
+            for fixed in [-30.0, 30.0] {
+                for changing_tilt in [false, true] {
+                    let mut previous: Option<(Vec<(f32, f32)>, RgbaImage)> = None;
+                    for tiny in [-0.001, 0.0, 0.001] {
+                        let mut params = base.clone();
+                        params["adjustments"] = if changing_tilt {
+                            json!({"eyeTilt":tiny,key:fixed})
+                        } else {
+                            json!({"eyeTilt":fixed,key:tiny})
+                        };
+                        RECORD_MAPPING.set(true);
+                        let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                        RECORD_MAPPING.set(false);
+                        let mapping = LAST_MAPPING.take().unwrap();
+                        if let Some((old, pixels)) = previous {
+                            let jump = mapping
+                                .iter()
+                                .zip(old)
+                                .map(|(a, b)| (a.0 - b.0).hypot(a.1 - b.1))
+                                .fold(0.0f32, f32::max);
+                            assert!(
+                                jump < 0.01,
+                                "{key}, fixed={fixed}, changing_tilt={changing_tilt}: {jump}"
+                            );
+                            assert!(output
+                                .pixels
+                                .iter()
+                                .zip(pixels.pixels)
+                                .all(|(a, b)| a.abs_diff(b) <= 1));
+                        }
+                        previous = Some((mapping, output));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn eye_tilt_zero_keeps_other_eye_output_exactly() {
+        let (source, base) = measured_iris_feature_fixture();
+        for key in ["eyeSize", "eyeWidth", "eyeSpacing"] {
+            for amount in [-30.0, 30.0] {
+                let mut params = base.clone();
+                params["adjustments"] = json!({"eyeTilt":0,key:amount});
+                RECORD_MAPPING.set(true);
+                let output = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                let mapping = LAST_MAPPING.take().unwrap();
+                params["adjustments"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("eyeTilt");
+                RECORD_MAPPING.set(true);
+                let reference = local_adjust_kind(&source, &params, "feature.adjust").unwrap();
+                RECORD_MAPPING.set(false);
+                assert_eq!(mapping, LAST_MAPPING.take().unwrap());
+                assert_eq!(output.pixels, reference.pixels);
+            }
+        }
+    }
+
+    #[test]
+    fn eye_tilt_flow_keeps_small_increments_at_photographic_coordinates() {
+        let center = (400.0f32, 280.0f32);
+        let point = (423.0f32, 278.0f32);
+        let coverage = |_: f32, _: f32| 1.0;
+        for (scale, angle, shift) in [
+            (0.0f32, 0.0f32, (4.25f32, 1.375f32)),
+            (0.0, 0.09, (0.0, 0.0)),
+            (0.09, 0.09, (0.0, 0.0)),
+        ] {
+            let warp = LocalWarp {
+                center,
+                across: (1.0, 0.0),
+                radius: (1000.0, 1000.0),
+                scale: (scale, scale),
+                translation: shift,
+                angle,
+                preserve_eyes: false,
+                whole_eye_size: true,
+                whole_eye_tilt: true,
+                whole_eye_spacing: false,
+                eye_width_material: None,
+                whole_eye_inner: 0.9,
+                eye_size_brows: None,
+            };
+            let actual =
+                integrate_feature_flow(point, &[warp.clone()], &[], &[], &coverage, 267, 1.0);
+            let expected = if shift.0 != 0.0 {
+                (
+                    point.0 as f64 + shift.0 as f64,
+                    point.1 as f64 + shift.1 as f64,
+                )
+            } else {
+                let a = angle as f64;
+                let e = (scale as f64).exp();
+                let x = (point.0 - center.0) as f64;
+                let y = (point.1 - center.1) as f64;
+                (
+                    center.0 as f64 + e * (a.cos() * x - a.sin() * y),
+                    center.1 as f64 + e * (a.sin() * x + a.cos() * y),
+                )
+            };
+            assert!((actual.0 as f64-expected.0).hypot(actual.1 as f64-expected.1)<0.0001,"scale={scale}, angle={angle}, shift={shift:?}, actual={actual:?}, expected={expected:?}");
+            let reverse = integrate_feature_flow(actual, &[warp], &[], &[], &coverage, 267, -1.0);
+            assert!((reverse.0 - point.0).hypot(reverse.1 - point.1) < 0.0001);
+        }
+    }
+
     // Photo-derived landmarks stay local. Loading at runtime keeps ordinary
     // builds independent of private test data while retaining opt-in replay.
     fn local_photo_feature_fixture() -> Value {
@@ -2133,6 +3749,10 @@ mod tests {
 
     thread_local! {
         static RECORD_MAPPING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+        static RECORD_SPACING_MATERIAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+        static LAST_SPACING_MATERIAL_REPORT: std::cell::RefCell<Option<Value>> = const { std::cell::RefCell::new(None) };
+        static RECORD_WIDTH_MATERIAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+        static LAST_WIDTH_MATERIAL_REPORT: std::cell::RefCell<Option<Value>> = const { std::cell::RefCell::new(None) };
         static LAST_MAPPING: std::cell::RefCell<Option<Vec<(f32, f32)>>> = const { std::cell::RefCell::new(None) };
         static RECORD_FLOW: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
         static LAST_FLOW_REPORT: std::cell::RefCell<Option<Value>> = const { std::cell::RefCell::new(None) };
@@ -2209,6 +3829,157 @@ mod tests {
             }
             LAST_ROTATION_REPORT.set(Some(json!(rows)));
         }
+
+        let spacing_path = std::env::var("BROW_FLOW_DIAGNOSTICS_OUT").ok();
+        if spacing_path.is_some() || RECORD_SPACING_MATERIAL.get() {
+            let without: Vec<_> = changes
+                .iter()
+                .filter(|w| !w.whole_eye_spacing)
+                .cloned()
+                .collect();
+            let full =
+                |p| integrate_feature_flow(p, changes, eyes, post_warps, coverage, steps, -1.0);
+            let prior =
+                |p| integrate_feature_flow(p, &without, eyes, post_warps, coverage, steps, -1.0);
+            let mut records = Vec::new();
+            for name in ["leftEye", "rightEye", "leftBrow", "rightBrow"] {
+                let Some(points) = symmetry_feature(params, name, source) else {
+                    continue;
+                };
+                let eye_name = if name.starts_with("left") {
+                    "leftEye"
+                } else {
+                    "rightEye"
+                };
+                let frame = feature_frame(params, eye_name, source).unwrap();
+                let sign = if name.starts_with("left") { -1.0 } else { 1.0 };
+                let expected = if name.ends_with("Eye") {
+                    let shift = sign
+                        * 0.08
+                        * (frame.width / 0.26)
+                        * percent(params.get("adjustments").unwrap(), "eyeSpacing");
+                    (frame.across.0 * shift, frame.across.1 * shift)
+                } else {
+                    (0.0, 0.0)
+                };
+                let mut max_error = 0.0f32;
+                let mut reference_movement = 0.0f32;
+                let mut reverse_error = 0.0f32;
+                let mut count = 0;
+                for (a, b) in points
+                    .iter()
+                    .zip(points.iter().cycle().skip(1))
+                    .take(points.len())
+                {
+                    for t in [0.0, 0.25, 0.5, 0.75] {
+                        let p = (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
+                        let target = full(p);
+                        let reference = prior(p);
+                        let back = mapping(target.0, target.1);
+                        max_error = max_error.max(
+                            (target.0 - reference.0 - expected.0)
+                                .hypot(target.1 - reference.1 - expected.1),
+                        );
+                        reference_movement =
+                            reference_movement.max((reference.0 - p.0).hypot(reference.1 - p.1));
+                        reverse_error = reverse_error.max((back.0 - p.0).hypot(back.1 - p.1));
+                        count += 1;
+                    }
+                }
+                records.push(json!({"feature":name,"sourceBoundarySamples":count,"maxAdditionalShiftTargetErrorPx":max_error,"maxPriorMovementPx":reference_movement,"maxFinalInverseErrorPx":reverse_error,"scope":"actual final forward flow compared with same prior fields after removing spacing; expected eye constant translation or brow zero additional motion"}));
+            }
+            if let Some(path) = spacing_path {
+                std::fs::write(
+                    format!("{}.spacing.json", path),
+                    serde_json::to_vec_pretty(&records).unwrap(),
+                )
+                .unwrap();
+            }
+            if RECORD_SPACING_MATERIAL.get() {
+                LAST_SPACING_MATERIAL_REPORT.set(Some(json!(records)));
+            }
+        }
+
+        let material_path = std::env::var("BROW_FLOW_DIAGNOSTICS_OUT").ok();
+        if material_path.is_some() || RECORD_WIDTH_MATERIAL.get() {
+            let other: Vec<_> = changes
+                .iter()
+                .filter(|w| w.eye_width_material.is_none())
+                .cloned()
+                .collect();
+            let mut records = Vec::new();
+            for warp in changes {
+                let Some(material) = &warp.eye_width_material else {
+                    continue;
+                };
+                let mut b = [
+                    f32::INFINITY,
+                    f32::INFINITY,
+                    f32::NEG_INFINITY,
+                    f32::NEG_INFINITY,
+                ];
+                for &(x, y) in &material.aperture {
+                    b[0] = b[0].min(x);
+                    b[1] = b[1].min(y);
+                    b[2] = b[2].max(x);
+                    b[3] = b[3].max(y);
+                }
+                let mut n = 0;
+                let mut max_error = 0.0f32;
+                let mut sum = 0.0f64;
+                let mut max_at = (0.0, 0.0);
+                let mut derivative_error = 0.0f32;
+                let full =
+                    |p| integrate_feature_flow(p, changes, eyes, post_warps, coverage, steps, -1.0);
+                let reference =
+                    |p| integrate_feature_flow(p, &other, eyes, post_warps, coverage, steps, -1.0);
+                for y in b[1].floor() as i32..=b[3].ceil() as i32 {
+                    for x in b[0].floor() as i32..=b[2].ceil() as i32 {
+                        let p = (x as f32 + 0.5, y as f32 + 0.5);
+                        let q = material.ellipse_coordinate(p);
+                        if q.0 * q.0 + q.1 * q.1 > 1.0
+                            || feature_polygon_signed_distance(&material.aperture, p) > 0.0
+                        {
+                            continue;
+                        }
+                        let a = full(p);
+                        let r = reference(p);
+                        let error = (a.0 - r.0).hypot(a.1 - r.1);
+                        n += 1;
+                        sum += (error as f64).powi(2);
+                        if error > max_error {
+                            max_error = error;
+                            max_at = p;
+                        }
+                        for h in [(0.25, 0.0), (0.0, 0.25)] {
+                            let ap = full((p.0 + h.0, p.1 + h.1));
+                            let am = full((p.0 - h.0, p.1 - h.1));
+                            let rp = reference((p.0 + h.0, p.1 + h.1));
+                            let rm = reference((p.0 - h.0, p.1 - h.1));
+                            derivative_error = derivative_error.max(
+                                ((ap.0 - am.0) - (rp.0 - rm.0))
+                                    .hypot((ap.1 - am.1) - (rp.1 - rm.1))
+                                    / 0.5,
+                            );
+                        }
+                    }
+                }
+                records.push(json!({"observedIrisSamples":n,"maxAdditionalMotionFromWidthPx":max_error,"rmsAdditionalMotionFromWidthPx":(sum/n as f64).sqrt(),"maximumAt":max_at,"maxAdditionalJacobianColumnNorm":derivative_error,"comparison":"actual full mapper forward flow versus same other fields with eyeWidth removed; observed iris projection intersect source aperture"}));
+            }
+            if !records.is_empty() {
+                if let Some(path) = material_path {
+                    std::fs::write(
+                        format!("{}.material.json", path),
+                        serde_json::to_vec_pretty(&records).unwrap(),
+                    )
+                    .unwrap();
+                }
+                if RECORD_WIDTH_MATERIAL.get() {
+                    LAST_WIDTH_MATERIAL_REPORT.set(Some(json!(records)));
+                }
+            }
+        }
+
         let path = std::env::var_os("BROW_FLOW_DIAGNOSTICS_OUT");
         if path.is_none() && !RECORD_FLOW.get() {
             return;
@@ -2274,7 +4045,7 @@ mod tests {
         };
         let other: Vec<_> = changes
             .iter()
-            .copied()
+            .cloned()
             .filter(|w| !w.preserve_eyes)
             .collect();
         let mut minimum = f32::INFINITY;
@@ -2400,8 +4171,16 @@ mod tests {
                 translation: (0.0, 0.0),
                 angle,
                 preserve_eyes: false,
+                whole_eye_size: false,
+                whole_eye_tilt: false,
+                whole_eye_spacing: false,
+                eye_width_material: None,
+                whole_eye_inner: 0.0,
+                eye_size_brows: None,
             };
-            let flow = |point| integrate_feature_flow(point, &[warp], &[], &[], &coverage, 64, 1.0);
+            let flow = |point| {
+                integrate_feature_flow(point, &[warp.clone()], &[], &[], &coverage, 64, 1.0)
+            };
             let point = flow((10.0, 0.0));
             let expected_angle = angle * (1.0f32 - (10.0f32 / 32.0).powi(2)).powi(2);
             assert!(

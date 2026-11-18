@@ -350,6 +350,76 @@ fn landmarks(value: &Value) -> Result<(), ImageError> {
     Ok(())
 }
 
+fn eye_geometry(value: &Value, params: &Value) -> Result<(), ImageError> {
+    const EYES: &[&str] = &["leftEye", "rightEye"];
+    keys(value, EYES, "eyeGeometry")?;
+    if object(value, "eyeGeometry")?.is_empty() {
+        return Err(error(
+            "eyeGeometry must contain at least one measured eye".into(),
+        ));
+    }
+    for (name, eye) in object(value, "eyeGeometry")? {
+        keys(eye, &["iris"], "measured eye")?;
+        let iris = &eye["iris"];
+        keys(iris, &["center", "boundary"], "iris")?;
+        let center = &iris["center"];
+        point(center)?;
+        for axis in ["x", "y"] {
+            number(center, axis, 0.0, 1.0, true)?;
+        }
+        let boundary = iris["boundary"]
+            .as_array()
+            .filter(|b| b.len() == 4)
+            .ok_or_else(|| {
+                error(format!(
+                    "{name}: iris boundary requires four ordered points"
+                ))
+            })?;
+        for p in boundary {
+            point(p)?;
+            for axis in ["x", "y"] {
+                number(p, axis, 0.0, 1.0, true)?;
+            }
+        }
+        // Opposite pairs define projected axes; tilted eyes need not be ordered
+        // by screen x/y. Pixel-sized sampling guards remain in the image kernel.
+        let difference = |a: usize, b: usize, axis: &str| {
+            boundary[a][axis].as_f64().unwrap() - boundary[b][axis].as_f64().unwrap()
+        };
+        let determinant = difference(0, 2, "x") * difference(3, 1, "y")
+            - difference(0, 2, "y") * difference(3, 1, "x");
+        if determinant.abs() <= f64::EPSILON {
+            return Err(error(format!("{name}: degenerate iris projection")));
+        }
+        let aperture = &params["semanticMasks"][name];
+        if aperture
+            .get("shape")
+            .or_else(|| aperture.get("kind"))
+            .and_then(Value::as_str)
+            != Some("polygon")
+            || aperture["points"]
+                .as_array()
+                .is_none_or(|points| points.len() < 3)
+        {
+            return Err(error(format!(
+                "{name}: measured iris requires a source aperture polygon"
+            )));
+        }
+        mask(aperture)?;
+    }
+    if params["adjustments"]["eyeWidth"]
+        .as_f64()
+        .is_some_and(|v| v != 0.0)
+    {
+        for name in EYES {
+            if params["semanticMasks"].get(*name).is_some() && value.get(*name).is_none() {
+                return Err(error(format!("{name}: every active eye requires measured iris geometry when eyeGeometry is supplied")));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
     let allowed: &[&str] = match op.kind.as_str() {
         "identity" | "core.identity" => &[],
@@ -360,7 +430,16 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
         "perspective" => &["corners", "points"],
         "warp.grid" => &["points", "controlPoints"],
         "warp.liquify" => &["strokes"],
-        "face.adjust" | "feature.adjust" | "body.adjust" | "clothing.adjust" => &[
+        "feature.adjust" => &[
+            "adjustments",
+            "landmarks",
+            "bodyPart",
+            "semanticMasks",
+            "subjectMask",
+            "partMask",
+            "eyeGeometry",
+        ],
+        "face.adjust" | "body.adjust" | "clothing.adjust" => &[
             "adjustments",
             "landmarks",
             "bodyPart",
@@ -612,7 +691,18 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
     let adjustments = op.params.get("adjustments").unwrap_or(&op.params);
     let pending: &[&str] = match op.kind.as_str() {
         "face.adjust" => &["faceHeight", "midface", "doubleChin"],
-        "feature.adjust" => &["eyeBag", "tearTrough", "noseHeight", "noseLipAngle"],
+        // Vertical eye reshaping needs measured ocular source layers (iris /
+        // sclera plus ordered lid/canthus boundaries). The current detector
+        // only supplies an aperture polygon, so allowing this value would
+        // stretch lashes and the upper lid as if they were one material.
+        "feature.adjust" => &[
+            "eyeHeight",
+            "eyelid",
+            "eyeBag",
+            "tearTrough",
+            "noseHeight",
+            "noseLipAngle",
+        ],
         "body.adjust" => &[
             "neck",
             "height",
@@ -946,6 +1036,9 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
             if let Some(landmark_values) = op.params.get("landmarks") {
                 landmarks(landmark_values)?;
             }
+            if let Some(geometry) = op.params.get("eyeGeometry") {
+                eye_geometry(geometry, &op.params)?;
+            }
         }
         "warp.liquify" | "repair.clone" | "repair.heal" => {
             if let Some(strokes) = op.params.get("strokes").and_then(Value::as_array) {
@@ -1083,7 +1176,14 @@ mod tests {
             ("face.adjust", vec!["faceHeight", "midface", "doubleChin"]),
             (
                 "feature.adjust",
-                vec!["eyeBag", "tearTrough", "noseHeight", "noseLipAngle"],
+                vec![
+                    "eyeHeight",
+                    "eyelid",
+                    "eyeBag",
+                    "tearTrough",
+                    "noseHeight",
+                    "noseLipAngle",
+                ],
             ),
             (
                 "body.adjust",

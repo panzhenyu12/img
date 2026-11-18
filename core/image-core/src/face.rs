@@ -1,6 +1,7 @@
 //! Face contour editing separates the detected face foreground from its
 //! backdrop. The original oval is a source alpha, never an output clipping
-//! mask. Only the narrow strip exposed by a moved contour is reconstructed.
+//! mask. Joint face/neck edits reconstruct a stable source underlayer and
+//! transport its paired premultiplied foreground; source colors stay consistent.
 //! Pixel parsing supplies both the head alpha and the skin/hair face boundary.
 //! A manual or legacy mesh contour remains a geometric approximation.
 
@@ -11,12 +12,121 @@ use serde_json::{json, Value};
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
+/// Automatic material classification is distinct from explicit user freezing.
+/// Only the native ear experiment changes the observed ear motion policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ObservedEarMotion {
+    Fixed,
+    JointFlexible,
+}
+
+impl ObservedEarMotion {
+    fn follows_joint_field(self) -> bool {
+        match self {
+            Self::Fixed => false,
+            Self::JointFlexible => true,
+        }
+    }
+}
+
 #[path = "face_flow.rs"]
 mod flow;
 #[path = "face_mls.rs"]
 mod mls;
 
+#[cfg(test)]
+#[path = "face_profile_replay.rs"]
+mod profile_replay;
+
+#[cfg(test)]
+#[path = "face_fringe_regression.rs"]
+mod fringe_regression;
+
+#[cfg(test)]
+#[path = "face_edge_continuity_regression.rs"]
+mod edge_continuity_regression;
+
+#[path = "face_scene_edge.rs"]
+mod scene_edge;
+
+#[path = "face_layer_pair.rs"]
+pub(crate) mod layer_pair;
+
+#[path = "face_ear_support.rs"]
+mod ear_support;
+
+#[path = "face_source_plate.rs"]
+mod source_plate;
+
+#[path = "face_source_layers.rs"]
+mod source_layers;
+pub use source_layers::{ObservationRegion, SourceLayers};
+
+#[path = "face_optical_domain.rs"]
+mod optical_domain;
+
+#[cfg(test)]
+#[path = "face_source_pair_regression.rs"]
+mod source_pair_regression;
+
+#[cfg(test)]
+#[path = "face_material_regression.rs"]
+mod material_regression;
+
+#[cfg(test)]
+#[path = "face_joint_support_regression.rs"]
+mod joint_support_regression;
+
+#[cfg(test)]
+#[path = "face_background_regression.rs"]
+mod background_regression;
+
+#[cfg(test)]
+#[path = "face_occlusion_regression.rs"]
+mod occlusion_regression;
+
+#[cfg(test)]
+#[path = "face_curve_candidate.rs"]
+mod curve_candidate;
+
+#[cfg(test)]
+#[path = "face_displacement_curve.rs"]
+mod displacement_curve;
+
+#[cfg(test)]
+#[path = "face_field_regression.rs"]
+mod field_regression;
+
+#[cfg(test)]
+#[path = "face_anchor_transition.rs"]
+mod anchor_transition;
+
+#[path = "face_positive_kernel.rs"]
+mod positive_kernel;
+
+#[path = "face_joint_domain.rs"]
+mod joint_domain;
+
+#[path = "face_hairline.rs"]
+mod hairline;
+
+#[path = "face_scalar_field.rs"]
+mod scalar_field;
+
+#[cfg(test)]
+#[path = "face_hairline_regression.rs"]
+mod hairline_regression;
+
+#[path = "face_upper_width.rs"]
+mod upper_width;
+
+#[cfg(test)]
+#[path = "face_scene_role_regression.rs"]
+mod scene_role_regression;
+
 type Point = (f32, f32);
+// Fairing and velocity construction must use one fixed-DOF contract.
+const MIN_CONTROL_GAIN: f32 = 0.05;
 const CONTOUR_KEYS: &[&str] = &[
     "faceWidth",
     "forehead",
@@ -36,6 +146,7 @@ fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
     let t = ((x - a) / (b - a).max(1e-6)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
 }
+
 fn profile(y: f32, start: f32, peak: f32, end: f32) -> f32 {
     if y < peak {
         smoothstep(start, peak, y)
@@ -68,6 +179,37 @@ fn add(a: Point, b: Point) -> Point {
 fn scale(p: Point, a: f32) -> Point {
     (p.0 * a, p.1 * a)
 }
+
+fn add_fixed_boundary_control(
+    p: Point,
+    pitch: f32,
+    boundary_controls: &mut Vec<Point>,
+    control_positions: &mut Vec<Point>,
+    requested_positions: &mut Vec<Point>,
+    feasible_positions: &mut Vec<Point>,
+    velocity_values: &mut Vec<Point>,
+    movable: &mut Vec<bool>,
+) {
+    if boundary_controls
+        .iter()
+        .any(|&q| dot(sub(p, q), sub(p, q)) < pitch * pitch)
+    {
+        return;
+    }
+    if let Some(j) = control_positions.iter().position(|&q| q == p) {
+        feasible_positions[j] = p;
+        velocity_values[j] = (0.0, 0.0);
+        movable[j] = false;
+        return;
+    }
+    // A zero-velocity free handle is not a fixed material constraint.
+    boundary_controls.push(p);
+    control_positions.push(p);
+    requested_positions.push(p);
+    feasible_positions.push(p);
+    velocity_values.push((0.0, 0.0));
+    movable.push(false);
+}
 fn center(points: &[Point]) -> Option<Point> {
     (!points.is_empty()).then(|| {
         scale(
@@ -95,7 +237,7 @@ fn inside(p: Point, polygon: &[Point]) -> bool {
 }
 /// Signed pixel distance gives a consistent one-pixel antialias fringe on
 /// both square and tall images; normalized polygon feather does not.
-fn alpha(p: Point, polygon: &[Point]) -> f32 {
+fn signed_distance(p: Point, polygon: &[Point]) -> f32 {
     let mut inside = false;
     let mut distance = f32::MAX;
     for i in 0..polygon.len() {
@@ -106,7 +248,18 @@ fn alpha(p: Point, polygon: &[Point]) -> f32 {
         }
         distance = distance.min(closest(p, a, b).0);
     }
-    smoothstep(-0.5, 0.5, if inside { distance } else { -distance })
+    if inside { distance } else { -distance }
+}
+
+fn alpha_with_feather(p: Point, polygon: &[Point], feather: f32) -> f32 {
+    if !feather.is_finite() || feather <= 0.0 {
+        return if inside(p, polygon) { 1.0 } else { 0.0 };
+    }
+    smoothstep(-feather, feather, signed_distance(p, polygon))
+}
+
+fn alpha(p: Point, polygon: &[Point]) -> f32 {
+    alpha_with_feather(p, polygon, 0.5)
 }
 
 #[derive(Clone, Copy)]
@@ -407,9 +560,93 @@ fn neighbors(i: usize, w: usize, h: usize) -> impl Iterator<Item = usize> {
     .flatten()
 }
 
+/// Build an anatomical lower-neck motion envelope for the isolated candidate
+/// profile.  The distance is measured through the observed neck component
+/// from the face/neck seam, so a rotated or slanted neck is not cut by an
+/// image-space y threshold.  Non-neck pixels retain full support; disconnected
+/// neck islands receive no support and therefore cannot become guessed motion.
+#[cfg(test)]
+fn geodesic_neck_motion(
+    neck: &[f32],
+    face: &[f32],
+    owned: &[bool],
+    w: usize,
+    h: usize,
+) -> Option<Vec<f32>> {
+    if neck.len() != w * h || face.len() != w * h || owned.len() != w * h {
+        return None;
+    }
+    let is_neck = |i: usize| neck[i] >= 0.5 && face[i] <= 0.5;
+    let mut distance = vec![u16::MAX; w * h];
+    let mut queue = VecDeque::new();
+    for i in 0..w * h {
+        if !owned[i] || face[i] <= 0.5 {
+            continue;
+        }
+        for n in neighbors(i, w, h) {
+            if is_neck(n) && distance[n] == u16::MAX {
+                distance[n] = 0;
+                queue.push_back(n);
+            }
+        }
+    }
+    if queue.is_empty() {
+        return None;
+    }
+    while let Some(i) = queue.pop_front() {
+        let next = distance[i].saturating_add(1);
+        for n in neighbors(i, w, h) {
+            if is_neck(n) && next < distance[n] {
+                distance[n] = next;
+                queue.push_back(n);
+            }
+        }
+    }
+    let mut row_widths = Vec::new();
+    let mut max_distance = 0_u16;
+    for y in 0..h {
+        let width = (0..w)
+            .filter(|&x| is_neck(y * w + x) && distance[y * w + x] != u16::MAX)
+            .count();
+        if width > 0 {
+            row_widths.push(width as f32);
+        }
+    }
+    for &d in &distance {
+        if d != u16::MAX {
+            max_distance = max_distance.max(d);
+        }
+    }
+    if row_widths.is_empty() || max_distance < 2 {
+        return None;
+    }
+    row_widths.sort_by(f32::total_cmp);
+    let width = row_widths[row_widths.len() / 2].max(2.0);
+    let length = max_distance as f32 + 1.0;
+    let start = (0.5 * width).max(1.0);
+    let end = (2.5 * width).min(0.22 * length).max(start + 1.0);
+    let mut motion = vec![1.0; w * h];
+    for i in 0..w * h {
+        if !is_neck(i) {
+            continue;
+        }
+        if distance[i] == u16::MAX {
+            motion[i] = 0.0;
+            continue;
+        }
+        let t = ((distance[i] as f32 - start) / (end - start)).clamp(0.0, 1.0);
+        // Quintic smoothstep has zero first derivative at both ends, avoiding
+        // a visible velocity kink where the neck becomes stationary.
+        let h5 = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+        motion[i] = 1.0 - h5;
+    }
+    Some(motion)
+}
+
 /// Propagate only clean exterior donors into the newly exposed band. The
 /// surviving original foreground and frozen pixels are never donors. This
 /// deterministic local fill cannot reconstruct complex hidden scene content.
+#[cfg(test)]
 fn reconstruct(
     source: &RgbaImage,
     holes: &[bool],
@@ -418,6 +655,52 @@ fn reconstruct(
     donor_excluded: &[bool],
     known_layer: &[u8],
     estimated_background: Option<&RgbaImage>,
+) -> Result<RgbaImage, ImageError> {
+    reconstruct_with_scene(
+        source,
+        holes,
+        subject,
+        frozen,
+        donor_excluded,
+        known_layer,
+        estimated_background,
+        None,
+    )
+}
+
+fn reconstruct_with_scene(
+    source: &RgbaImage,
+    holes: &[bool],
+    subject: &[f32],
+    frozen: &[bool],
+    donor_excluded: &[bool],
+    known_layer: &[u8],
+    estimated_background: Option<&RgbaImage>,
+    scene_background: Option<&[Option<[f32; 3]>]>,
+) -> Result<RgbaImage, ImageError> {
+    reconstruct_source_background(
+        source,
+        holes,
+        subject,
+        frozen,
+        donor_excluded,
+        known_layer,
+        estimated_background,
+        scene_background,
+        false,
+    )
+}
+
+fn reconstruct_source_background(
+    source: &RgbaImage,
+    holes: &[bool],
+    subject: &[f32],
+    frozen: &[bool],
+    donor_excluded: &[bool],
+    known_layer: &[u8],
+    estimated_background: Option<&RgbaImage>,
+    scene_background: Option<&[Option<[f32; 3]>]>,
+    independent_scene_color: bool,
 ) -> Result<RgbaImage, ImageError> {
     let w = source.width as usize;
     let h = source.height as usize;
@@ -441,11 +724,11 @@ fn reconstruct(
                 || frozen[i]
         })
         .collect();
-    // The lower jaw can uncover neck rather than scene background. Partition
-    // the hidden layer by the nearest accessible clean exterior donor. Neck,
-    // visible hair and backdrop donors never mix across their layer join.
-    // `known_layer` is 0 for scene, 1 for neck and 2 for fixed visible hair.
-    let mut layer: Vec<u8> = known_layer.to_vec();
+    // The lower jaw can uncover neck rather than the stationary backdrop.
+    // Hair and scene are both observed parts of that same backdrop: separating
+    // their solve domains invents a hard Voronoi seam across an unknown strip.
+    // Keep hair's donor eligibility above, but only neck is a separate layer.
+    let mut layer: Vec<u8> = known_layer.iter().map(|&k| u8::from(k == 1)).collect();
     let mut classified: Vec<bool> = target.iter().map(|t| !t).collect();
     let mut front = VecDeque::new();
     for i in 0..count {
@@ -533,6 +816,123 @@ fn reconstruct(
     // on a shortened chin; solve only actual exposed pixels to convergence.
     // The neck and scene layers never mix.
     let hole_indices: Vec<usize> = (0..count).filter(|&i| holes[i] && known[i]).collect();
+    // The source-mixture bounds below are straight-RGB bounds for an opaque
+    // photograph. Do not apply them to premultiplied transparent layers.
+    let opaque_layers = source.pixels.chunks_exact(4).all(|p| p[3] == 255)
+        && estimated_background.is_some_and(|b| b.pixels.chunks_exact(4).all(|p| p[3] == 255));
+    struct BackgroundEvidence {
+        prior: [f32; 4],
+        precision: f32,
+        scene_prior: Option<[f32; 3]>,
+        visible_min: [f32; 3],
+        visible_max: [f32; 3],
+        visible_center: [f32; 3],
+        directions: f32,
+        feasible_min: [f32; 3],
+        feasible_max: [f32; 3],
+    }
+    let evidence: Vec<_> = hole_indices
+        .iter()
+        .map(|&i| {
+            let scene_prior = scene_background.and_then(|scene| scene[i]);
+            if estimated_background.is_none() && scene_prior.is_none() {
+                return None;
+            }
+            let a = subject[i].clamp(0.0, 1.0);
+            let rgba = &estimated_background.unwrap_or(source).pixels[i * 4..i * 4 + 4];
+            let opacity = rgba[3] as f32 / 255.0;
+            let mut e = BackgroundEvidence {
+                prior: [
+                    rgba[0] as f32 * opacity,
+                    rgba[1] as f32 * opacity,
+                    rgba[2] as f32 * opacity,
+                    rgba[3] as f32,
+                ],
+                // A fully opaque transported foreground has no source-mixture
+                // observation for B. Its F/B prior is therefore disabled;
+                // only clean observed backdrop rays may guide the hidden B.
+                // A scene model already supplies the separate unit-weight
+                // term below. Its copied F/B estimate is not an independent
+                // high-precision source-mixture observation of B.
+                precision: if a >= 1.0
+                    || estimated_background.is_none()
+                    || (independent_scene_color && scene_prior.is_some())
+                {
+                    0.0
+                } else {
+                    4.0 * ((1.0 - a) / a.max(1.0 / 255.0)).powi(2)
+                },
+                scene_prior,
+                visible_min: [255.0; 3],
+                visible_max: [0.0; 3],
+                visible_center: [0.0; 3],
+                directions: 0.0,
+                feasible_min: [0.0; 3],
+                feasible_max: [255.0; 3],
+            };
+            if opaque_layers && a < 1.0 {
+                for c in 0..3 {
+                    // Necessary source-mixture bounds, with half a byte of source
+                    // quantization uncertainty; no uncertain F color is fixed.
+                    let observed = source.pixels[4 * i + c] as f32;
+                    e.feasible_min[c] =
+                        ((observed - 0.5 - 255.0 * a) / (1.0 - a)).clamp(0.0, 255.0);
+                    e.feasible_max[c] = ((observed + 0.5) / (1.0 - a)).clamp(0.0, 255.0);
+                }
+                // Original visible colors only. Never recycle the BFS fill as
+                // observation. One nearest donor in each direction limits the
+                // influence of correlated pixels in a large constant patch.
+                let mut ray_values = [[0.0_f32; 8]; 3];
+                let mut ray_count = 0usize;
+                for (dx, dy) in [
+                    (-1, -1),
+                    (0, -1),
+                    (1, -1),
+                    (-1, 0),
+                    (1, 0),
+                    (-1, 1),
+                    (0, 1),
+                    (1, 1),
+                ] {
+                    for step in 1..=12 {
+                        let x = (i % w) as i32 + dx * step;
+                        let y = (i / w) as i32 + dy * step;
+                        if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 {
+                            break;
+                        }
+                        let j = y as usize * w + x as usize;
+                        if target[j]
+                            || protected[j]
+                            || layer[j] != layer[i]
+                            || source.pixels[j * 4 + 3] != 255
+                        {
+                            continue;
+                        }
+                        for c in 0..3 {
+                            let v = source.pixels[j * 4 + c] as f32;
+                            e.visible_min[c] = e.visible_min[c].min(v);
+                            e.visible_max[c] = e.visible_max[c].max(v);
+                            ray_values[c][ray_count] = v;
+                        }
+                        ray_count += 1;
+                        e.directions += 1.0;
+                        break;
+                    }
+                }
+                // A channel-wise median is robust to one dark hair/shirt ray.
+                // Keep the min/max envelope for feasibility diagnostics, but
+                // use the robust center for the continuous local data term.
+                for c in 0..3 {
+                    let mut values = ray_values[c][..ray_count].to_vec();
+                    values.sort_by(|a, b| a.total_cmp(b));
+                    if let Some(&median) = values.get(ray_count / 2) {
+                        e.visible_center[c] = median;
+                    }
+                }
+            }
+            Some(e)
+        })
+        .collect();
     let mut colors: Vec<[f32; 4]> = result
         .pixels
         .chunks_exact(4)
@@ -549,7 +949,7 @@ fn reconstruct(
     for _ in 0..128 {
         let mut residual = 0.0_f32;
         for parity in 0..2 {
-            for &i in &hole_indices {
+            for (slot, &i) in hole_indices.iter().enumerate() {
                 if ((i % w + i / w) & 1) != parity {
                     continue;
                 }
@@ -563,11 +963,58 @@ fn reconstruct(
                     }
                     donor_count += 1;
                 }
-                if donor_count == 0 {
+                // A partly visible backdrop is an observation, not a hole
+                // with arbitrary color. Keep its F/B estimate as a screened
+                // data term. The conditioning of C=aF+(1-a)B gives relative
+                // background precision ((1-a)/a)^2: low-alpha edge pixels
+                // strongly retain their local backdrop; opaque holes use only
+                // the spatial continuation. This acts inside reconstruction,
+                // without filtering the final face or changing its motion.
+                let mut denominator = donor_count as f32;
+                if let Some(e) = &evidence[slot] {
+                    for c in 0..4 {
+                        sum[c] += e.precision * e.prior[c];
+                    }
+                    denominator += e.precision;
+                }
+                let scene_prior = evidence[slot].as_ref().and_then(|e| e.scene_prior);
+                if denominator <= 0.0 && scene_prior.is_none() {
                     continue;
                 }
-                for (channel, total) in colors[i].iter_mut().zip(sum) {
-                    let value = total / donor_count as f32;
+                for (c, (channel, total)) in colors[i].iter_mut().zip(sum).enumerate() {
+                    let mut total = total;
+                    let mut denominator = denominator;
+                    if c < 3 {
+                        if let Some(b) = scene_prior {
+                            // A fitted backdrop is one local observation, not
+                            // an exact replacement for this hidden texel. Put
+                            // it in the same spatial solve as adjacent holes;
+                            // its availability boundary must not draw an edge.
+                            total += b[c];
+                            denominator += 1.0;
+                        }
+                    }
+                    // A validated scene RGB prior can be the only observation
+                    // in a surrounded hole. It provides no alpha observation;
+                    // retain that channel's initializer when it has no donors.
+                    if denominator <= 0.0 {
+                        continue;
+                    }
+                    let mut value = total / denominator;
+                    if c < 3 {
+                        if let Some(e) = &evidence[slot] {
+                            if e.directions > 0.0 {
+                                let observed =
+                                    e.visible_center[c].clamp(e.visible_min[c], e.visible_max[c]);
+                                // Continuous squared-distance penalty to the
+                                // observed range. An intersection/no-intersection
+                                // switch creates discontinuities as alpha varies.
+                                value = (total + e.directions * observed)
+                                    / (denominator + e.directions);
+                            }
+                            value = value.clamp(e.feasible_min[c], e.feasible_max[c]);
+                        }
+                    }
                     residual = residual.max((value - *channel).abs());
                     *channel = value;
                 }
@@ -584,7 +1031,114 @@ fn reconstruct(
         }
         result.pixels[i * 4 + 3] = byte(colors[i][3]);
     }
+    // Excluded pixels can be temporary paths for discovering clean donors.
+    // Their zero foreground alpha still means the underlayer is already
+    // visible. Returning the temporary fill there polluted expansion edges.
+    for (i, &a) in subject.iter().enumerate() {
+        if a <= 1e-6 {
+            result.pixels[i * 4..i * 4 + 4].copy_from_slice(&source.pixels[i * 4..i * 4 + 4]);
+        }
+    }
     Ok(result)
+}
+
+/// Repair the short source face strip exposed by a contraction with an
+/// outward background ray. The full F/B plate is intentionally regularized
+/// over the complete moving layer, but a destination hole needs the local
+/// backdrop immediately beyond the observed source silhouette. A ray keeps
+/// the local blur/lighting gradient and avoids the broad dark bands produced
+/// when a scene prior wins a large harmonic solve.
+fn repair_exposed_face_background(
+    background: &mut RgbaImage,
+    crop: &RgbaImage,
+    holes: &[bool],
+    face_membership: &[f32],
+    color_alpha: &[f32],
+    frozen: &[bool],
+    donor_excluded: &[bool],
+    known_layer: &[u8],
+    polygon: &[Point],
+    origin: Point,
+) {
+    let width = crop.width as usize;
+    let height = crop.height as usize;
+    let count = width * height;
+    if polygon.len() < 3 || holes.len() != count {
+        return;
+    }
+    let clean_background: Vec<f32> = (0..count)
+        .map(|i| {
+            if color_alpha[i] <= 0.04
+                && !frozen[i]
+                && !donor_excluded[i]
+                && known_layer[i] == 0
+            {
+                1.0
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    if clean_background.iter().all(|&v| v <= 0.0) {
+        return;
+    }
+    for i in 0..count {
+        if !holes[i] || face_membership[i] <= 1e-6 {
+            continue;
+        }
+        let p = (
+            origin.0 + (i % width) as f32 + 0.5,
+            origin.1 + (i / width) as f32 + 0.5,
+        );
+        if !inside(p, polygon) {
+            continue;
+        }
+        let mut nearest = (f32::MAX, 0, 0.0);
+        for j in 0..polygon.len() {
+            let (distance, t) = closest(
+                p,
+                polygon[j],
+                polygon[(j + 1) % polygon.len()],
+            );
+            if distance < nearest.0 {
+                nearest = (distance, j, t);
+            }
+        }
+        let (_, edge, t) = nearest;
+        let next = (edge + 1) % polygon.len();
+        let boundary = add(
+            scale(polygon[edge], 1.0 - t),
+            scale(polygon[next], t),
+        );
+        let normal = neck_normal(polygon, edge, t, 6.0);
+        if dot(normal, normal) <= 1e-6 {
+            continue;
+        }
+        // Move just outside the old silhouette, then advance slowly with the
+        // hole depth so a local background gradient is preserved.
+        let search_start = 1.5 + nearest.0 * 0.15;
+        let mut donor = None;
+        for step in 0..=24 {
+            let q = add(boundary, scale(normal, search_start + step as f32));
+            let candidate = sample(
+                crop,
+                &clean_background,
+                q.0 - origin.0 - 0.5,
+                q.1 - origin.1 - 0.5,
+            );
+            if candidate.1 >= 0.65 && candidate.0[3] > 1e-6 {
+                donor = Some(candidate);
+                break;
+            }
+        }
+        let Some(donor) = donor else { continue };
+        let weight = (0.72 + 0.20 * face_membership[i]).clamp(0.0, 0.95);
+        for c in 0..3 {
+            let value = donor.0[c] / donor.0[3].max(1e-6);
+            let current = background.pixels[i * 4 + c] as f32;
+            background.pixels[i * 4 + c] = byte(current * (1.0 - weight) + value * weight);
+        }
+    }
 }
 
 /// Bilinear sampling of RGB premultiplied by both original RGBA alpha and
@@ -1182,7 +1736,52 @@ fn validate_isoline(
     Ok(())
 }
 
+fn validate_motion_interface(source: &RgbaImage, params: &Value, interface: Option<&Value>) -> Result<(), ImageError> {
+    let (w, h) = (source.width as f32, source.height as f32);
+    let semantics = params.get("semanticMasks");
+    if let Some(interface) = interface {
+        let error = || invalid("invalid source motion interface; no optical-contour fallback");
+        let matte = interface.get("mask").ok_or_else(error)?;
+        let hair = semantics.and_then(|m| m.get("hair")).ok_or_else(error)?;
+        let mw = matte.get("width").and_then(Value::as_u64).ok_or_else(error)?;
+        let mh = matte.get("height").and_then(Value::as_u64).ok_or_else(error)?;
+        let data = matte.get("data").and_then(Value::as_array).ok_or_else(error)?;
+        if matte.get("shape").and_then(Value::as_str) != Some("raster")
+            || mw == 0 || mh == 0 || mw.checked_mul(mh) != Some(data.len() as u64)
+            || matte.get("width") != hair.get("width") || matte.get("height") != hair.get("height")
+            || data.iter().any(|v| !v.as_f64().is_some_and(|n| n.is_finite() && (0.0..=255.0).contains(&n))) {
+            return Err(error());
+        }
+        let outline = interface.get("contour").ok_or_else(error)?;
+        let vertices = outline.get("points").and_then(Value::as_array).ok_or_else(error)?;
+        if outline.get("shape").and_then(Value::as_str) != Some("polygon") || vertices.len() < 3
+            || vertices.iter().any(|v| ["x", "y"].iter().any(|key|
+                !v.get(*key).and_then(Value::as_f64).is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n)))) {
+            return Err(error());
+        }
+        validate_isoline(matte, &points(outline, w, h), source, "sourceMotionInterface")?;
+    }
+    Ok(())
+}
+
 pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, ImageError> {
+    adjust_impl(source, params, None)
+}
+
+pub(crate) fn adjust_with_source_layers(
+    source: &RgbaImage, params: &Value, layers: &SourceLayers<'_>,
+) -> Result<RgbaImage, ImageError> {
+    layers.validate(source)?;
+    validate_motion_interface(source, params, layers.motion_interface)?;
+    if percent(params.get("adjustments").unwrap_or(params), "symmetry").abs() > 1e-6 {
+        return Err(invalid("source-layer contour editing requires symmetry as a separate source preparation step"));
+    }
+    adjust_impl(source, params, Some(layers))
+}
+
+fn adjust_impl(
+    source: &RgbaImage, params: &Value, source_layers: Option<&SourceLayers<'_>>,
+) -> Result<RgbaImage, ImageError> {
     #[cfg(not(target_arch = "wasm32"))]
     let mut profile_start = std::time::Instant::now();
     macro_rules! mark {
@@ -1298,7 +1897,152 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     if let Some(matte) = contour_matte.filter(|_| face_contour.is_some()) {
         validate_isoline(matte, &polygon, source, "faceContour")?;
     }
+    #[cfg(test)]
+    if source_layers.is_none() && params.get("__sourceMotionInterface").is_some() {
+        let mode = params.get("experimentalFaceProfile").and_then(Value::as_str);
+        if !mode.is_some_and(|m| ["shared-cheek-v1", "shared-cheek-curve-v4",
+            "shared-cheek-ear-v1", "shared-cheek-ear-periodic-v1", "source-domain-continuous-v1"].contains(&m)) {
+            return Err(invalid("invalid source motion interface; no optical-contour fallback"));
+        }
+        validate_motion_interface(source, params, params.get("__sourceMotionInterface"))?;
+    }
+    // Upper-face width edits meet a special ownership case: the observed face
+    // contour is the skin/hair interface, while the outer head and explicit
+    // facial features must stay fixed. Promote only an evidence-backed,
+    // connected hair band into the skin ownership and let the established
+    // source-forward joint field transport it. This keeps the public path
+    // continuous without inventing a hidden outer silhouette.
+    if (source_layers.is_some() || params
+        .get("experimentalFaceProfile")
+        .and_then(Value::as_str)
+        .map(|mode| {
+            mode == "upper-shared-v1"
+                || cfg!(test)
+                    && ["shared-cheek-v1", "shared-cheek-curve-v4", "shared-cheek-ear-v1", "shared-cheek-ear-periodic-v1", "source-domain-continuous-v1"]
+                        .contains(&mode)
+        })
+        .unwrap_or(true))
+        // The shared hairline ownership is valid for a combined contour edit
+        // too.  Restricting it to an upper-face-only request made
+        // `faceWidth + foreheadWidth` and `faceWidth + temples` silently drop
+        // the upper control: the lower contour field ran with the hair band
+        // frozen as an obstacle.  The recursive guard below prevents a second
+        // promotion, so all contour controls continue through one transport
+        // field and one source/matte ownership decision.
+        && percent(values, "symmetry").abs() <= 1e-6
+        && params
+            .get("__upperSharedCandidateApplied")
+            .and_then(Value::as_bool)
+            != Some(true)
+        && params.get("__legacyUpperShared").and_then(Value::as_bool) != Some(true)
+    {
+        if let Some(prepared) =
+            upper_width::promote_with_source(params, &polygon, frame, source.width, source.height,
+                source_layers.is_some(), source_layers.and_then(|l| l.motion_interface))
+        {
+            // Keep the candidate entirely inside the established ownership,
+            // matting and source-forward transport path. The only change is
+            // the observed shared hair/skin band; no output pixels are painted
+            // by the candidate itself.
+            return adjust_impl(source, &prepared, source_layers);
+        }
+    }
+    let manual = semantic_outline.is_none();
+    // Older detector projects stored the same oval twice. Interpret that
+    // redundant mask as a source contour, just like a manual face tracing.
+    let redundant_outline = params
+        .get("mask")
+        .is_some_and(|m| m.get("points") == outline.get("points"));
+    let mut support_params = Cow::Borrowed(params);
+    if manual || redundant_outline {
+        support_params
+            .to_mut()
+            .as_object_mut()
+            .expect("validated params")
+            .remove("mask");
+        let selected = Region::read(params.get("region"));
+        if polygon.iter().all(|p| selected.contains(p.0 / w, p.1 / h)) {
+            let pad = frame.width() * 0.18;
+            let left = polygon.iter().map(|p| p.0).fold(f32::MAX, f32::min) - pad;
+            let top = polygon.iter().map(|p| p.1).fold(f32::MAX, f32::min) - pad;
+            let right = polygon.iter().map(|p| p.0).fold(f32::MIN, f32::max) + pad;
+            let bottom = polygon.iter().map(|p| p.1).fold(f32::MIN, f32::max) + pad;
+            support_params.to_mut()["region"] = json!({"x":left.max(0.0)/w,"y":top.max(0.0)/h,"width":(right.min(w)-left.max(0.0))/w,"height":(bottom.min(h)-top.max(0.0))/h});
+        }
+    }
+    let interior_hairline = true;
+    #[cfg(test)]
+    let interior_hairline =
+        interior_hairline && params.get("__legacyHairline").and_then(Value::as_bool) != Some(true);
+    if interior_hairline {
+        if let Some(hairline) = hairline::prepare(source, &support_params, &polygon, frame) {
+            // Compose the dedicated interior hairline map with the established
+            // contour map. A tiny second slider must not switch the forehead
+            // back to a different algorithm. Apply opacity/blend only once.
+            let mut lower_params = support_params.clone().into_owned();
+            if lower_params.get("adjustments").is_some() {
+                lower_params["adjustments"]["forehead"] = json!(0);
+            } else {
+                lower_params["forehead"] = json!(0);
+            }
+            lower_params["opacity"] = json!(100);
+            lower_params["blendMode"] = json!("normal");
+            let lower = adjust_impl(source, &lower_params, source_layers)?;
+            let rendered = hairline.render(&lower);
+            let mut composite_params = support_params.into_owned();
+            if composite_params
+                .get("blendMode")
+                .and_then(Value::as_str)
+                .unwrap_or("normal")
+                == "normal"
+            {
+                composite_params
+                    .as_object_mut()
+                    .expect("validated params")
+                    .remove("mask");
+                composite_params
+                    .as_object_mut()
+                    .expect("validated params")
+                    .remove("protectMask");
+            }
+            let mut output = crate::mask::composite(source, &rendered, &composite_params);
+            for (i, original) in source.pixels.chunks_exact(4).enumerate() {
+                if rendered.pixels[i * 4..i * 4 + 4] == *original {
+                    output.pixels[i * 4..i * 4 + 4].copy_from_slice(original);
+                }
+            }
+            return Ok(output);
+        }
+    }
     let target = target_contour(&polygon, frame, values);
+    // Native research replay only. The parameter is deliberately absent from
+    // the public protocol and this branch does not exist in production builds.
+    #[cfg(test)]
+    let target = if params
+        .get("experimentalFaceProfile")
+        .and_then(Value::as_str)
+        == Some("segmented-lateral-v1")
+    {
+        crate::face_profile::target_contour(
+            &polygon,
+            (
+                frame.origin,
+                frame.across,
+                frame.down,
+                frame.left,
+                frame.right,
+                frame.top,
+                frame.bottom,
+            ),
+            semantics,
+            w,
+            h,
+            values,
+        )
+        .map_err(invalid)?
+    } else {
+        target
+    };
     // A purely shrinking operation must not fill concave notches which were
     // outside the original foreground. Moving every x toward the center is
     // insufficient to prove polygon containment for parsed concave contours.
@@ -1373,79 +2117,6 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         support: (frame.width() * 0.28).max(3.0),
         mls: mls::RigidMls::new(handles),
     };
-    let manual = semantic_outline.is_none();
-    // Older detector projects stored the same oval twice. Interpret that
-    // redundant mask as a source contour, just like a manual face tracing.
-    let redundant_outline = params
-        .get("mask")
-        .is_some_and(|m| m.get("points") == outline.get("points"));
-    let mut support_params = Cow::Borrowed(params);
-    if manual || redundant_outline {
-        support_params
-            .to_mut()
-            .as_object_mut()
-            .expect("validated params")
-            .remove("mask");
-        let selected = Region::read(params.get("region"));
-        if polygon.iter().all(|p| selected.contains(p.0 / w, p.1 / h)) {
-            let pad = frame.width() * 0.18;
-            let left = polygon.iter().map(|p| p.0).fold(f32::MAX, f32::min) - pad;
-            let top = polygon.iter().map(|p| p.1).fold(f32::MAX, f32::min) - pad;
-            let right = polygon.iter().map(|p| p.0).fold(f32::MIN, f32::max) + pad;
-            let bottom = polygon.iter().map(|p| p.1).fold(f32::MIN, f32::max) + pad;
-            support_params.to_mut()["region"] = json!({"x":left.max(0.0)/w,"y":top.max(0.0)/h,"width":(right.min(w)-left.max(0.0))/w,"height":(bottom.min(h)-top.max(0.0))/h});
-        }
-    }
-    let region = Region::read(support_params.get("region"));
-    let context_outline = head_outline.map(|m| points(m, w, h)).unwrap_or_default();
-    let pad = field.support + frame.width() * 0.11 + 4.0;
-    let left = (polygon
-        .iter()
-        .chain(&target)
-        .chain(&context_outline)
-        .map(|p| p.0)
-        .fold(f32::MAX, f32::min)
-        - pad)
-        .floor()
-        .max(0.0) as usize;
-    let top = (polygon
-        .iter()
-        .chain(&target)
-        .chain(&context_outline)
-        .map(|p| p.1)
-        .fold(f32::MAX, f32::min)
-        - pad)
-        .floor()
-        .max(0.0) as usize;
-    let right = (polygon
-        .iter()
-        .chain(&target)
-        .chain(&context_outline)
-        .map(|p| p.0)
-        .fold(f32::MIN, f32::max)
-        + pad)
-        .ceil()
-        .min(w) as usize;
-    let bottom = (polygon
-        .iter()
-        .chain(&target)
-        .chain(&context_outline)
-        .map(|p| p.1)
-        .fold(f32::MIN, f32::max)
-        + pad)
-        .ceil()
-        .min(h) as usize;
-    let (cw, ch) = (right - left, bottom - top);
-    let count = cw * ch;
-    let source_matte = face_matte.map(PreparedMask::new);
-    let contour_mask = contour_matte.map(PreparedMask::new);
-    let person_mask = params.get("subjectMask").map(PreparedMask::new);
-    let protect_mask = params.get("protectMask").map(PreparedMask::new);
-    let neck_mask = semantics.and_then(|m| m.get("neck")).map(PreparedMask::new);
-    let hair_mask = semantics.and_then(|m| m.get("hair")).map(PreparedMask::new);
-    // Current parser projects can transport the connected face/upper-neck
-    // foreground together. Older projects and manual tracings keep their
-    // established face-only path when this observed raster evidence is absent.
     let observed_raster = |value: &Value| {
         let width = value.get("width").and_then(Value::as_u64).unwrap_or(0);
         let height = value.get("height").and_then(Value::as_u64).unwrap_or(0);
@@ -1459,8 +2130,103 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                     .is_some_and(|data| data.len() as u64 == count)
             })
     };
-    let joint_skin = semantics
-        .and_then(|m| m.get("skin"))
+    let region = Region::read(support_params.get("region"));
+    let context_outline = head_outline.map(|m| points(m, w, h)).unwrap_or_default();
+    let pad = field.support + frame.width() * 0.11 + 4.0;
+    // A source decomposition cannot change its crop when the edit crosses a
+    // pixel boundary. Reserve the legal contour displacement in the anatomical
+    // frame once, independent of this target. Field trajectories still require
+    // their own support/boundary verification; this is not a flow bound.
+    let stable_source_layers = face_contour.is_some()
+        && face_matte.is_some()
+        && contour_matte.is_some()
+        // The exact source-mixture interval below is for opaque photographs.
+        // Keep transparent/RGBA callers on their established layer path before
+        // changing the source crop, permissions or reconstruction domain.
+        && source.pixels.chunks_exact(4).all(|pixel| pixel[3] == 255)
+        && semantics
+            .and_then(|m| m.get("skin"))
+            .is_some_and(observed_raster)
+        && semantics
+            .and_then(|m| m.get("neck"))
+            .is_some_and(observed_raster);
+    let max_du = frame.width() * 0.11;
+    let max_dv = frame.height() * 0.135;
+    let pad_x = if stable_source_layers {
+        pad.max(max_du * frame.across.0.abs() + max_dv * frame.down.0.abs() + 4.0)
+    } else {
+        pad
+    };
+    let pad_y = if stable_source_layers {
+        pad.max(max_du * frame.across.1.abs() + max_dv * frame.down.1.abs() + 4.0)
+    } else {
+        pad
+    };
+    let left = (polygon
+        .iter()
+        .chain(target.iter().filter(|_| !stable_source_layers))
+        .chain(&context_outline)
+        .map(|p| p.0)
+        .fold(f32::MAX, f32::min)
+        - pad_x)
+        .floor()
+        .max(0.0) as usize;
+    let top = (polygon
+        .iter()
+        .chain(target.iter().filter(|_| !stable_source_layers))
+        .chain(&context_outline)
+        .map(|p| p.1)
+        .fold(f32::MAX, f32::min)
+        - pad_y)
+        .floor()
+        .max(0.0) as usize;
+    let right = (polygon
+        .iter()
+        .chain(target.iter().filter(|_| !stable_source_layers))
+        .chain(&context_outline)
+        .map(|p| p.0)
+        .fold(f32::MIN, f32::max)
+        + pad_x)
+        .ceil()
+        .min(w) as usize;
+    let bottom = (polygon
+        .iter()
+        .chain(target.iter().filter(|_| !stable_source_layers))
+        .chain(&context_outline)
+        .map(|p| p.1)
+        .fold(f32::MIN, f32::max)
+        + pad_y)
+        .ceil()
+        .min(h) as usize;
+    let (cw, ch) = (right - left, bottom - top);
+    let count = cw * ch;
+    let source_matte = face_matte.map(PreparedMask::new);
+    let contour_mask = contour_matte.map(PreparedMask::new);
+    let person_mask = params.get("subjectMask").map(PreparedMask::new);
+    let protect_mask = params.get("protectMask").map(PreparedMask::new);
+    // Independent source material evidence is identity/ownership, not optical
+    // alpha. It is consumed throughout the fringe and matte release paths.
+    let garment_mask = params.get("__sourceGarment").map(PreparedMask::new);
+    let neck_mask = params
+        .get("__sourceNeckSupport")
+        .or_else(|| semantics.and_then(|m| m.get("neck")))
+        .map(PreparedMask::new);
+    let hair_mask = semantics.and_then(|m| m.get("hair")).map(PreparedMask::new);
+    // Research-only source depth evidence. Hair color/class alone cannot tell
+    // a front strand from a stationary layer behind the cheek. Public calls
+    // keep the established conservative foreground-hair contract.
+    let rear_hair_mask: Option<PreparedMask<'_>> = None;
+    #[cfg(test)]
+    let rear_hair_mask = params
+        .get("__rearHairMask")
+        .map(PreparedMask::new)
+        .or(rear_hair_mask);
+    // Current parser projects can transport the connected face/upper-neck
+    // foreground together. Older projects and manual tracings keep their
+    // established face-only path when this observed raster evidence is absent.
+    let joint_skin = params
+        .get("__sourceSkinSupport")
+        .or_else(|| semantics.and_then(|m| m.get("skin")))
         .filter(|m| observed_raster(m))
         .map(PreparedMask::new);
     let mut joint_neck = face_contour.is_some()
@@ -1470,11 +2236,71 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         && semantics
             .and_then(|m| m.get("neck"))
             .is_some_and(observed_raster);
+    let ear_material = semantics.and_then(|m| m.get("ears"));
+    let flexible_ears = source_layers.is_some();
+    #[cfg(test)]
+    let flexible_ears = flexible_ears || params.get("experimentalFaceProfile")
+        .and_then(Value::as_str).is_some_and(|mode| ["shared-cheek-ear-v1", "shared-cheek-ear-periodic-v1", "source-domain-continuous-v1"].contains(&mode));
+    let observed_ear_motion = if flexible_ears
+        && stable_source_layers
+        && joint_neck
+        && ear_material.is_some_and(observed_raster)
+        && ear_material
+            .and_then(|m| m.get("data"))
+            .and_then(Value::as_array)
+            .is_some_and(|data| data.iter().any(|v| v.as_f64().is_some_and(|v| v >= 127.5)))
+    {
+        ObservedEarMotion::JointFlexible
+    } else {
+        ObservedEarMotion::Fixed
+    };
+    let ear_mask = if observed_ear_motion.follows_joint_field() {
+        ear_material.map(PreparedMask::new)
+    } else {
+        None
+    };
+    // A source attachment plan is permission, not a material alpha. It must
+    // arrive before source connectivity is decided; releasing an accessory
+    // only after tracing leaves an obsolete disconnected-ear lock behind it.
+    let attachment_support = source_layers.and_then(|l| l.moving_attachment_support);
+    #[cfg(test)]
+    let attachment_support = attachment_support.or_else(|| params.get("__sourceMovingAttachmentSupport"));
+    let moving_attachment_mask = if let Some(mask) = attachment_support {
+        let valid_data = mask.get("data").and_then(Value::as_array).is_some_and(|data| {
+            data.len() == source.width as usize * source.height as usize
+                && data.iter().all(|v| matches!(v.as_u64(), Some(0 | 255)))
+        });
+        if !observed_ear_motion.follows_joint_field()
+            || mask.get("shape").and_then(Value::as_str) != Some("raster")
+            || mask.get("width").and_then(Value::as_u64) != Some(source.width as u64)
+            || mask.get("height").and_then(Value::as_u64) != Some(source.height as u64)
+            || !valid_data
+        {
+            return Err(invalid("source moving attachment support requires a full-source binary raster and joint observed ear mode"));
+        }
+        Some(PreparedMask::new(mask))
+    } else {
+        None
+    };
+    let attachment_feature_masks: Vec<_> = if moving_attachment_mask.is_some() {
+        ["leftEye", "rightEye", "leftBrow", "rightBrow", "nose", "lips", "teeth"]
+            .into_iter()
+            .filter_map(|key| semantics.and_then(|m| m.get(key)))
+            .map(PreparedMask::new)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let rigid_masks: Vec<_> = ["accessories", "ears"]
+        .into_iter()
+        .filter(|key| *key != "ears" || !observed_ear_motion.follows_joint_field())
+        .filter_map(|key| semantics.and_then(|m| m.get(key)).map(|m| (key, PreparedMask::new(m))))
+        .collect();
     let output_mask = support_params.get("mask").map(PreparedMask::new);
     let fixed_masks: Vec<_> = ["accessories", "ears", "hair"]
-        .iter()
-        .filter_map(|key| semantics.and_then(|m| m.get(key)))
-        .map(PreparedMask::new)
+        .into_iter()
+        .filter(|key| *key != "ears" || !observed_ear_motion.follows_joint_field())
+        .filter_map(|key| semantics.and_then(|m| m.get(key)).map(|m| (key, PreparedMask::new(m))))
         .collect();
     let mut input = source.clone();
     if symmetry > 1e-6 {
@@ -1492,10 +2318,19 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let mut donor_frozen = Vec::with_capacity(count);
     let mut inferred_person_fixed = Vec::with_capacity(count);
     let mut attachment_fixed = Vec::with_capacity(count);
+    let mut moving_attachment = Vec::with_capacity(count);
     let mut protection = Vec::with_capacity(count);
     let mut donor_excluded = Vec::with_capacity(count);
     let mut known_layer = Vec::with_capacity(count);
+    let mut neck_membership = Vec::with_capacity(count);
+    let mut ear_membership = Vec::with_capacity(if observed_ear_motion.follows_joint_field() {
+        count
+    } else {
+        0
+    });
+    let mut material_fixed = Vec::with_capacity(count);
     let mut neck_lighting_known = Vec::with_capacity(count);
+    let mut legacy_fringe_permissions = Vec::with_capacity(count);
     mark!("prepare");
     for y in top..bottom {
         for x in left..right {
@@ -1518,18 +2353,65 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 .as_ref()
                 .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
                 .unwrap_or(0.0);
-            donor_excluded.push(person_coverage > 1.0 / 255.0);
+            let garment = garment_mask
+                .as_ref()
+                .is_some_and(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            material_fixed.push(garment);
+            donor_excluded.push(person_coverage > 1.0 / 255.0 || garment);
             let protected = protect_mask
                 .as_ref()
                 .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
                 .unwrap_or(0.0);
-            let accessory = fixed_masks
-                .iter()
-                .any(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
-            attachment_fixed.push(accessory);
             let hair = hair_mask
                 .as_ref()
                 .is_some_and(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            let rear_hair = hair
+                && rear_hair_mask.as_ref().is_some_and(|m| {
+                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
+                });
+            let planned_attachment = moving_attachment_mask.as_ref().is_some_and(|m| {
+                m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
+            });
+            if planned_attachment && (protected > 0.0 || hair
+                || garment_mask.as_ref().is_some_and(|m| {
+                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.0
+                })
+                || attachment_feature_masks.iter().any(|m| {
+                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
+                })) {
+                return Err(invalid("source moving attachment support conflicts with protected material; recompute the source plan"));
+            }
+            moving_attachment.push(planned_attachment);
+            if planned_attachment {
+                *donor_excluded.last_mut().expect("current pixel") = true;
+            }
+            let rigid_attachment = rigid_masks
+                .iter()
+                .any(|(name, m)| (*name != "accessories" || !planned_attachment)
+                    && m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            let accessory = (hair && !rear_hair) || rigid_attachment;
+            attachment_fixed.push(accessory);
+            neck_membership.push(
+                neck_mask
+                    .as_ref()
+                    .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
+                    .unwrap_or(0.0),
+            );
+            let ear_coverage = if observed_ear_motion.follows_joint_field() {
+                let coverage = ear_mask
+                    .as_ref()
+                    .map(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height))
+                    .unwrap_or(0.0);
+                ear_membership.push(coverage);
+                coverage
+            } else {
+                0.0
+            };
+            // A movable ear remains foreground material, never a backdrop
+            // donor. Automatic motion permission does not change donor identity.
+            if observed_ear_motion.follows_joint_field() && ear_coverage > 1.0 / 255.0 {
+                *donor_excluded.last_mut().expect("current pixel") = true;
+            }
             // Record the observed fixed lower layer independently of the
             // semantic face confidence. The physical matte below decides
             // which of these texels are foreground and must be reconstructed.
@@ -1547,7 +2429,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             // A confidently classified non-neck person pixel is not a soft
             // facial fringe, even if approximate head alpha overlaps it.
             // Keep other people, clothing and undetected ears fixed.
-            let other_person = person_coverage >= 0.8
+            let other_person = person_coverage >= 0.8 && !rear_hair
                 // The face and neck probabilities can both fall below .5 in
                 // the one-pixel class transition. Freezing that uncertainty
                 // leaves dotted copies of the old chin after extension. Only
@@ -1570,18 +2452,29 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                     .iter()
                     .enumerate()
                     .any(|(j, &a)| closest(p, a, polygon[(j + 1) % polygon.len()]).0 <= 3.0);
+            legacy_fringe_permissions.push(covered_old_fringe);
+            // The joint source decomposition must not depend on whether the
+            // current destination happens to cover an uncertain source edge.
+            let covered_old_fringe = covered_old_fringe && !(stable_source_layers && joint_neck);
             inferred_person_fixed.push(other_person && !covered_old_fringe);
             frozen.push(
-                protected >= 1.0 - 1e-6 || accessory || (other_person && !covered_old_fringe),
+                protected >= 1.0 - 1e-6
+                    || accessory
+                    || garment
+                    || (other_person && !covered_old_fringe),
             );
             // Existing hair remains fixed in the output, but its observed
             // color is the visible underlying layer at a skin/hair boundary.
             // Refusing it as a donor leaves a skin-colored band after a cheek
             // contraction. User-frozen pixels, ears, adornments and another
             // person's pixels remain forbidden donors.
+            // A connected moving ear is excluded via donor_excluded above.
+            // This array also locks its hidden backdrop reconstruction; using
+            // it for a moving ear would strand the old ear color in that plate.
             donor_frozen.push(
                 protected >= 1.0 - 1e-6
-                    || (accessory && !hair)
+                    || garment
+                    || rigid_attachment
                     || (other_person && !covered_old_fringe),
             );
             protection.push(protected);
@@ -1605,9 +2498,16 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     // alpha remains the context/protection support above, while visible hair
     // supplies a stationary underlayer for the newly exposed skin strip.
     // A finite observed seed from parser face and skin-group(1,10,14).
-    // This is not a union of raw class probabilities or an invented envelope.
+    // The isolated ear policy additionally admits observed connected ear
+    // material into this trimap. Class confidence is not physical opacity;
+    // the existing matting stage below must estimate that independently.
     let mut joint_alpha = face_membership.clone();
     let mut joint_owned = vec![false; count];
+    let mut joint_ear_prior = if observed_ear_motion.follows_joint_field() {
+        vec![0.0_f32; count]
+    } else {
+        Vec::new()
+    };
     if joint_neck {
         let skin = joint_skin.as_ref().expect("raster evidence checked");
         for (i, alpha) in joint_alpha.iter_mut().enumerate() {
@@ -1615,7 +2515,16 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 left as f32 + (i % cw) as f32 + 0.5,
                 top as f32 + (i / cw) as f32 + 0.5,
             );
-            *alpha = (*alpha).max(skin.coverage(p.0 / w, p.1 / h, source.width, source.height));
+            if observed_ear_motion.follows_joint_field() && !frozen[i] {
+                joint_ear_prior[i] = ear_membership[i];
+            }
+            *alpha = if material_fixed[i] {
+                0.0
+            } else {
+                (*alpha)
+                    .max(skin.coverage(p.0 / w, p.1 / h, source.width, source.height))
+                    .max(joint_ear_prior.get(i).copied().unwrap_or(0.0))
+            };
         }
         let mut queue = VecDeque::new();
         for i in 0..count {
@@ -1624,6 +2533,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 top as f32 + (i / cw) as f32 + 0.5,
             );
             if !attachment_fixed[i]
+                && !material_fixed[i]
                 && protection[i] < 1.0 - 1e-6
                 && face_membership[i] > 0.5
                 && inside(p, &polygon)
@@ -1636,8 +2546,9 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             for n in neighbors(i, cw, ch) {
                 if !joint_owned[n]
                     && !attachment_fixed[n]
+                    && !material_fixed[n]
                     && protection[n] < 1.0 - 1e-6
-                    && joint_alpha[n] > 0.5
+                    && (joint_alpha[n] > 0.5 || moving_attachment[n])
                 {
                     joint_owned[n] = true;
                     queue.push_back(n);
@@ -1660,6 +2571,11 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 ) > 0.8
         }) {
             joint_neck = false;
+        }
+        if observed_ear_motion.follows_joint_field() && !joint_neck {
+            return Err(invalid(
+                "observed ear motion requires a connected face/neck material layer",
+            ));
         }
         // Preserve only the physical trimap next to the observed connected
         // component. Disconnected skin islands cannot become moving people.
@@ -1691,8 +2607,69 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             for i in 0..count {
                 if !joint_owned[i] && (distance[i] > fringe || joint_alpha[i] > 0.5) {
                     joint_alpha[i] = 0.0;
+                    if let Some(prior) = joint_ear_prior.get_mut(i) {
+                        *prior = 0.0;
+                    }
                 }
             }
+            if observed_ear_motion.follows_joint_field() {
+                // Ear motion is a component permission, not an opacity
+                // threshold. A core-free component fully inside the source
+                // crop must not append disconnected-ear protection. A weak
+                // isolated classification on cheek skin retains the existing
+                // material policy instead of becoming a new fixed obstacle.
+                // Crop-edge components stay conservative: a core may lie
+                // outside this raster, so absence has not been established.
+                // Source component identity is determined BEFORE protection
+                // barriers so a protected core cannot release its soft tail.
+                // This does not change the source alpha prior, donor policy,
+                // or face/neck connectivity and inferred-fringe rules.
+                let source_ear_support =
+                    ear_support::SourceEarSupport::new(&ear_membership, cw, ch);
+                let mut allowed = vec![false; count];
+                for i in 0..count {
+                    if ear_membership[i] <= 1.0 / 255.0 {
+                        continue;
+                    }
+                    // Reuse established fixed material and explicit user
+                    // protection as connection barriers. A low-confidence
+                    // hair/accessory overlap is not new hard-freeze evidence;
+                    // the existing material path still owns its soft edge.
+                    allowed[i] = protection[i] <= 0.0
+                        && !material_fixed[i]
+                        && !attachment_fixed[i]
+                        && !(frozen[i] && !inferred_person_fixed[i]);
+                }
+                let disconnected_ear = source_ear_support.disconnected(&allowed, &joint_owned);
+                for i in 0..count {
+                    if disconnected_ear[i] {
+                        attachment_fixed[i] = true;
+                        frozen[i] = true;
+                        donor_frozen[i] = true;
+                        donor_excluded[i] = true;
+                        joint_owned[i] = false;
+                        joint_alpha[i] = 0.0;
+                        joint_ear_prior[i] = 0.0;
+                    }
+                }
+            }
+        }
+    }
+    // A missing/disconnected neck falls back to the established face-only
+    // renderer, whose destination occlusion permissions are a separate path.
+    if stable_source_layers && !joint_neck {
+        for (i, &covered) in legacy_fringe_permissions.iter().enumerate() {
+            if !covered {
+                continue;
+            }
+            let p = ((left + i % cw) as f32 + 0.5, (top + i / cw) as f32 + 0.5);
+            let rigid_attachment = rigid_masks
+                .iter()
+                .any(|(name, m)| (*name != "accessories" || !moving_attachment[i])
+                    && m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            inferred_person_fixed[i] = false;
+            frozen[i] = protection[i] >= 1.0 - 1e-6 || attachment_fixed[i] || material_fixed[i];
+            donor_frozen[i] = protection[i] >= 1.0 - 1e-6 || rigid_attachment || material_fixed[i];
         }
     }
     let moving_alpha = if joint_neck {
@@ -1702,11 +2679,12 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     } else {
         &subject
     };
-    let mut color_alpha = if face_matte.is_some() {
-        crate::face_matting::refine_portrait_alpha(&crop, moving_alpha)
-    } else {
-        moving_alpha.clone()
-    };
+    // Polygon antialiasing is geometric coverage, just as parser confidence
+    // is semantic coverage. Neither is physical opacity at a decoded RGB
+    // boundary. Refine both before imposing any source-mixture constraint;
+    // otherwise a fractional polygon texel on opaque skin strands old skin
+    // in the reconstructed backdrop. Ambiguous colors/RGBA retain the input.
+    let mut color_alpha = crate::face_matting::refine_portrait_alpha(&crop, moving_alpha);
     // An independently parsed head is stationary context support around the
     // facial class, including hair/ears. Its confidently empty exterior remains
     // fixed even when an ambiguous local color-line projection suggests skin.
@@ -1716,6 +2694,27 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         for (i, alpha) in color_alpha.iter_mut().enumerate() {
             if subject[i] <= 1e-6 && (!joint_neck || joint_alpha[i] <= 1e-6) {
                 *alpha = 0.0;
+            }
+        }
+    }
+    if joint_neck {
+        // A color-line fit can explain ordinary backdrop texture as tiny
+        // foreground coverage. Source material needs observed head/skin or
+        // selected-person support; the independently verified fringe recovery
+        // below may still restore skin omitted by either semantic mask.
+        for (i, alpha) in color_alpha.iter_mut().enumerate() {
+            if subject[i] <= 1e-6 && joint_alpha[i] <= 1e-6 && !donor_excluded[i] {
+                *alpha = 0.0;
+            }
+        }
+    }
+    if let Some(rear_hair) = &rear_hair_mask {
+        for (i, a) in color_alpha.iter_mut().enumerate() {
+            let p = ((left + i % cw) as f32 + 0.5, (top + i / cw) as f32 + 0.5);
+            if moving_alpha[i] <= 1e-6
+                && rear_hair.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
+            {
+                *a = 0.0;
             }
         }
     }
@@ -1729,7 +2728,10 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         let mut person = Vec::with_capacity(count);
         let mut forbidden = Vec::with_capacity(count);
         let mut semantic_edge = Vec::with_capacity(count);
-        let skin_mask = semantics.and_then(|m| m.get("skin")).map(PreparedMask::new);
+        let skin_mask = params
+            .get("__sourceSkinSupport")
+            .or_else(|| semantics.and_then(|m| m.get("skin")))
+            .map(PreparedMask::new);
         for i in 0..count {
             let nx = (left as f32 + (i % cw) as f32 + 0.5) / w;
             let ny = (top as f32 + (i / cw) as f32 + 0.5) / h;
@@ -1747,14 +2749,19 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 .as_ref()
                 .map(|m| m.coverage(nx, ny, source.width, source.height))
                 .unwrap_or(0.0);
-            semantic_edge.push(skin_value.max(neck_value));
+            semantic_edge.push(
+                skin_value
+                    .max(neck_value)
+                    .max(joint_ear_prior.get(i).copied().unwrap_or(0.0)),
+            );
             forbidden.push(
                 frozen[i]
                     || inferred_person_fixed[i]
                     || protection[i] > 1e-6
                     || fixed_masks
                         .iter()
-                        .any(|m| m.coverage(nx, ny, source.width, source.height) > 1e-6),
+                        .any(|(name, m)| (*name != "accessories" || !moving_attachment[i])
+                            && m.coverage(nx, ny, source.width, source.height) > 1e-6),
             );
         }
         color_alpha = crate::face_matting::recover_connected_portrait_fringe(
@@ -1766,6 +2773,117 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             &forbidden,
             fringe,
         );
+        // Recheck inferred portrait-edge freezes against connected source
+        // evidence. This changes neither the edit target nor the output by
+        // painting; verified source material is transported by the same field.
+        let strict_forbidden: Vec<_> = (0..count)
+            .map(|i| {
+                let nx = (left as f32 + (i % cw) as f32 + 0.5) / w;
+                let ny = (top as f32 + (i / cw) as f32 + 0.5) / h;
+                protection[i] > 1e-6
+                    || material_fixed[i]
+                    || (frozen[i] && !inferred_person_fixed[i])
+                    || fixed_masks
+                        .iter()
+                        .any(|(name, m)| (*name != "accessories" || !moving_attachment[i])
+                            && m.coverage(nx, ny, source.width, source.height) > 1e-6)
+            })
+            .collect();
+        let recover_fringe = true;
+        #[cfg(test)]
+        let recover_fringe = recover_fringe
+            && params
+                .get("__legacyInferredFringe")
+                .and_then(Value::as_bool)
+                != Some(true);
+        if recover_fringe {
+            let recovered = crate::face_source_fringe::recover_inferred_fringe(
+                &crop,
+                &color_alpha,
+                &joint_owned,
+                &person,
+                &semantic_edge,
+                &strict_forbidden,
+                &inferred_person_fixed,
+                fringe,
+            );
+            for (i, &released) in recovered.released.iter().enumerate() {
+                if released && !material_fixed[i] {
+                    frozen[i] = false;
+                }
+            }
+            color_alpha = recovered.alpha;
+        }
+    }
+    if let Some(layers) = source_layers {
+        if !stable_source_layers || !joint_neck {
+            return Err(invalid("face source layers require a connected face and neck material domain"));
+        }
+        for i in 0..count {
+            let x = left + i % cw;
+            let y = top + i / cw;
+            if !layers.contains(x, y) { continue; }
+            color_alpha[i] = if material_fixed[i] { 0.0 } else {
+                layers.optical_alpha[y * source.width as usize + x]
+            };
+            if color_alpha[i] > 1e-6 && inferred_person_fixed[i]
+                && !attachment_fixed[i] && !material_fixed[i]
+                && protection[i] < 1.0 - 1e-6 {
+                frozen[i] = false;
+            }
+        }
+    }
+    #[cfg(test)]
+    if let Some(observed) = params.get("__physicalAlpha").map(PreparedMask::new) {
+        // Isolated source-matting experiment. No generated output pixels are
+        // supplied: the same source RGB, contour request and compositor run.
+        let observed_region = Region::read(
+            params
+                .get("__physicalAlpha")
+                .and_then(|m| m.get("sourceRegion")),
+        );
+        let observed_selection = params
+            .get("__physicalAlpha")
+            .and_then(|m| m.get("sourceSelection"))
+            .map(PreparedMask::new);
+        let selected_source = |p: Point| {
+            observed_region.contains(p.0 / w, p.1 / h)
+                && observed_selection.as_ref().is_none_or(|mask| {
+                    mask.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.5
+                })
+        };
+        for i in 0..count {
+            let p = ((left + i % cw) as f32 + 0.5, (top + i / cw) as f32 + 0.5);
+            if !selected_source(p) {
+                continue;
+            }
+            color_alpha[i] = if material_fixed[i] {
+                0.0
+            } else {
+                observed.coverage(p.0 / w, p.1 / h, source.width, source.height)
+            };
+            if color_alpha[i] > 1e-6
+                && inferred_person_fixed[i]
+                && !attachment_fixed[i]
+                && !material_fixed[i]
+                && protection[i] < 1.0 - 1e-6
+            {
+                frozen[i] = false;
+            }
+        }
+        if params.get("__refinePhysicalAlpha").and_then(Value::as_bool) == Some(true) {
+            let refined = crate::face_matting::refine_portrait_alpha(&crop, &color_alpha);
+            for i in 0..count {
+                let p = ((left + i % cw) as f32 + 0.5, (top + i / cw) as f32 + 0.5);
+                if selected_source(p) {
+                    color_alpha[i] = if attachment_fixed[i] || material_fixed[i] {
+                        0.0
+                    } else {
+                        refined[i]
+                    };
+                }
+            }
+        }
     }
     // The existing source physical matting trimap is the uncertain own-face
     // edge. PersonAlpha is the selected person's combined class confidence,
@@ -1799,13 +2917,98 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         let own_face_uncertain_edge = (independent_head
             && contour_distance <= own_edge_uncertainty)
             || (joint_neck && joint_owned[i] && joint_alpha[i] > 0.8);
-        let explicit_fixed = protection[i] >= 1.0 - 1e-6
-            || fixed_masks
-                .iter()
-                .any(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+        // Ear motion changes the observed ear material only. It must not
+        // upgrade uncertain face/neck classifications to explicit locks.
+        // Disconnected ears have already been restored to attachment_fixed.
+        let explicit_fixed =
+            protection[i] >= 1.0 - 1e-6 || attachment_fixed[i] || material_fixed[i];
         if own_face_uncertain_edge && !explicit_fixed {
             frozen[i] = false;
             // Inferred other-person texels remain forbidden as color donors.
+        }
+    }
+    // A semantic garment identity is fixed material, never moving skin. Keep
+    // it out of the physical alpha before F/B estimation and source pairing.
+    for (i, alpha) in color_alpha.iter_mut().enumerate() {
+        if material_fixed[i] {
+            *alpha = 0.0;
+        }
+    }
+    // Establish a stationary scene estimate from the unedited photograph.
+    // The decoded edge can carry a skin/shadow contribution even where every
+    // semantic mask has already reached zero. Such a contribution must travel
+    // with the same continuous field as the face, rather than being erased by
+    // a threshold on a destination sample or on the requested face polygon.
+    let scene_edge = if joint_neck {
+        let blocked: Vec<_> = (0..count)
+            .map(|i| {
+                let p = ((left + i % cw) as f32 + 0.5, (top + i / cw) as f32 + 0.5);
+                frozen[i] || attachment_fixed[i] || protection[i] > 1e-6
+                    // Rear hair may be occluded by new face coverage, but it
+                    // remains a stationary layer, never a missing skin fringe.
+                    || rear_hair_mask.as_ref().is_some_and(|m| {
+                        m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 1e-6
+                    })
+            })
+            .collect();
+        let support: Vec<_> = (0..count)
+            .map(|i| {
+                subject[i]
+                    .max(joint_alpha[i])
+                    .max(neck_membership[i])
+                    .max(if donor_excluded[i] { 1.0 } else { 0.0 })
+            })
+            .collect();
+        #[cfg(test)]
+        if std::env::var_os("FACE_SOURCE_LAYERS_TRACE").is_some() {
+            if let Some(path) = params.get("__faceFieldTrace").and_then(Value::as_str) {
+                // Source-only replay evidence for scene-model rejection.
+                // Keep the inputs before minimum-alpha updates; the later
+                // F/B dump alone cannot reproduce this estimator's decision.
+                let directory = std::path::Path::new(path);
+                std::fs::create_dir_all(directory).map_err(|e| invalid(&e.to_string()))?;
+                for (name, values) in [
+                    ("source-scene-alpha.f32", &color_alpha),
+                    ("source-scene-support.f32", &support),
+                ] {
+                    let bytes: Vec<_> = values.iter().flat_map(|a| a.to_le_bytes()).collect();
+                    std::fs::write(directory.join(name), bytes)
+                        .map_err(|e| invalid(&e.to_string()))?;
+                }
+                for (name, values) in [
+                    ("source-scene-blocked.u8", &blocked),
+                    ("source-scene-owned.u8", &joint_owned),
+                ] {
+                    let bytes: Vec<_> = values.iter().map(|&b| u8::from(b)).collect();
+                    std::fs::write(directory.join(name), bytes)
+                        .map_err(|e| invalid(&e.to_string()))?;
+                }
+                std::fs::write(
+                    directory.join("source-scene-meta.json"),
+                    serde_json::to_vec(&json!({
+                        "width": cw, "height": ch,
+                        "pixelIndexOrigin": [left, top],
+                        "fringe": own_edge_uncertainty.ceil() as usize
+                    }))
+                    .unwrap(),
+                )
+                .map_err(|e| invalid(&e.to_string()))?;
+            }
+        }
+        Some(scene_edge::prepare(
+            &crop,
+            &color_alpha,
+            &joint_owned,
+            &blocked,
+            &support,
+            own_edge_uncertainty.ceil() as usize,
+        ))
+    } else {
+        None
+    };
+    if let Some(evidence) = &scene_edge {
+        for (i, a) in color_alpha.iter_mut().enumerate() {
+            *a = a.max(evidence.minimum_alpha[i]);
         }
     }
     // The refined matte represents physical foreground at the RGB edge.
@@ -1817,16 +3020,219 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             *layer = 0;
         }
     }
-    let color_layers = crate::face_matting::estimate(&crop, &color_alpha);
+    // The model center need not be feasible at the conservative alpha bound.
+    // Only source-paired opaque layers can project B and derive its matching F.
+    // A legacy/manual joint path may lack stable source layers; keep its old
+    // projection and prior precision until it supports that same pairing.
+    let independent_scene_color = stable_source_layers
+        && joint_neck
+        && crop.pixels.chunks_exact(4).all(|pixel| pixel[3] == 255);
+    let reconstruction_scene = scene_edge.as_ref().map(|e| {
+        if independent_scene_color {
+            e.color_prior()
+        } else {
+            e.background.clone()
+        }
+    });
+    let mut color_layers = if stable_source_layers && joint_neck {
+        optical_domain::estimate(&crop, &color_alpha)
+    } else {
+        crate::face_matting::estimate(&crop, &color_alpha)
+    };
+    #[cfg(test)]
+    if std::env::var_os("FACE_SOURCE_LAYERS_TRACE").is_some() {
+        if let Some(path) = params.get("__faceFieldTrace").and_then(Value::as_str) {
+            // Freeze the actual estimator input before scene priors or source
+            // pairing. A local neural-alpha file alone is not this full matte.
+            let directory = std::path::Path::new(path);
+            std::fs::create_dir_all(directory).map_err(|error| invalid(&error.to_string()))?;
+            let alpha_bytes: Vec<_> = color_alpha.iter().flat_map(|a| a.to_le_bytes()).collect();
+            std::fs::write(directory.join("source-color-alpha.f32"), alpha_bytes)
+                .map_err(|error| invalid(&error.to_string()))?;
+            for (name, image) in [
+                ("source-estimator-input.png", Some(&crop)),
+                (
+                    "source-estimated-foreground.png",
+                    color_layers.as_ref().map(|(f, _)| f),
+                ),
+                (
+                    "source-estimated-background.png",
+                    color_layers.as_ref().map(|(_, b)| b),
+                ),
+            ] {
+                if let Some(image) = image {
+                    image::save_buffer(
+                        directory.join(name),
+                        &image.pixels,
+                        image.width,
+                        image.height,
+                        image::ColorType::Rgba8,
+                    )
+                    .map_err(|error| invalid(&error.to_string()))?;
+                }
+            }
+        }
+    }
+    if let (Some(evidence), Some((foreground, background))) =
+        (&reconstruction_scene, &mut color_layers)
+    {
+        for (i, prior) in evidence.iter().enumerate() {
+            let Some(b) = prior else { continue };
+            let a = color_alpha[i];
+            for c in 0..3 {
+                background.pixels[i * 4 + c] = byte(b[c]);
+                if a > 1e-6 {
+                    // This is only an initial color prior: its model center
+                    // need not be feasible at the conservative alpha bound.
+                    // Complete source pairing below jointly projects B and
+                    // derives its matching F before opaque joint transport.
+                    foreground.pixels[i * 4 + c] =
+                        byte((crop.pixels[i * 4 + c] as f32 - (1.0 - a) * b[c]) / a);
+                }
+            }
+        }
+    }
     mark!("F/B estimate");
-    let foreground = color_layers.as_ref().map(|(f, _)| f).unwrap_or(&crop);
+    // Reconstruct the complete SOURCE underlayer before sampling. Choosing the
+    // source B from destination holes made F jump whenever a hole closed, even
+    // though each pair separately reconstructed C. This plate never receives
+    // target coverage or the inverse field as input.
+    let mut paired_background = crop.clone();
+    let paired_foreground = if stable_source_layers && joint_neck {
+        let source_holes: Vec<_> = (0..count)
+            .map(|i| color_alpha[i] > 1e-6 && !frozen[i])
+            .collect();
+        paired_background = reconstruct_source_background(
+            &crop,
+            &source_holes,
+            &color_alpha,
+            &donor_frozen,
+            &donor_excluded,
+            &known_layer,
+            color_layers.as_ref().map(|(_, b)| b),
+            reconstruction_scene.as_deref(),
+            independent_scene_color,
+        )?;
+        layer_pair::pair(&crop, &color_alpha, &mut paired_background)
+    } else {
+        None
+    };
+    #[cfg(test)]
+    if let Some(path) = params.get("__sourcePlatePrior").and_then(Value::as_str) {
+        if paired_foreground.is_none() {
+            return Err(invalid("source plate prior requires paired opaque source layers"));
+        }
+        // Apply after physical pairing. Re-pairing afterwards would project
+        // signed contrast back into the stationary plate and undo the edit.
+        source_plate::apply_cached(
+            source, &crop, &mut color_alpha, &mut paired_background, &frozen,
+            (left, top), std::path::Path::new(path),
+        ).map_err(|e| invalid(&e))?;
+    }
+    if let Some(layers) = source_layers {
+        if paired_foreground.is_none() {
+            return Err(invalid("face source layers require complete face, skin and neck raster evidence"));
+        }
+        layers.apply_scene(&crop, &mut color_alpha, &mut paired_background, &frozen, (left, top))?;
+    }
+    let foreground = paired_foreground
+        .as_ref()
+        .or_else(|| color_layers.as_ref().map(|(f, _)| f))
+        .unwrap_or(&crop);
+
     let neck_support: Vec<f32> = neck_lighting_known
         .iter()
         .map(|&v| if v { 1.0 } else { 0.0 })
         .collect();
+    // Research candidate: use the same source-role partition for the motion
+    // transition that is used by the source compositor. It is deliberately
+    // opt-in; the default path keeps the accepted legacy falloffs until this
+    // candidate passes real-photo image review.
+    let source_domain_profile = source_layers.is_some() || params
+        .get("experimentalFaceProfile")
+        .and_then(Value::as_str)
+        .is_some_and(|profile| {
+            matches!(profile, "source-domain-v1" | "source-domain-continuous-v1")
+        });
+    // The continuous candidate inherits the observed skin/adjacent-hair
+    // material domain prepared above. Its flow extends beyond the old optical
+    // coverage, while unshared hair, fixed attachments and user protection
+    // remain continuous motion barriers. A stationary scene layer does not
+    // turn the foreground's original silhouette into a zero-velocity wall.
+    // The explicit source-layer API enables this path in ordinary builds;
+    // legacy graph calls retain their prior path. Photo quality still requires
+    // acceptance for the supplied source layers and requested operation.
+    let continuous_source_domain = source_layers.is_some();
+    #[cfg(test)]
+    let continuous_source_domain = continuous_source_domain || params
+        .get("experimentalFaceProfile")
+        .and_then(Value::as_str)
+        == Some("source-domain-continuous-v1");
+    let source_domain = if source_domain_profile && joint_neck
+    {
+        let active: Vec<bool> = (0..count)
+            .map(|i| {
+                joint_owned[i]
+                    || face_membership[i] > 0.5
+                    || neck_membership[i] > 0.5
+                    || moving_attachment[i]
+            })
+            .collect();
+        let blocked: Vec<bool> = (0..count)
+            .map(|i| {
+                if continuous_source_domain {
+                    // Same-layer fixed material constrains the field. The
+                    // neighbouring shared hair band has already been admitted
+                    // by promote_interface and is absent from attachment_fixed.
+                    // Scene and other-person output locks remain separate.
+                    material_fixed[i]
+                        || attachment_fixed[i]
+                        || protection[i] >= 1.0 - 1e-6
+                } else {
+                    frozen[i] || material_fixed[i] || attachment_fixed[i]
+                }
+            })
+            .collect();
+        let origin = (left as f32 + 0.5, top as f32 + 0.5);
+        let taper = (frame.width() * 0.12).clamp(6.0, 24.0);
+        if continuous_source_domain {
+            // The optical source coverage is not the domain of exp(v).
+            // Reserve both directions of travel beyond the old silhouette;
+            // this only permits evaluation of the foreground flow there.
+            // Actual foreground/background ownership stays in the compositor.
+            let travel = polygon.iter().zip(&target)
+                .map(|(&p, &q)| { let d = sub(q, p); dot(d, d).sqrt() })
+                .fold(0.0_f32, f32::max) * 2.0;
+            joint_domain::MotionDomain::build_with_motion_halo(
+                cw, ch, origin, &active, &blocked, travel, taper,
+            )
+        } else {
+            joint_domain::MotionDomain::build(cw, ch, origin, &active, &blocked, taper)
+        }
+    } else {
+        None
+    };
+    #[cfg(test)]
+    if let Some(path) = params.get("__faceFieldTrace").and_then(Value::as_str) {
+        std::fs::create_dir_all(path).map_err(|error| invalid(&error.to_string()))?;
+        std::fs::write(
+            std::path::Path::new(path).join("source-domain-state.json"),
+            serde_json::to_vec(&json!({
+                "profile": params.get("experimentalFaceProfile"),
+                "sourceDomainProfile": source_domain_profile,
+                "jointNeck": joint_neck,
+                "stableSourceLayers": stable_source_layers,
+                "continuous": continuous_source_domain
+            }))
+            .unwrap(),
+        )
+        .map_err(|error| invalid(&error.to_string()))?;
+    }
     let velocity = if joint_neck {
-        // One smooth source-forward velocity authority. No nearest-segment/MLS
-        // inverse offset enters the velocity. RBF control values are corrected by
+        // One source-forward velocity authority. No nearest-segment/MLS
+        // inverse offset enters the velocity. Positive control weights avoid RBF
+        // overshoot; fixed material participates as zero-valued observations.
+        // Direct control values are corrected by
         // the measured advected source-contour residual after exp(v).
         // Fixed context is not an anatomical attachment. A separate person or a
         // user-protected patch stays exact, while nearby skin may shrink away from
@@ -1867,6 +3273,16 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         };
         let velocity_taper = (frame.width() * 0.035).clamp(6.0, 14.0);
         let attachment_taper = (frame.width() * 0.14).max(8.0);
+        #[cfg(test)]
+        let geodesic_neck = params.get("__geodesicNeck").and_then(Value::as_bool) == Some(true);
+        #[cfg(not(test))]
+        let geodesic_neck = false;
+        #[cfg(test)]
+        let geodesic_neck_field = geodesic_neck
+            .then(|| geodesic_neck_motion(&neck_membership, &face_membership, &joint_owned, cw, ch))
+            .flatten();
+        #[cfg(not(test))]
+        let geodesic_neck_field: Option<Vec<f32>> = None;
         let external_constraint = |p: Point| {
             if !region.contains(p.0 / w, p.1 / h) {
                 return 0.0;
@@ -1884,7 +3300,7 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         // Intended lower-neck motion falloff; the unchanged ROI can cut it short.
         // Compact support must already vanish there; no general ROI continuity guarantee.
         // This is a motion falloff, not an alpha cutoff or a made-up skin border.
-        let neck_motion = |p: Point| {
+        let legacy_neck_motion = |p: Point| {
             if joint_neck {
                 1.0 - smoothstep(
                     frame.bottom + frame.height() * 0.04,
@@ -1895,15 +3311,90 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 1.0
             }
         };
+        let neck_motion = |p: Point| {
+            if geodesic_neck {
+                let x = (p.0 - left as f32 - 0.5)
+                    .clamp(0.0, (cw - 1) as f32)
+                    .round() as usize;
+                let y = (p.1 - top as f32 - 0.5).clamp(0.0, (ch - 1) as f32).round() as usize;
+                geodesic_neck_field
+                    .as_ref()
+                    .map(|motion| motion[y * cw + x])
+                    .unwrap_or_else(|| legacy_neck_motion(p))
+            } else {
+                legacy_neck_motion(p)
+            }
+        };
+        let feature_weight = |p: Point| field.anchor_weight(p);
+        let positive_kernel = true;
+        #[cfg(test)]
+        let positive_kernel = positive_kernel
+            && params.get("__legacyFaceField").and_then(Value::as_bool) != Some(true)
+            && !params
+                .get("experimentalFaceProfile")
+                .and_then(Value::as_str)
+                .is_some_and(|mode| {
+                    [
+                        "supported-rbf-v1",
+                        "feature-distance-v1",
+                        "segmented-lateral-v1",
+                    ]
+                    .contains(&mode)
+                });
+        let supported_kernel = false;
+        #[cfg(test)]
+        let supported_kernel = supported_kernel
+            || params
+                .get("experimentalFaceProfile")
+                .and_then(Value::as_str)
+                == Some("supported-rbf-v1");
+        #[cfg(test)]
+        let feature_ramps = if params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str)
+            == Some("feature-distance-v1")
+        {
+            Some(anchor_transition::FeatureRamps::new(&anchors, &polygon).map_err(invalid)?)
+        } else {
+            None
+        };
+        #[cfg(test)]
+        let feature_weight = |p: Point| {
+            feature_ramps
+                .as_ref()
+                .map(|ramps| ramps.weight(p))
+                .unwrap_or_else(|| feature_weight(p))
+        };
         let velocity_weight = |p: Point| {
-            smoothstep(
-                2.0,
-                velocity_taper,
-                nearest_distance(&attachment_distance, p),
-            ) * smoothstep(0.0, 4.0, nearest_distance(&frozen_distance, p))
+            // The continuous candidate applies same-layer attachment_fixed
+            // through the shared domain: it is both an output lock and a
+            // continuous field barrier. Do not multiply the legacy attachment
+            // distance ramp again here. Shared hair admitted upstream is no
+            // longer attachment_fixed; unrelated scene/context output locks
+            // remain separate from the foreground velocity definition.
+            let attachment_transition = if continuous_source_domain {
+                1.0
+            } else {
+                smoothstep(
+                    2.0,
+                    velocity_taper,
+                    nearest_distance(&attachment_distance, p),
+                )
+            };
+            let context_transition = if continuous_source_domain {
+                1.0
+            } else {
+                smoothstep(0.0, 4.0, nearest_distance(&frozen_distance, p))
+            };
+            let legacy = attachment_transition
+                * context_transition
                 * external_constraint(p)
-                * field.anchor_weight(p)
-                * neck_motion(p)
+                * feature_weight(p)
+                * neck_motion(p);
+            source_domain
+                .as_ref()
+                .map(|domain| legacy * domain.weight(p))
+                .unwrap_or(legacy)
         };
         let mut control_positions = Vec::new();
         let mut requested_positions = Vec::new();
@@ -1922,7 +3413,15 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             let p = add(scale(polygon[edge], 1.0 - t), scale(polygon[next], t));
             let requested = add(scale(target[edge], 1.0 - t), scale(target[next], t));
             let distance = nearest_distance(&attachment_distance, p);
-            let achievable = smoothstep(2.0, attachment_taper, distance) * external_constraint(p);
+            let achievable = if source_domain.is_some() {
+                source_domain
+                    .as_ref()
+                    .map(|domain| domain.weight(p))
+                    .unwrap_or(0.0)
+                    * external_constraint(p)
+            } else {
+                smoothstep(2.0, attachment_taper, distance) * external_constraint(p)
+            };
             let q = add(p, scale(sub(requested, p), achievable));
             vertical_displacements.push(
                 (vertical_contour_offset(frame, polygon[edge], values) * (1.0 - t)
@@ -1933,16 +3432,46 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             control_positions.push(p);
             requested_positions.push(requested);
             feasible_positions.push(q);
-            movable.push(weight > 0.05 && dot(sub(q, p), sub(q, p)) > 0.01);
-            velocity_values.push(if weight > 0.05 {
-                scale(sub(q, p), 1.0 / weight)
+            movable.push(weight > MIN_CONTROL_GAIN && dot(sub(q, p), sub(q, p)) > 0.01);
+            velocity_values.push(if weight > MIN_CONTROL_GAIN {
+                scale(
+                    sub(q, p),
+                    if supported_kernel || positive_kernel {
+                        1.0
+                    } else {
+                        1.0 / weight
+                    },
+                )
             } else {
                 (0.0, 0.0)
             });
         }
+        #[cfg(test)]
+        if let Some(path) = params.get("__faceFieldTrace").and_then(Value::as_str) {
+            let controls = (0..128)
+                .map(|i| {
+                    let p = control_positions[i];
+                    json!({
+                        "p": p,
+                        "requested": requested_positions[i],
+                        "feasible": feasible_positions[i],
+                        "domain": source_domain.as_ref().map(|d| d.weight(p)),
+                        "external": external_constraint(p),
+                        "velocityWeight": velocity_weight(p)
+                    })
+                })
+                .collect::<Vec<_>>();
+            std::fs::create_dir_all(path).map_err(|error| invalid(&error.to_string()))?;
+            std::fs::write(
+                std::path::Path::new(path).join("source-domain-controls.json"),
+                serde_json::to_vec(&controls).unwrap(),
+            )
+            .map_err(|error| invalid(&error.to_string()))?;
+        }
+        #[cfg(test)]
+        let pre_projection_positions = feasible_positions.clone();
         let center_u = (frame.left + frame.right) * 0.5;
-        // Lateral feasibility stays active across vertical slider zero. Preserve
-        // its requested vertical displacement instead of projecting v to source.
+        let mut projection_groups = Vec::new();
         for orientation in [1.0_f32, -1.0] {
             let mut side_indices: Vec<_> = (0..control_positions.len())
                 .filter(|&i| {
@@ -1958,6 +3487,39 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                     .1
                     .total_cmp(&frame.coordinates(control_positions[b]).1)
             });
+            projection_groups.push((side_indices, orientation));
+        }
+        #[cfg(test)]
+        let periodic_curve = params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str)
+            == Some("shared-cheek-ear-periodic-v1");
+        #[cfg(test)]
+        let physical_bending_length = projection_groups
+            .iter()
+            .map(|(indices, _)| {
+                indices
+                    .windows(2)
+                    .map(|pair| {
+                        let delta = sub(control_positions[pair[1]], control_positions[pair[0]]);
+                        dot(delta, delta).sqrt()
+                    })
+                    .sum::<f32>()
+            })
+            .sum::<f32>()
+            / 50.0;
+        #[cfg(test)]
+        if periodic_curve {
+            // Solve the observed contour once, including the chin and both
+            // joins. Separate side arcs may overlap at nonzero motion, so an
+            // arbitrary open-arc cut cannot supply valid boundary conditions.
+            // The one physical bending length is the mean of the two former
+            // core lengths / 25; it does not grow with full-contour length.
+            projection_groups = vec![((0..control_positions.len()).collect(), 1.0)];
+        }
+        // Lateral projection retains independently requested axial movement.
+        // A lateral regularizer does not certify the full 2D tangent or field.
+        for (side_indices, orientation) in projection_groups {
             let samples: Vec<_> = side_indices
                 .iter()
                 .map(|&i| {
@@ -1972,7 +3534,10 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                             ),
                         ))
                         .0;
-                    let fixed = velocity_weight(control_positions[i]) <= 0.001;
+                    // Curve fairing and the field must agree on the same
+                    // fixed degrees of freedom. Controls below this gain
+                    // are zeroed by both velocity-value construction passes.
+                    let fixed = velocity_weight(control_positions[i]) <= MIN_CONTROL_GAIN;
                     (
                         v,
                         orientation * u,
@@ -1982,22 +3547,57 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                     )
                 })
                 .collect();
+            #[cfg(not(test))]
             let projected =
                 flow::project_side_curve(&samples).map_err(|message| invalid(&message))?;
+            #[cfg(test)]
+            let projected = if periodic_curve {
+                displacement_curve::project_closed_curve(&samples, physical_bending_length)
+                    .map_err(|message| invalid(&message))?
+            } else if params
+                .get("experimentalFaceProfile")
+                .and_then(Value::as_str)
+                .is_some_and(|mode| {
+                    ["shared-cheek-curve-v4", "shared-cheek-ear-v1"].contains(&mode)
+                })
+            {
+                displacement_curve::project_side_curve(&samples)
+                    .map_err(|message| invalid(&message))?
+            } else if params
+                .get("experimentalFaceProfile")
+                .and_then(Value::as_str)
+                == Some("layered-curve-v1")
+            {
+                curve_candidate::project_side_curve(&samples)
+                    .map_err(|message| invalid(&message))?
+            } else {
+                flow::project_side_curve(&samples).map_err(|message| invalid(&message))?
+            };
             for (&i, &oriented_u) in side_indices.iter().zip(&projected) {
                 let (_, v) = frame.coordinates(control_positions[i]);
                 feasible_positions[i] =
                     frame.position(oriented_u * orientation, v + vertical_displacements[i]);
+                #[cfg(test)]
+                if periodic_curve
+                    && oriented_u == frame.coordinates(control_positions[i]).0
+                    && vertical_displacements[i] == 0.0
+                {
+                    feasible_positions[i] = control_positions[i];
+                }
                 let weight = velocity_weight(control_positions[i]);
-                movable[i] = weight > 0.05
+                movable[i] = weight > MIN_CONTROL_GAIN
                     && dot(
                         sub(feasible_positions[i], control_positions[i]),
                         sub(feasible_positions[i], control_positions[i]),
                     ) > 0.01;
-                velocity_values[i] = if weight > 0.05 {
+                velocity_values[i] = if weight > MIN_CONTROL_GAIN {
                     scale(
                         sub(feasible_positions[i], control_positions[i]),
-                        1.0 / weight,
+                        if supported_kernel || positive_kernel {
+                            1.0
+                        } else {
+                            1.0 / weight
+                        },
                     )
                 } else {
                     (0.0, 0.0)
@@ -2033,6 +3633,40 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 movable.push(false);
             }
         }
+        let boundary_constraints = positive_kernel;
+        #[cfg(test)]
+        let boundary_constraints = boundary_constraints
+            && params
+                .get("experimentalFaceProfile")
+                .and_then(Value::as_str)
+                != Some("positive-field-v1");
+        if boundary_constraints {
+            // Observed fixed material is a source boundary condition, not
+            // merely a post-interpolation multiplier. Use the same physical
+            // sampling pitch as the moving contour; no image-space repair.
+            let pitch = (perimeter / 128.0).max(1.0);
+            let mut boundary_controls: Vec<Point> = Vec::new();
+            for i in 0..count {
+                if !frozen[i] || !neighbors(i, cw, ch).any(|n| !frozen[n] && color_alpha[n] > 1e-6)
+                {
+                    continue;
+                }
+                let p = (
+                    left as f32 + (i % cw) as f32 + 0.5,
+                    top as f32 + (i / cw) as f32 + 0.5,
+                );
+                add_fixed_boundary_control(
+                    p,
+                    pitch,
+                    &mut boundary_controls,
+                    &mut control_positions,
+                    &mut requested_positions,
+                    &mut feasible_positions,
+                    &mut velocity_values,
+                    &mut movable,
+                );
+            }
+        }
         let support_weights: Vec<f32> = (0..count)
             .map(|i| {
                 let p = (
@@ -2042,16 +3676,43 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                 velocity_weight(p)
             })
             .collect();
-        let rbf =
-            flow::CompactRbf::new(control_positions.clone(), (frame.width() * 0.31).max(12.0));
+        // Research comparisons retain their historical RBF, but a positive
+        // kernel does not need its dense factorization or five unused solves.
+        #[cfg(test)]
+        let rbf = (!positive_kernel).then(|| {
+            if supported_kernel {
+                flow::CompactRbf::new_supported(
+                    control_positions.clone(),
+                    (frame.width() * 0.31).max(12.0),
+                    control_positions
+                        .iter()
+                        .map(|&p| velocity_weight(p))
+                        .collect(),
+                )
+            } else {
+                flow::CompactRbf::new(control_positions.clone(), (frame.width() * 0.31).max(12.0))
+            }
+        });
+        let positive_interpolator = positive_kernel::PositiveKernel::new(
+            control_positions.clone(),
+            (frame.width() * 0.31).max(12.0),
+        );
         let mut velocity = flow::VelocityGrid::new(
             (left as f32 + 0.5, top as f32 + 0.5),
             cw,
             ch,
             vec![(0.0, 0.0); count],
         );
+        #[cfg(test)]
+        let mut control_diagnostics = Vec::new();
         for iteration in 0..5 {
-            let coefficients = rbf.solve(&velocity_values);
+            #[cfg(test)]
+            if params.get("__faceFieldTrace").is_some() {
+                control_diagnostics.push(json!({"iteration":iteration,"values":velocity_values,
+                    "weights":control_positions.iter().map(|&p| velocity_weight(p)).collect::<Vec<_>>() }));
+            }
+            #[cfg(test)]
+            let coefficients = rbf.as_ref().map(|solver| solver.solve(&velocity_values));
             let vectors = (0..count)
                 .map(|i| {
                     if support_weights[i] <= 1e-6 {
@@ -2061,7 +3722,16 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                         left as f32 + (i % cw) as f32 + 0.5,
                         top as f32 + (i / cw) as f32 + 0.5,
                     );
-                    scale(rbf.evaluate(&coefficients, p), support_weights[i])
+                    #[cfg(not(test))]
+                    let raw = positive_interpolator.evaluate(&velocity_values, p);
+                    #[cfg(test)]
+                    let raw = if positive_kernel {
+                        positive_interpolator.evaluate(&velocity_values, p)
+                    } else {
+                        rbf.as_ref().expect("RBF mode has a solver")
+                            .evaluate(coefficients.as_ref().expect("RBF mode has coefficients"), p)
+                    };
+                    scale(raw, support_weights[i])
                 })
                 .collect();
             velocity =
@@ -2077,9 +3747,103 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
                     let midpoint = scale(add(p, q), 0.5);
                     let weight =
                         (velocity_weight(p) + velocity_weight(midpoint) + velocity_weight(q)) / 3.0;
-                    velocity_values[i] =
-                        add(velocity_values[i], scale(error, 0.65 / weight.max(0.1)));
+                    velocity_values[i] = add(
+                        velocity_values[i],
+                        scale(
+                            error,
+                            if supported_kernel || positive_kernel {
+                                0.65
+                            } else {
+                                0.65 / weight.max(0.1)
+                            },
+                        ),
+                    );
                 }
+            }
+        }
+        #[cfg(test)]
+        if let Some(path) = params.get("__faceFieldTrace").and_then(Value::as_str) {
+            anchor_transition::write_trace(
+                path,
+                &velocity,
+                (left as f32 + 0.5, top as f32 + 0.5),
+                cw,
+                ch,
+                &control_positions,
+                &requested_positions,
+                &feasible_positions,
+                &pre_projection_positions,
+                feature_ramps.as_ref(),
+            )
+            .map_err(|error| invalid(&error))?;
+            std::fs::write(
+                std::path::Path::new(path).join("control-iterations.json"),
+                serde_json::to_vec(&control_diagnostics).unwrap(),
+            )
+            .map_err(|error| invalid(&error.to_string()))?;
+            if observed_ear_motion.follows_joint_field() {
+                // Independent photo audits need the material connection and
+                // original ear evidence, not just a lower aggregate error.
+                // RGB channels: original ear prior, joint ownership, frozen.
+                let material_map: Vec<u8> = (0..count)
+                    .flat_map(|i| {
+                        [
+                            byte(ear_membership[i] * 255.0),
+                            if joint_owned[i] { 255 } else { 0 },
+                            if frozen[i] { 255 } else { 0 },
+                        ]
+                    })
+                    .collect();
+                image::save_buffer(
+                    std::path::Path::new(path).join("ear-material.png"),
+                    &material_map,
+                    cw as u32,
+                    ch as u32,
+                    image::ColorType::Rgb8,
+                )
+                .map_err(|error| invalid(&error.to_string()))?;
+                let ear_indices: Vec<_> =
+                    (0..count).filter(|&i| ear_membership[i] >= 0.5).collect();
+                let report = json!({
+                    "policy":"joint-flexible-observed-ear",
+                    "origin":[left,top],"width":cw,"height":ch,
+                    "materialMapChannels":["observedEarPrior","jointOwned","frozen"],
+                    "observedEarPixels":ear_indices.len(),
+                    "connectedEarPixels":ear_indices.iter().filter(|&&i| joint_owned[i]).count(),
+                    "frozenEarPixels":ear_indices.iter().filter(|&&i| frozen[i]).count(),
+                    "explicitlyProtectedEarPixels":ear_indices.iter().filter(|&&i| protection[i]>=1.0-1e-6).count(),
+                    "earPriorIsPhysicalOpacity":false,
+                    "rigidEarGuarantee":false,
+                    "accessoryMotion":if moving_attachment_mask.is_some() {"source-plan"} else {"fixed"},
+                    "plannedMovingAttachmentPixels":moving_attachment.iter().filter(|&&v| v).count()
+                });
+                std::fs::write(
+                    std::path::Path::new(path).join("ear-material.json"),
+                    serde_json::to_vec(&report).unwrap(),
+                )
+                .map_err(|error| invalid(&error.to_string()))?;
+            }
+            if let Some(probes) = params.get("__faceProbePoints").and_then(Value::as_array) {
+                let coefficients = rbf.as_ref().map(|solver| solver.solve(&velocity_values));
+                let report: Vec<_> = probes.iter().filter_map(|q| {
+                    let p = (q.get(0)?.as_f64()? as f32, q.get(1)?.as_f64()? as f32);
+                    let x = (p.0-left as f32-0.5).clamp(0.0,(cw-1) as f32).round() as usize;
+                    let y = (p.1-top as f32-0.5).clamp(0.0,(ch-1) as f32).round() as usize;
+                    let i = y*cw+x;
+                    Some(json!({"p":p,"forward":velocity.transport(p,1.0),
+                        "rawVelocity":if positive_kernel {positive_interpolator.evaluate(&velocity_values,p)} else {rbf.as_ref().expect("RBF mode has a solver").evaluate(coefficients.as_ref().expect("RBF mode has coefficients"),p)},"velocity":velocity.velocity(p),
+                        "weight":velocity_weight(p),"featureWeight":feature_weight(p),
+                        "contextDistance":frozen_distance[i],"attachmentDistance":attachment_distance[i],
+                        "frozen":frozen[i],"inferredFixed":inferred_person_fixed[i],"attachmentFixed":attachment_fixed[i],
+                        "faceMembership":face_membership[i],"colorAlpha":color_alpha[i],"jointOwned":joint_owned[i],
+                        "earMembership":ear_membership.get(i).copied().unwrap_or(0.0),
+                        "jointEarPrior":joint_ear_prior.get(i).copied().unwrap_or(0.0)}))
+                }).collect();
+                std::fs::write(
+                    std::path::Path::new(path).join("probes.json"),
+                    serde_json::to_vec(&report).unwrap(),
+                )
+                .map_err(|error| invalid(&error.to_string()))?;
             }
         }
         Some(velocity)
@@ -2089,6 +3853,8 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
     let mut grid =
         (!joint_neck).then(|| ContourGrid::new((left as f32 + 0.5, top as f32 + 0.5), cw, ch));
     let mut samples = vec![([0.0; 4], 0.0); count];
+    #[cfg(test)]
+    let target_alpha_used = vec![1.0_f32; count];
     let mut changed = vec![false; count];
     let mut holes = vec![false; count];
     for y in 0..ch {
@@ -2105,15 +3871,32 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             if selection <= 1e-6 {
                 continue;
             }
-            // Deform the facial layer, not the whole head texture. Existing
-            // hair/ears/background outside the source face remain fixed unless
-            // the target contour explicitly covers that previously exterior
-            // region. Raster holes do not become an invented filled polygon.
+            // A contraction exposes the original backdrop. The source-role
+            // candidate must never write a transported foreground into a
+            // destination with no observed physical coverage; otherwise the
+            // shared field can create horizontal donor stripes at the jaw.
+            // Expansion keeps the established observed-foreground path.
+            if source_domain_profile && contraction_only && color_alpha[i] <= 1e-6 {
+                continue;
+            }
+            // Face and upper neck are one transported source material. A
+            // semantic face/neck class boundary cannot clip the write domain:
+            // adjacent opaque skin texels must use the same sampling map.
+            // Exact protection is handled above, and the velocity already
+            // decays to zero toward the lower neck.
+            // Coverage describes the observed source material. The joint
+            // path can include connected neck and permitted attachments;
+            // source coverage is therefore not just the facial polygon.
             let old_coverage = if contour_matte.is_some() {
                 color_alpha[i]
             } else {
                 face_membership[i]
             };
+            // Joint motion transports the physical face/neck alpha itself.
+            // The face-only requested polygon cannot clip this layer: it omits
+            // the upper neck, observed antialias fringe and feasible attachment
+            // transition. The old/new transported coverage check below owns
+            // the write support; unrelated scene remains exact when both are 0.
             if !joint_neck
                 && old_coverage < if contour_matte.is_some() { 1e-6 } else { 0.5 }
                 && (contraction_only
@@ -2137,12 +3920,33 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             if movement.0.abs() + movement.1.abs() < 1e-5 {
                 continue;
             }
-            let mut sample = sample(
-                foreground,
-                &color_alpha,
-                x as f32 + movement.0,
-                y as f32 + movement.1,
-            );
+            let mut sample = if paired_foreground.is_some() {
+                layer_pair::sample_residual(
+                    &crop,
+                    &color_alpha,
+                    &paired_background,
+                    x as f32 + movement.0,
+                    y as f32 + movement.1,
+                )
+            } else {
+                sample(
+                    foreground,
+                    &color_alpha,
+                    x as f32 + movement.0,
+                    y as f32 + movement.1,
+                )
+            };
+            // The inverse sample transports physical source opacity. The
+            // requested contour is a geometric constraint, not a second alpha
+            // matte; multiplying by it would cut through opaque material.
+            // A contraction exposes the original background. Do not let an
+            // inverse sample that crosses the old edge paint foreground into
+            // that destination; this is the source of ear/cheek color blocks.
+            // Expansion still uses the existing path to cover a new target
+            // strip with observed foreground.
+            if !joint_neck && contraction_only && old_coverage <= 1e-6 {
+                continue;
+            }
             if !joint_neck && contour_matte.is_some() {
                 clip_supported_jaw_opacity(
                     &mut sample,
@@ -2164,8 +3968,23 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         }
     }
     mark!("sample grid");
-    let mut background = if holes.iter().any(|&h| h) {
-        reconstruct(
+    let keep_source_plate = source_layers.is_some();
+    #[cfg(test)]
+    let keep_source_plate = keep_source_plate || params.get("__sourcePlatePrior").is_some();
+    let mut background = if keep_source_plate {
+        // A caller-supplied source scene is already paired with the sampled
+        // foreground residual. Revealing it must preserve its spatial texture;
+        // rebuilding it from destination holes would silently discard that
+        // scene and break the declared immutable-layer contract.
+        paired_background.clone()
+    } else if paired_foreground.is_some() && holes.iter().any(|&h| h) {
+        // The paired plate is an immutable F/B sampling plate. It contains a
+        // deliberately regularized underlayer across the whole moving face,
+        // which is correct for residual foreground transport but too coarse
+        // to expose directly at a newly shortened jaw. Reconstruct the final
+        // destination holes from their actual support and scene evidence so
+        // the revealed strip follows the observed backdrop continuously.
+        reconstruct_source_background(
             &crop,
             &holes,
             &color_alpha,
@@ -2173,10 +3992,37 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
             &donor_excluded,
             &known_layer,
             color_layers.as_ref().map(|(_, b)| b),
+            reconstruction_scene.as_deref(),
+            independent_scene_color,
+        )?
+    } else if holes.iter().any(|&h| h) {
+        reconstruct_with_scene(
+            &crop,
+            &holes,
+            &color_alpha,
+            &donor_frozen,
+            &donor_excluded,
+            &known_layer,
+            color_layers.as_ref().map(|(_, b)| b),
+            reconstruction_scene.as_deref(),
         )?
     } else {
         crop.clone()
     };
+    if source_domain_profile && joint_neck && contraction_only && !keep_source_plate {
+        repair_exposed_face_background(
+            &mut background,
+            &crop,
+            &holes,
+            &face_membership,
+            &color_alpha,
+            &frozen,
+            &donor_excluded,
+            &known_layer,
+            &polygon,
+            (left as f32, top as f32),
+        );
+    }
     let lighting_changed = if joint_neck {
         vec![false; count]
     } else {
@@ -2196,6 +4042,76 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         }
     }
     mark!("reconstruct");
+    #[cfg(test)]
+    if std::env::var_os("FACE_SOURCE_LAYERS_TRACE").is_some() {
+        if let Some(path) = params.get("__faceFieldTrace").and_then(Value::as_str) {
+            // Preserve the actual immutable plate and write support so local
+            // color experiments can replay complete floating-point composition,
+            // rather than adding an approximate delta to a rounded PNG.
+            let directory = std::path::Path::new(path);
+            // This is the final source coverage actually used by the sampler,
+            // including an opt-in source-scene lower bound when requested.
+            std::fs::write(
+                directory.join("source-color-alpha.f32"),
+                color_alpha
+                    .iter()
+                    .flat_map(|a| a.to_le_bytes())
+                    .collect::<Vec<_>>(),
+            )
+            .map_err(|e| invalid(&e.to_string()))?;
+            image::save_buffer(
+                directory.join("source-paired-background.png"),
+                &paired_background.pixels,
+                paired_background.width,
+                paired_background.height,
+                image::ColorType::Rgba8,
+            )
+            .map_err(|e| invalid(&e.to_string()))?;
+            image::save_buffer(
+                directory.join("destination-reconstructed-background.png"),
+                &background.pixels,
+                background.width,
+                background.height,
+                image::ColorType::Rgba8,
+            )
+            .map_err(|e| invalid(&e.to_string()))?;
+            for (name, values) in [
+                ("render-changed.u8", &changed),
+                ("render-frozen.u8", &frozen),
+            ] {
+                std::fs::write(
+                    directory.join(name),
+                    values.iter().map(|&v| u8::from(v)).collect::<Vec<_>>(),
+                )
+                .map_err(|e| invalid(&e.to_string()))?;
+            }
+            for (name, values) in [
+                ("source-donor-frozen.u8", &donor_frozen),
+                ("source-donor-excluded.u8", &donor_excluded),
+                ("source-moving-attachment.u8", &moving_attachment),
+            ] {
+                std::fs::write(
+                    directory.join(name),
+                    values.iter().map(|&v| u8::from(v)).collect::<Vec<_>>(),
+                )
+                .map_err(|e| invalid(&e.to_string()))?;
+            }
+            std::fs::write(directory.join("source-known-layer.u8"), &known_layer)
+                .map_err(|e| invalid(&e.to_string()))?;
+            let scene: Vec<u8> = (0..count)
+                .flat_map(|i| {
+                    reconstruction_scene
+                        .as_ref()
+                        .and_then(|v| v[i])
+                        .unwrap_or([f32::NAN; 3])
+                        .into_iter()
+                        .flat_map(f32::to_le_bytes)
+                })
+                .collect();
+            std::fs::write(directory.join("source-reconstruction-scene.f32"), scene)
+                .map_err(|e| invalid(&e.to_string()))?;
+        }
+    }
     let mut rendered = input.clone();
     for i in 0..count {
         if frozen[i] {
@@ -2209,15 +4125,71 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
         let alpha_bg = background.pixels[i * 4 + 3] as f32 / 255.0;
         let bg_weight = alpha_bg * (1.0 - membership);
         let final_alpha = pixel[3] + bg_weight;
+        // Residual foreground is paired with the immutable source plate.
+        // Replacing that whole plate, including its already visible fraction,
+        // creates a finite colour jump even for infinitesimal motion. Only
+        // the positive coverage difference uses the reconstructed destination
+        // scene. This is the maximal-overlap approximation for local contour
+        // contraction, not a recovery of subpixel transparency/occlusion.
+        // With opaque old material this admits the entire new backdrop; at
+        // identity it retains the exact source decomposition.
+        let revealed_fraction = if paired_foreground.is_some() && membership < 1.0 {
+            ((color_alpha[i] - membership).max(0.0) / (1.0 - membership)).min(1.0)
+        } else {
+            1.0
+        };
         let j = ((top + i / cw) * source.width as usize + left + i % cw) * 4;
         for (c, &channel) in pixel.iter().enumerate().take(3) {
+            let reconstructed = background.pixels[i * 4 + c] as f32;
+            let paired = paired_background.pixels[i * 4 + c] as f32;
+            let visible_background = paired + revealed_fraction * (reconstructed - paired);
             rendered.pixels[j + c] = if final_alpha > 1e-6 {
-                byte((channel + background.pixels[i * 4 + c] as f32 * bg_weight) / final_alpha)
+                byte((channel + visible_background * bg_weight) / final_alpha)
             } else {
                 0
             };
         }
         rendered.pixels[j + 3] = byte(final_alpha * 255.0);
+    }
+    #[cfg(test)]
+    if let (Some(path), Some(probes), Some(velocity)) = (
+        params.get("__faceFieldTrace").and_then(Value::as_str),
+        params.get("__faceProbePoints").and_then(Value::as_array),
+        velocity.as_ref(),
+    ) {
+        let report: Vec<_> = probes.iter().filter_map(|q| {
+            let p = (q.get(0)?.as_f64()? as f32, q.get(1)?.as_f64()? as f32);
+            let x = (p.0-left as f32-0.5).clamp(0.0,(cw-1) as f32).round() as usize;
+            let y = (p.1-top as f32-0.5).clamp(0.0,(ch-1) as f32).round() as usize;
+            let i = y*cw+x;
+            let j = ((top+y)*source.width as usize+left+x)*4;
+            let movement = flow::inverse(velocity, p);
+            let sampled = if paired_foreground.is_some() {
+                layer_pair::sample_residual(&crop, &color_alpha, &paired_background,
+                    x as f32+movement.0,y as f32+movement.1)
+            } else {
+                sample(foreground, &color_alpha, x as f32+movement.0,y as f32+movement.1)
+            };
+            Some(json!({"p":p,"inverseDisplacement":movement,"sampledAlpha":sampled.1,
+                "sampledPremultiplied":sampled.0,"oldAlpha":color_alpha[i],"faceMembership":face_membership[i],
+                "jointAlpha":joint_alpha[i],"jointOwned":joint_owned[i],"headAlpha":subject[i],
+                "earMembership":ear_membership.get(i).copied().unwrap_or(0.0),
+                "jointEarPrior":joint_ear_prior.get(i).copied().unwrap_or(0.0),
+                "sceneBackground":scene_edge.as_ref().and_then(|e|e.background[i]),
+                "sceneMinimumAlpha":scene_edge.as_ref().map(|e|e.minimum_alpha[i]),
+                "targetAlpha":alpha(p,&target),"targetAlphaUsed":target_alpha_used[i],"frozen":frozen[i],"changed":changed[i],"hole":holes[i],
+                "knownLayer":known_layer[i],"donorFrozen":donor_frozen[i],"donorExcluded":donor_excluded[i],
+                "source":&source.pixels[j..j+4],"output":&rendered.pixels[j..j+4],
+                "renderSample":samples[i],
+                "background":&background.pixels[i*4..i*4+4],
+                "pairedBackground":&paired_background.pixels[i*4..i*4+4],
+                "estimatedBackground":color_layers.as_ref().map(|(_,b)| &b.pixels[i*4..i*4+4])}))
+        }).collect();
+        std::fs::write(
+            std::path::Path::new(path).join("render-probes.json"),
+            serde_json::to_vec(&report).unwrap(),
+        )
+        .map_err(|error| invalid(&error.to_string()))?;
     }
     // ROI/protection/opacity/blend are applied once over the expanded support,
     // never again clipped by the original foreground alpha in engine.rs.
@@ -2267,7 +4239,62 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn joint_portrait() -> (RgbaImage, Value) {
+
+    #[test]
+    fn fixed_boundary_is_independent_of_nearby_free_handle_velocity() {
+        let field = |epsilon: f32| {
+            let mut positions = vec![(7.5, 7.5), (12.0, 7.5)];
+            let mut requested = positions.clone();
+            let mut feasible = positions.clone();
+            let mut values = vec![(3.0, 0.0), (epsilon, 0.0)];
+            let mut movable = vec![true, true];
+            let mut boundary = Vec::new();
+            add_fixed_boundary_control(
+                (12.5, 7.5),
+                1.0,
+                &mut boundary,
+                &mut positions,
+                &mut requested,
+                &mut feasible,
+                &mut values,
+                &mut movable,
+            );
+            assert_eq!(boundary, vec![(12.5, 7.5)]);
+            assert_eq!(movable, vec![true, true, false]);
+            let kernel = positive_kernel::PositiveKernel::new(positions, 8.0);
+            kernel.evaluate(&values, (10.5, 7.5))
+        };
+        let zero = field(0.0);
+        let tiny = field(0.00001);
+        assert!((zero.0 - tiny.0).hypot(zero.1 - tiny.1) < 0.00002);
+    }
+
+    #[test]
+    fn exact_fixed_boundary_collision_overrides_free_motion() {
+        let p = (12.5, 7.5);
+        let mut positions = vec![p];
+        let mut requested = vec![(15.5, 7.5)];
+        let mut feasible = requested.clone();
+        let mut values = vec![(3.0, 0.0)];
+        let mut movable = vec![true];
+        add_fixed_boundary_control(
+            p,
+            1.0,
+            &mut Vec::new(),
+            &mut positions,
+            &mut requested,
+            &mut feasible,
+            &mut values,
+            &mut movable,
+        );
+        assert_eq!(positions, vec![p]);
+        assert_eq!(requested, vec![(15.5, 7.5)]);
+        assert_eq!(feasible, vec![p]);
+        assert_eq!(values, vec![(0.0, 0.0)]);
+        assert_eq!(movable, vec![false]);
+    }
+
+    pub(super) fn joint_portrait() -> (RgbaImage, Value) {
         let (short_source, mut params) = portrait(160, 240);
         let mut pixels = short_source.pixels;
         pixels.extend((0..160 * 80).flat_map(|_| [20_u8, 50, 130, 255]));
@@ -2313,7 +4340,10 @@ mod tests {
         (source, params)
     }
 
-    fn public_adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, ImageError> {
+    pub(super) fn public_adjust(
+        source: &RgbaImage,
+        params: &Value,
+    ) -> Result<RgbaImage, ImageError> {
         crate::apply_graph_json(
             source,
             &json!({"version":"1","operations":[{
@@ -2321,6 +4351,74 @@ mod tests {
             }]})
             .to_string(),
         )
+    }
+
+    #[test]
+    fn source_attachment_plan_prevents_a_stale_disconnected_ear_lock() {
+        let (mut source, mut params) = joint_portrait();
+        let size = 160 * 320;
+        let mut ears = vec![0_u8; size];
+        let mut accessory = vec![0_u8; size];
+        // A slender ear joins the cheek above a stud. The parser assigns the
+        // stud to accessory rather than skin/ear, leaving a class gap.
+        for y in 110..155 {
+            for x in 35..=if y < 115 { 45 } else { 40 } {
+                let i = y * 160 + x;
+                ears[i] = 255;
+                source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[205, 145, 95, 255]);
+                if (130..134).contains(&y) {
+                    ears[i] = 0;
+                    accessory[i] = 255;
+                    source.pixels[i * 4..i * 4 + 4].copy_from_slice(&[210, 195, 40, 255]);
+                }
+            }
+        }
+        let mask = |data: Vec<u8>| json!({"shape":"raster","width":160,"height":320,"data":data});
+        params["semanticMasks"]["ears"] = mask(ears);
+        params["semanticMasks"]["accessories"] = mask(accessory.clone());
+        params["experimentalFaceProfile"] = json!("shared-cheek-ear-periodic-v1");
+        params["adjustments"] = json!({"faceWidth":30});
+        params["__faceProbePoints"] = json!([[37.5,150.5],[37.5,131.5]]);
+        let root = std::env::temp_dir().join(format!("face-moving-attachment-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let render = |name: &str, p: &Value| {
+            let mut p = p.clone();
+            let path = root.join(name);
+            p["__faceFieldTrace"] = json!(path);
+            let result = adjust(&source, &p).unwrap();
+            let probes: Value = serde_json::from_slice(&std::fs::read(path.join("render-probes.json")).unwrap()).unwrap();
+            (result, probes)
+        };
+        let (baseline, old) = render("fixed", &params);
+        assert_eq!(old[0]["frozen"], true, "counterexample must reproduce the stale lower-ear lock");
+        assert_eq!(old[0]["jointOwned"], false);
+        let mut zero = params.clone();
+        zero["__sourceMovingAttachmentSupport"] = mask(vec![0; size]);
+        let (no_plan_motion, _) = render("empty-plan", &zero);
+        assert_eq!(baseline, no_plan_motion, "an empty plan must preserve existing behavior");
+        let mut planned = params.clone();
+        planned["__sourceMovingAttachmentSupport"] = mask(accessory.clone());
+        let (_, new) = render("planned", &planned);
+        assert_eq!(new[0]["frozen"], false, "planned stud must not cut off the attached ear below it");
+        assert_eq!(new[0]["jointOwned"], true);
+        assert_eq!(new[1]["jointOwned"], true, "permission must bridge the parser class gap");
+        assert_eq!(old[1]["jointAlpha"], 0.0);
+        assert_eq!(new[1]["jointAlpha"], 0.0, "motion support must not be promoted into opacity");
+        assert_eq!(new[1]["donorExcluded"], true, "moving adornment is never a backdrop donor");
+        assert_eq!(new[1]["donorFrozen"], false, "old stud must not be pinned into the backdrop plate");
+        for conflict in ["user", "hair", "feature", "garment"] {
+            let mut blocked = planned.clone();
+            match conflict {
+                "user" => blocked["protectMask"] = mask(accessory.clone()),
+                "hair" => blocked["semanticMasks"]["hair"] = mask(accessory.clone()),
+                "feature" => blocked["semanticMasks"]["leftEye"] = mask(accessory.clone()),
+                "garment" => blocked["__sourceGarment"] = mask(accessory.clone()),
+                _ => unreachable!(),
+            }
+            let result = adjust(&source, &blocked);
+            assert!(result.is_err(), "planned attachment must reject {conflict} protection rather than remove it");
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

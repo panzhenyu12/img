@@ -5,10 +5,16 @@
 //! adapter translates the shared JSON operation protocol into these Rust types.
 
 mod body;
+mod body_layered_compositor;
 mod color;
 mod engine;
 mod face;
 pub(crate) mod face_matting;
+mod face_ownership;
+#[cfg(test)]
+mod face_profile;
+mod face_source_fringe;
+mod face_transport;
 mod film;
 mod geometry;
 mod inpaint;
@@ -21,6 +27,44 @@ mod wasm;
 
 pub use engine::{apply_graph, apply_graph_json, EditGraph, GraphOperation};
 pub use model_inpaint::{composite_model_inpaint, prepare_model_inpaint, InpaintMasks};
+pub use face::{ObservationRegion as FaceObservationRegion, SourceLayers as FaceSourceLayers};
+pub use body::SourceLayers as BodySourceLayers;
+pub use body_layered_compositor::{composite_body_source_layers, BodyLayeredSource};
+
+/// Edit a portrait with explicit, frozen source material evidence. This uses
+/// the continuous source motion domain in ordinary native builds as well as
+/// tests. It performs no detection, model inference or filesystem access.
+/// `params` follows the normal face.adjust schema; private research flags are
+/// rejected. Existing graph operations retain their compatibility behavior.
+pub fn adjust_face_with_source_layers(
+    source: &RgbaImage,
+    params: &serde_json::Value,
+    layers: &FaceSourceLayers<'_>,
+) -> Result<RgbaImage, ImageError> {
+    validate_layer_operation("face.adjust", params)?;
+    face::adjust_with_source_layers(source, params, layers)
+}
+
+/// Edit an observed body material layer independently of its anatomical
+/// selection. Supply a fixed paired background, or use source-only estimation.
+/// This single moving layer does not infer ordering of overlapping garments.
+pub fn adjust_body_with_source_layers(
+    source: &RgbaImage,
+    params: &serde_json::Value,
+    layers: &BodySourceLayers<'_>,
+) -> Result<RgbaImage, ImageError> {
+    validate_layer_operation("body.adjust", params)?;
+    body::adjust_with_source_layers(source, params, layers)
+}
+
+fn validate_layer_operation(kind: &str, params: &serde_json::Value) -> Result<(), ImageError> {
+    // Use the same domain/schema checks as graph execution. No extra JSON
+    // switch can silently choose a research algorithm through this API.
+    validation::operation(&GraphOperation {
+        id: String::new(), kind: kind.into(), enabled: true,
+        params: params.clone(), control_points: Vec::new(),
+    })
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RgbaImage {

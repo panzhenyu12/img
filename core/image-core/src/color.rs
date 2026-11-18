@@ -1350,7 +1350,6 @@ fn skin_detail_planes(
     let mut blemish = vec![([0.0; 3], 0.0); width * height];
     let max_radius = (face_width * 0.028).clamp(4.0, 18.0);
     let max_area = (std::f32::consts::PI * max_radius.powi(2)) as usize;
-    let padding = (face_width * 0.02).round().clamp(4.0, 12.0) as usize;
     for start in 0..candidates.len() {
         if !candidates[start] || visited[start] {
             continue;
@@ -1392,10 +1391,22 @@ fn skin_detail_planes(
         {
             continue;
         }
-        let mut sum = [0.0; 3];
-        let mut count = 0.0;
-        for y in bounds[1].saturating_sub(padding)..=(bounds[3] + padding).min(height - 1) {
-            for x in bounds[0].saturating_sub(padding)..=(bounds[2] + padding).min(width - 1) {
+        // The seed identifies a compact source defect. Its full low-frequency
+        // footprint and surrounding reference are prepared once, independent
+        // of the smooth/texture slider. A residual must not both identify the
+        // lesion and increase its correction fraction at the center.
+        let context = (max_radius * 2.0).ceil() as usize;
+        let x0 = bounds[0].saturating_sub(context);
+        let y0 = bounds[1].saturating_sub(context);
+        let x1 = (bounds[2] + context).min(width - 1);
+        let y1 = (bounds[3] + context).min(height - 1);
+        let cx = (bounds[0] + bounds[2]) as f64 * 0.5;
+        let cy = (bounds[1] + bounds[3]) as f64 * 0.5;
+        let scale = context.max(1) as f64;
+        let position = |x: usize, y: usize| [1.0, (x as f64 - cx) / scale, (y as f64 - cy) / scale];
+        let mut donors = Vec::new();
+        for y in y0..=y1 {
+            for x in x0..=x1 {
                 let i = y * width + x;
                 if (x >= bounds[0] && x <= bounds[2] && y >= bounds[1] && y <= bounds[3])
                     || selection.weights[i].1 <= 0.5
@@ -1404,44 +1415,104 @@ fn skin_detail_planes(
                 {
                     continue;
                 }
-                let index =
-                    ((y + selection.y as usize) * source.width as usize + x + selection.x as usize)
-                        * 4;
-                let weight = selection.weights[i].1;
-                for (c, value) in sum.iter_mut().enumerate() {
-                    *value += source.pixels[index + c] as f32 * weight;
-                }
-                count += weight;
+                donors.push(UnderEyeDonor {
+                    position: position(x, y),
+                    color: fine[i],
+                    weight: selection.weights[i].1 as f64,
+                });
             }
         }
-        if count < 8.0 {
+        let Some(plane) = skin_reference_plane(&donors) else {
+            continue;
+        };
+        let reference = |x: usize, y: usize| {
+            let pos = position(x, y);
+            std::array::from_fn::<_, 3, _>(|c| {
+                (0..3).map(|a| plane[a][c] * pos[a]).sum::<f64>() as f32
+            })
+        };
+        // A high-pass shoulder around a bright whitehead may seed as "dark".
+        // Source reconstruction must independently confirm a dark lesion
+        // against healthy low-frequency skin; it cannot use an arbitrary RGB
+        // projection that also admits the bright whitehead.
+        let darkness = |i: usize| {
+            let r = reference(i % width, i / width);
+            luma(r[0] - fine[i][0], r[1] - fine[i][1], r[2] - fine[i][2])
+        };
+        let mut normal_residual: Vec<f32> = donors
+            .iter()
+            .map(|d| {
+                let r: [f32; 3] = std::array::from_fn(|c| {
+                    (0..3).map(|a| plane[a][c] * d.position[a]).sum::<f64>() as f32
+                });
+                luma(r[0] - d.color[0], r[1] - d.color[1], r[2] - d.color[2]).abs()
+            })
+            .collect();
+        normal_residual.sort_by(f32::total_cmp);
+        let tolerance = (2.0 * 1.4826 * normal_residual[normal_residual.len() / 2]).max(1.0);
+        if component.iter().map(|&i| darkness(i)).sum::<f32>() / component.len() as f32 <= tolerance
+        {
             continue;
         }
-        let tone = sum.map(|v| v / count);
+        let rw = x1 - x0 + 1;
+        let mut included = vec![false; rw * (y1 - y0 + 1)];
+        let mut footprint = Vec::new();
         for &i in &component {
-            let amount = smoothstep(2.0, 14.0, residuals[i]);
-            if amount > blemish[i].1 {
-                blemish[i] = (tone, amount);
+            let local = (i / width - y0) * rw + i % width - x0;
+            if darkness(i) > tolerance && !included[local] {
+                included[local] = true;
+                footprint.push(i);
             }
-            // A short transition into the surrounding healthy skin avoids a
-            // hard connected-component border. No protected donor is admitted.
+        }
+        let mut cursor = 0;
+        let mut complete = true;
+        while cursor < footprint.len() {
+            let i = footprint[cursor];
+            cursor += 1;
             let x = i % width;
             let y = i / width;
-            for ny in y.saturating_sub(2)..=(y + 2).min(height - 1) {
-                for nx in x.saturating_sub(2)..=(x + 2).min(width - 1) {
+            if x == x0 || x == x1 || y == y0 || y == y1 {
+                complete = false;
+            }
+            for ny in y.saturating_sub(1).max(y0)..=(y + 1).min(y1) {
+                for nx in x.saturating_sub(1).max(x0)..=(x + 1).min(x1) {
                     let j = ny * width + nx;
-                    if selection.weights[j].1 <= 0.5 || structure[j] < 0.8 {
+                    let local = (ny - y0) * rw + nx - x0;
+                    if included[local] || darkness(j) <= tolerance {
                         continue;
                     }
-                    let distance =
-                        ((nx as f32 - x as f32).powi(2) + (ny as f32 - y as f32).powi(2)).sqrt();
-                    let spread = amount
-                        * (1.0 - distance / 3.0).max(0.0)
-                        * smoothstep(2.0, 11.0, residuals[j]);
-                    if spread > blemish[j].1 {
-                        blemish[j] = (tone, spread);
+                    if selection.weights[j].1 <= 0.5 || structure[j] < 0.6 {
+                        complete = false;
+                        continue;
                     }
+                    included[local] = true;
+                    footprint.push(j);
                 }
+            }
+        }
+        if !complete {
+            continue;
+        }
+        for i in footprint {
+            let excess = (darkness(i) - tolerance).max(0.0);
+            let index = ((i / width + selection.y as usize) * source.width as usize
+                + i % width
+                + selection.x as usize)
+                * 4;
+            // Preserve the original high-frequency residual. The correction
+            // uses a constant lesion gain over the source low-frequency
+            // deficit and vanishes as the source reaches healthy skin.
+            let r = reference(i % width, i / width);
+            let fraction = excess / darkness(i);
+            let tone = std::array::from_fn(|c| source.pixels[index + c] as f32 + r[c] - fine[i][c]);
+            // Fade the complete blend, including its interaction with base
+            // smoothing, to zero at the healthy boundary. A constant amount
+            // would abruptly restore source texture even as excess vanishes.
+            if blemish[i].1 == 0.0 {
+                blemish[i] = (tone, fraction);
+            }
+            if candidates[i] {
+                visited[i] = true;
             }
         }
     }
@@ -1649,6 +1720,10 @@ struct UnderEyeDonor {
 /// A robust plane rejects those local outliers instead of moving the healthy
 /// reference toward the lightest / most saturated nearby patch.
 fn under_eye_reference(donors: &[UnderEyeDonor]) -> Option<[f32; 3]> {
+    skin_reference_plane(donors).map(|plane| plane[0].map(|v| v as f32))
+}
+
+fn skin_reference_plane(donors: &[UnderEyeDonor]) -> Option<[[f64; 3]; 3]> {
     if donors.len() < 12 {
         return None;
     }
@@ -1721,7 +1796,7 @@ fn under_eye_reference(donors: &[UnderEyeDonor]) -> Option<[f32; 3]> {
             }
         }
     }
-    Some(plane[0].map(|v| v as f32))
+    Some(plane)
 }
 
 impl UnderEyeCorrection {
@@ -1961,6 +2036,47 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
     let brow_semantic = PreparedSemantic::new(p, bbox, "brows");
     let lip_semantic = PreparedSemantic::new(p, bbox, "lips");
     let teeth_semantic = PreparedSemantic::new(p, bbox, "teeth");
+    // Only a plain, non-inverted geometric feather has its true boundary
+    // at coverage .5. A raster, gradient, inverted mask or painted override
+    // may encode explicit tooth coverage and keeps conservative protection.
+    let geometric_oral_boundary = p
+        .get("semanticMasks")
+        .and_then(|masks| masks.get("teeth"))
+        .is_some_and(|mask| {
+            matches!(
+                mask.get("shape")
+                    .or_else(|| mask.get("kind"))
+                    .and_then(Value::as_str),
+                Some("polygon" | "rect")
+            ) && number(mask, "feather", 0.0) > 0.0
+                && !mask.get("invert").and_then(Value::as_bool).unwrap_or(false)
+                && mask
+                    .get("strokes")
+                    .and_then(Value::as_array)
+                    .is_none_or(Vec::is_empty)
+        });
+    let geometric_lip_boundary = p
+        .get("semanticMasks")
+        .and_then(Value::as_object)
+        .is_some_and(|masks| {
+            // PreparedSemantic unions the `lips` and legacy `lip` aliases.
+            // If both are present, the max coverage is no longer guaranteed
+            // to be the smoothstep of this one geometric boundary.
+            masks.get("lip").is_none()
+                && masks.get("lips").is_some_and(|mask| {
+                    matches!(
+                        mask.get("shape")
+                            .or_else(|| mask.get("kind"))
+                            .and_then(Value::as_str),
+                        Some("polygon" | "rect")
+                    ) && number(mask, "feather", 0.0) > 0.0
+                        && !mask.get("invert").and_then(Value::as_bool).unwrap_or(false)
+                        && mask
+                            .get("strokes")
+                            .and_then(Value::as_array)
+                            .is_none_or(Vec::is_empty)
+                })
+        });
     // A brow polygon includes skin between strands. Estimate that skin from
     // eligible surrounding texels rather than darkening the entire polygon.
     let brow_reference = (brow.abs() > 1e-6
@@ -2115,7 +2231,39 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
             // the polygon edge coverage is rarely exactly 1.0 at 8-bit size.
             let teeth_exclusion = (inner_mouth_weight > 1e-4) as u8 as f32;
             let lip_weight = mouth_weight * (1.0 - teeth_exclusion);
-            if lip_weight > 0.0 {
+            // The outside feather is uncertain lip material, not an extension
+            // of the oral cavity. Brightness reaches zero at the actual inner
+            // boundary (coverage .5), continuously across its outside band.
+            // Pigment controls retain their existing conservative exclusion.
+            let lip_light_weight = if geometric_oral_boundary {
+                mouth_weight * (1.0 - (inner_mouth_weight * 2.0).clamp(0.0, 1.0))
+            } else {
+                lip_weight
+            };
+            // Polygon/rect feather coverage is smoothstep(signed distance).
+            // Recover its linear distance coordinate so a strong negative
+            // brightness value has a bounded, uniform edge slope instead of
+            // smoothstep's 1.5x peak at the boundary. The analytic inverse
+            // leaves coverage 0 and 1 exact and does not alter full interior
+            // pixels. Keep oral protection separate from the lip edge.
+            let oral_factor = if geometric_oral_boundary {
+                1.0 - (inner_mouth_weight * 2.0).clamp(0.0, 1.0)
+            } else {
+                1.0
+            };
+            let lip_edge_distance = if mouth_weight <= 0.0 {
+                0.0
+            } else if mouth_weight >= 1.0 {
+                1.0
+            } else {
+                0.5 - libm::sinf(libm::asinf(1.0 - 2.0 * mouth_weight) / 3.0)
+            };
+            let lip_brightness_weight = if lip_brightness < 0.0 && geometric_lip_boundary {
+                lip_edge_distance * oral_factor
+            } else {
+                lip_light_weight
+            };
+            if lip_weight > 0.0 || (lip_brightness.abs() > 1e-6 && lip_light_weight > 0.0) {
                 // Change diffuse pigment at fixed luminance. A neutral bright
                 // reflection is lighting, and should not become a red stripe.
                 let original = std::array::from_fn::<_, 3, _>(|c| source.pixels[index + c] as f32);
@@ -2129,9 +2277,24 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
                 let light = luma(rgb[0], rgb[1], rgb[2]);
                 let tint = [35.0, -12.0, -4.0];
                 let tint_light = luma(tint[0], tint[1], tint[2]);
+                // Negative lip color removes existing red pigment. A fixed
+                // signed tint can overshoot a dark or weakly colored lip and
+                // create green shadows. Bound only this subtraction at the
+                // current red/green neutral axis, after the requested lip
+                // saturation. Neutral/cool reflections have no red to remove.
+                // Positive pigment and other controls retain their arithmetic.
+                let pigment_scale = lip_weight * diffuse;
+                let bounded_lip = if lip < 0.0 && pigment_scale > 0.0 {
+                    let available_red = ((rgb[0] - rgb[1])
+                        * (1.0 + lip_saturation * lip_weight * diffuse))
+                        .max(0.0);
+                    lip.max(-available_red / ((tint[0] - tint[1]) * pigment_scale))
+                } else {
+                    lip
+                };
                 let chroma: [f32; 3] = std::array::from_fn(|c| {
                     (rgb[c] - light) * (1.0 + lip_saturation * lip_weight * diffuse)
-                        + (tint[c] - tint_light) * lip * lip_weight * diffuse
+                        + (tint[c] - tint_light) * bounded_lip * lip_weight * diffuse
                 });
                 rgb = luma_chroma_rgb(light, chroma);
                 if lip_brightness.abs() > 1e-6 && source.pixels[index + 3] > 0 {
@@ -2143,10 +2306,10 @@ pub(crate) fn local_color(source: &RgbaImage, p: &Value, clothing: bool) -> Rgba
                     let linear = rgb.map(srgb_to_linear);
                     let scale = if lip_brightness > 0.0 {
                         let maximum = linear.into_iter().fold(0.0, f32::max);
-                        let gain = libm::exp2f(lip_brightness * lip_weight);
+                        let gain = libm::exp2f(lip_brightness * lip_light_weight);
                         gain / (1.0 + maximum * (gain - 1.0))
                     } else {
-                        libm::exp2f(lip_brightness * lip_weight * diffuse)
+                        libm::exp2f(lip_brightness * lip_brightness_weight * diffuse)
                     };
                     rgb = linear.map(|value| linear_to_srgb(value * scale));
                 }
@@ -3278,6 +3441,93 @@ mod tests {
     }
 
     #[test]
+    fn public_compact_spot_repair_does_not_hollow_a_smooth_dark_red_lesion() {
+        for sigma in [2.5_f32, 3.0, 4.0] {
+            let source = RgbaImage::new(
+                128,
+                128,
+                (0..128 * 128)
+                    .flat_map(|i| {
+                        let x = (i % 128) as f32 - 64.0;
+                        let y = (i / 128) as f32 - 64.0;
+                        let signal = (-(x * x + y * y) / (2.0 * sigma * sigma)).exp();
+                        [
+                            190,
+                            byte(145.0 - 60.0 * signal),
+                            byte(120.0 - 60.0 * signal),
+                            255,
+                        ]
+                    })
+                    .collect(),
+            )
+            .unwrap();
+            let graph = json!({"operations":[{"type":"skin.retouch","params":{"smooth":100,"texture":100,
+                "semanticMasks":{"skin":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}}}}}]});
+            let output = crate::apply_graph_json(&source, &graph.to_string()).unwrap();
+            let background = luma(190.0, 145.0, 120.0);
+            let mut radial = [0.0_f32; 9];
+            let mut counts = [0_usize; 9];
+            for y in 55..74 {
+                for x in 55..74 {
+                    let radius =
+                        ((x as f32 - 64.0).powi(2) + (y as f32 - 64.0).powi(2)).sqrt() as usize;
+                    if radius < 9 {
+                        radial[radius] += background - pixel_light(&output, y * 128 + x);
+                        counts[radius] += 1;
+                    }
+                }
+            }
+            for i in 0..9 {
+                radial[i] /= counts[i] as f32;
+            }
+            assert!(
+                radial[0] < 40.0,
+                "repair must actually soften the lesion, sigma {sigma}: {radial:?}"
+            );
+            for i in 1..9 {
+                assert!(radial[i]<=radial[i-1]+1.0,"repair hollowed a known smooth lesion into a dark ring, sigma {sigma}: {radial:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn public_skin_retouch_does_not_misread_a_bright_whitehead_as_a_dark_spot() {
+        // A bright bump with a red shoulder creates a positive high-pass
+        // seed. Its actual source luminance is above the healthy reference.
+        let source = RgbaImage::new(
+            256,
+            256,
+            (0..256 * 256)
+                .flat_map(|i| {
+                    let x = (i % 256) as f32 - 128.0;
+                    let y = (i / 256) as f32 - 128.0;
+                    let white = (-(x * x + y * y) / 18.0).exp();
+                    let red = (-((x - 6.0).powi(2) + y * y) / 3.0).exp();
+                    [
+                        byte(100.0 + 45.0 * white + 34.0 * red),
+                        byte(40.0 + 60.0 * white + 12.0 * red),
+                        byte(28.0 + 52.0 * white + 15.0 * red),
+                        255,
+                    ]
+                })
+                .collect(),
+        )
+        .unwrap();
+        let graph = json!({"operations":[{"type":"skin.retouch","params":{"smooth":100,"texture":100,
+            "semanticMasks":{"skin":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}}}}}]});
+        let output = crate::apply_graph_json(&source, &graph.to_string()).unwrap();
+        let i = (128 * 256 + 128) * 4;
+        for c in 0..3 {
+            assert!(
+                output.pixels[i + c] as i16 >= source.pixels[i + c] as i16 - 8,
+                "bright center acquired a dark/color patch: source {:?}, output {:?}",
+                &source.pixels[i..i + 3],
+                &output.pixels[i..i + 3]
+            );
+        }
+    }
+
+    #[test]
     fn guided_skin_reduces_small_dark_spots_without_flattening_shading() {
         let width = 128;
         let height = 80;
@@ -3541,6 +3791,57 @@ mod tests {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn public_negative_lip_color_removes_red_without_creating_green_shadows() {
+        // Includes the shadow color observed at (309, 553) in the independent
+        // dark portrait, plus bright pigment and neutral/cool lip reflections.
+        let colors = [
+            [18, 9, 10, 255],
+            [80, 78, 79, 255],
+            [170, 60, 80, 255],
+            [80, 80, 80, 255],
+            [60, 63, 70, 255],
+            [240, 238, 235, 255],
+        ];
+        let source = RgbaImage::new(6, 1, colors.concat()).unwrap();
+        let mut previous: Vec<i16> = colors
+            .iter()
+            .map(|p| i16::from(p[0]) - i16::from(p[1]))
+            .collect();
+        for amount in [0, -1, -30, -60, -100] {
+            let graph = json!({"operations":[{"type":"feature.adjust","params":{
+                "adjustments":{"lipColor":amount},"semanticMasks":{
+                    "lips":{"shape":"rect","region":{"x":0,"y":0,"width":1,"height":1}}
+                }
+            }}]});
+            let output = crate::apply_graph_json(&source, &graph.to_string()).unwrap();
+            if amount == 0 {
+                assert_eq!(output.pixels, source.pixels);
+            }
+            for (i, (original, edited)) in
+                colors.iter().zip(output.pixels.chunks_exact(4)).enumerate()
+            {
+                let red = i16::from(edited[0]) - i16::from(edited[1]);
+                if original[0] >= original[1] {
+                    assert!(red >= 0, "red removal created green at {i}, amount {amount}: {original:?} -> {edited:?}");
+                    assert!(red <= previous[i], "red removal must be monotonic");
+                    if amount <= -30 && original[0] - original[1] >= 9 {
+                        assert!(red < i16::from(original[0]) - i16::from(original[1]));
+                    }
+                } else {
+                    assert_eq!(
+                        original.as_slice(),
+                        edited,
+                        "cool lip reflection has no red pigment to subtract"
+                    );
+                }
+                assert!((pixel_light(&source, i) - pixel_light(&output, i)).abs() <= 0.5);
+                assert_eq!(original[3], edited[3]);
+                previous[i] = red;
             }
         }
     }

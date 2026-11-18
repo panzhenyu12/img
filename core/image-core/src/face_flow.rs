@@ -1,25 +1,36 @@
-//! Compact-RBF stationary-velocity transport for connected portrait layers.
+//! Stationary-velocity transport for connected portrait layers.
+//! The historical compact RBF remains available only to regression replays.
 //! RK4 integrates the same bilinear interior grid in opposite directions;
 //! continuity across the grid boundary additionally requires zero velocity
 //! there. No final displacement blending, nearest-contour branch or alpha cap.
 
-use super::{add, dot, scale, sub, Point};
+#[cfg(test)]
+use super::{add, scale};
+use super::{dot, sub, Point};
+#[cfg(test)]
 use nalgebra::{DMatrix, DVector};
 
 /// Wendland (1995) compact positive definite C2 basis in two dimensions.
 /// Bilinear samples are Lipschitz inside the grid. A zero exterior is continuous
 /// only where compact support also vanishes at the boundary. Raster constraints
 /// therefore do not imply a globally C2 flow.
+#[cfg(test)]
 pub(super) struct CompactRbf {
     controls: Vec<Point>,
     radius: f32,
     solver: nalgebra::linalg::Cholesky<f32, nalgebra::Dyn>,
+    observation_weights: Vec<f32>,
 }
+#[cfg(test)]
 impl CompactRbf {
     pub(super) fn new(controls: Vec<Point>, radius: f32) -> Self {
+        let weights = vec![1.0; controls.len()];
+        Self::with_observation_weights(controls, radius, weights)
+    }
+    fn with_observation_weights(controls: Vec<Point>, radius: f32, weights: Vec<f32>) -> Self {
         let n = controls.len();
         let mut matrix = DMatrix::from_fn(n, n, |i, j| {
-            Self::basis(sub(controls[i], controls[j]), radius)
+            weights[i] * Self::basis(sub(controls[i], controls[j]), radius) * weights[j]
         });
         for i in 0..n {
             matrix[(i, i)] += 0.002;
@@ -31,7 +42,18 @@ impl CompactRbf {
             controls,
             radius,
             solver,
+            observation_weights: weights,
         }
+    }
+    /// Solve weighted observations in the kernel system itself. This is an
+    /// isolated experiment until actual targets and source textures pass.
+    #[cfg(test)]
+    pub(super) fn new_supported(controls: Vec<Point>, radius: f32, weights: Vec<f32>) -> Self {
+        assert_eq!(controls.len(), weights.len());
+        assert!(weights
+            .iter()
+            .all(|w| w.is_finite() && (0.0..=1.0).contains(w)));
+        Self::with_observation_weights(controls, radius, weights)
     }
     fn basis(delta: Point, radius: f32) -> f32 {
         let r = dot(delta, delta).sqrt() / radius;
@@ -56,10 +78,14 @@ impl CompactRbf {
         self.controls
             .iter()
             .zip(coefficients)
-            .fold((0.0, 0.0), |sum, (&control, &coefficient)| {
+            .zip(&self.observation_weights)
+            .fold((0.0, 0.0), |sum, ((&control, &coefficient), &weight)| {
                 add(
                     sum,
-                    scale(coefficient, Self::basis(sub(p, control), self.radius)),
+                    scale(
+                        coefficient,
+                        weight * Self::basis(sub(p, control), self.radius),
+                    ),
                 )
             })
     }
@@ -94,50 +120,75 @@ impl VelocityGrid {
         }
     }
 
-    pub(super) fn velocity(&self, p: Point) -> Point {
-        let x = p.0 - self.origin.0;
-        let y = p.1 - self.origin.1;
-        if x < 0.0 || y < 0.0 || x > (self.width - 1) as f32 || y > (self.height - 1) as f32 {
+    /// Interpolate the same f32 grid in local f64 coordinates. Rounding each
+    /// RK4 stage back to an absolute f32 image coordinate quantizes the path;
+    /// on a large photograph, even a whole substep can disappear.
+    fn velocity_local(&self, x: f64, y: f64) -> (f64, f64) {
+        if x < 0.0 || y < 0.0 || x > (self.width - 1) as f64 || y > (self.height - 1) as f64 {
             return (0.0, 0.0);
         }
         let x0 = x.floor() as usize;
         let y0 = y.floor() as usize;
         let x1 = (x0 + 1).min(self.width - 1);
         let y1 = (y0 + 1).min(self.height - 1);
-        let tx = x - x0 as f32;
-        let ty = y - y0 as f32;
-        let top = add(
-            scale(self.vectors[y0 * self.width + x0], 1.0 - tx),
-            scale(self.vectors[y0 * self.width + x1], tx),
-        );
-        let bottom = add(
-            scale(self.vectors[y1 * self.width + x0], 1.0 - tx),
-            scale(self.vectors[y1 * self.width + x1], tx),
-        );
-        add(scale(top, 1.0 - ty), scale(bottom, ty))
+        let tx = x - x0 as f64;
+        let ty = y - y0 as f64;
+        let a = self.vectors[y0 * self.width + x0];
+        let b = self.vectors[y0 * self.width + x1];
+        let c = self.vectors[y1 * self.width + x0];
+        let d = self.vectors[y1 * self.width + x1];
+        let bilinear = |a: f32, b: f32, c: f32, d: f32| {
+            (a as f64 * (1.0 - tx) + b as f64 * tx) * (1.0 - ty)
+                + (c as f64 * (1.0 - tx) + d as f64 * tx) * ty
+        };
+        (bilinear(a.0, b.0, c.0, d.0), bilinear(a.1, b.1, c.1, d.1))
     }
 
-    pub(super) fn transport(&self, mut p: Point, direction: f32) -> Point {
-        if self.velocity(p) == (0.0, 0.0) {
-            return p;
+    #[cfg(test)]
+    pub(super) fn velocity(&self, p: Point) -> Point {
+        let v = self.velocity_local(
+            p.0 as f64 - self.origin.0 as f64,
+            p.1 as f64 - self.origin.1 as f64,
+        );
+        (v.0 as f32, v.1 as f32)
+    }
+
+    fn displacement(&self, p: Point, direction: f32) -> (f64, f64) {
+        let start = (
+            p.0 as f64 - self.origin.0 as f64,
+            p.1 as f64 - self.origin.1 as f64,
+        );
+        if self.velocity_local(start.0, start.1) == (0.0, 0.0) {
+            return (0.0, 0.0);
         }
-        let dt = direction / self.steps as f32;
+        let dt = direction as f64 / self.steps as f64;
+        let mut delta = (0.0, 0.0);
         for _ in 0..self.steps {
-            let k1 = self.velocity(p);
-            let k2 = self.velocity(add(p, scale(k1, dt * 0.5)));
-            let k3 = self.velocity(add(p, scale(k2, dt * 0.5)));
-            let k4 = self.velocity(add(p, scale(k3, dt)));
-            let sum = add(add(k1, scale(k2, 2.0)), add(scale(k3, 2.0), k4));
-            p = add(p, scale(sum, dt / 6.0));
+            let x = start.0 + delta.0;
+            let y = start.1 + delta.1;
+            let k1 = self.velocity_local(x, y);
+            let k2 = self.velocity_local(x + k1.0 * dt * 0.5, y + k1.1 * dt * 0.5);
+            let k3 = self.velocity_local(x + k2.0 * dt * 0.5, y + k2.1 * dt * 0.5);
+            let k4 = self.velocity_local(x + k3.0 * dt, y + k3.1 * dt);
+            delta.0 += (k1.0 + 2.0 * k2.0 + 2.0 * k3.0 + k4.0) * (dt / 6.0);
+            delta.1 += (k1.1 + 2.0 * k2.1 + 2.0 * k3.1 + k4.1) * (dt / 6.0);
         }
-        p
+        delta
+    }
+
+    pub(super) fn transport(&self, p: Point, direction: f32) -> Point {
+        let delta = self.displacement(p, direction);
+        ((p.0 as f64 + delta.0) as f32, (p.1 as f64 + delta.1) as f32)
     }
 }
 
-/// Exact integration initially: efficiency is measured after topology and
-/// attachment correctness, without introducing a second mapping authority.
+/// Integrate the inverse trajectory through the same stationary grid. RK4
+/// remains a numerical approximation, not a topology or material certificate.
 pub(super) fn inverse(grid: &VelocityGrid, p: Point) -> Point {
-    sub(grid.transport(p, -1.0), p)
+    // Keep the small sampling offset: subtracting two rounded absolute f32
+    // coordinates would reintroduce cancellation after accurate integration.
+    let delta = grid.displacement(p, -1.0);
+    (delta.0 as f32, delta.1 as f32)
 }
 
 #[cfg(test)]
@@ -216,6 +267,70 @@ mod tests {
                 assert_eq!(grid.transport(p, sign), p);
             }
         }
+    }
+
+    #[test]
+    fn small_motion_on_a_large_photo_survives_rk4_substeps() {
+        // The analytic flow of a constant velocity is p(t)=p(0)+t*v.
+        // Each old f32 substep is below one coordinate ULP at this origin,
+        // even though the total requested motion is representable.
+        let origin = (4000.5, 4000.5);
+        let p = (4020.5, 4020.5);
+        let grid = VelocityGrid::new(origin, 64, 64, vec![(0.001, 0.0); 64 * 64]);
+        for direction in [-1.0, 1.0] {
+            let expected = (
+                (p.0 as f64 + direction as f64 * 0.001_f32 as f64) as f32,
+                p.1,
+            );
+            assert_eq!(grid.transport(p, direction), expected);
+        }
+    }
+
+    #[test]
+    fn a_remote_gradient_cannot_erase_or_amplify_constant_local_motion() {
+        // A distant corner raises the global integration step count, but
+        // neither trajectory enters its bilinear support. Both exact flows
+        // must therefore be the same constant translation.
+        for (origin, speed) in [(2000.5, 0.005), (8000.5, 0.1)] {
+            let p = (origin + 20.0, origin + 20.0);
+            let uniform = vec![(speed, 0.0); 64 * 64];
+            let calm = VelocityGrid::new((origin, origin), 64, 64, uniform.clone());
+            let mut remote = uniform;
+            remote[0] = (40.0, 0.0);
+            let busy = VelocityGrid::new((origin, origin), 64, 64, remote);
+            assert!(busy.steps > calm.steps);
+            for direction in [-1.0, 1.0] {
+                let expected = ((p.0 as f64 + direction as f64 * speed as f64) as f32, p.1);
+                assert_eq!(busy.transport(p, direction), expected, "origin={origin}");
+                assert_eq!(calm.transport(p, direction), expected, "origin={origin}");
+            }
+        }
+    }
+
+    #[test]
+    fn inverse_displacement_preserves_subpixel_motion_independent_of_image_origin() {
+        let vectors: Vec<_> = (0..64 * 64)
+            .map(|i| {
+                let x = (i % 64) as f32 - 32.0;
+                let y = (i / 64) as f32 - 32.0;
+                (-y * 0.003, x * 0.003)
+            })
+            .collect();
+        let near = VelocityGrid::new((0.5, 0.5), 64, 64, vectors.clone());
+        let far = VelocityGrid::new((8000.5, 8000.5), 64, 64, vectors);
+        // Translating a grid and its query leaves the underlying field and
+        // its displacement invariant, including nonconstant stage samples.
+        assert_eq!(
+            inverse(&near, (22.5, 23.5)),
+            inverse(&far, (8022.5, 8023.5))
+        );
+        let constant = VelocityGrid::new((8000.5, 8000.5), 64, 64, vec![(0.00001, 0.0); 64 * 64]);
+        let delta = inverse(&constant, (8022.5, 8023.5));
+        assert!(
+            (delta.0 + 0.00001).abs() < 1e-10,
+            "lost inverse displacement {delta:?}"
+        );
+        assert_eq!(delta.1, 0.0);
     }
 }
 
@@ -322,6 +437,7 @@ pub(super) fn project_side_curve(
 #[cfg(test)]
 mod curve_tests {
     use super::*;
+
     #[test]
     fn fixed_attachments_cannot_create_a_new_expansion_lobe() {
         let samples = [
