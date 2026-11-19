@@ -501,9 +501,11 @@ fn exterior_contour_support(alpha: &[f32], width: usize, height: usize) -> Vec<f
             }
         }
     }
-    alpha.iter().enumerate().map(|(i, &a)| {
-        if a < 0.5 && !exterior[i] { 1.0 } else { a }
-    }).collect()
+    alpha
+        .iter()
+        .enumerate()
+        .map(|(i, &a)| if a < 0.5 && !exterior[i] { 1.0 } else { a })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -541,10 +543,15 @@ impl ContourProfile {
                 axis.origin.1 + axis.direction.1 * axis.length * t,
             );
             let mut sides = [0.0f32; 2];
-            let occluded_core = !limb && center.0 >= 0.0 && center.1 >= 0.0
-                && center.0 < width as f32 && center.1 < height as f32
-                && occluders.get(center.1 as usize * width + center.0 as usize)
-                    .copied().unwrap_or(false);
+            let occluded_core = !limb
+                && center.0 >= 0.0
+                && center.1 >= 0.0
+                && center.0 < width as f32
+                && center.1 < height as f32
+                && occluders
+                    .get(center.1 as usize * width + center.0 as usize)
+                    .copied()
+                    .unwrap_or(false);
             // The skeleton may lie behind an observed foreground object.
             // Its visibility does not decide whether the *opposite* visible
             // side of the same selected material can move. Measure the first
@@ -554,7 +561,11 @@ impl ContourProfile {
             // explicit protection at a missing core or the existing enclosed
             // aperture support; do not adopt a detached piece across a gap.
             // Unparsed limbs still need their observed core.
-            let core = if limb { read(alpha, center) } else { read(&contour_alpha, center) };
+            let core = if limb {
+                read(alpha, center)
+            } else {
+                read(&contour_alpha, center)
+            };
             if core >= 0.5 || occluded_core {
                 for (side, sign) in [-1.0f32, 1.0].into_iter().enumerate() {
                     let limit = (axis.radius * 2.0 + 8.0)
@@ -563,10 +574,13 @@ impl ContourProfile {
                     let mut previous = read(&contour_alpha, center);
                     let mut entered = previous >= 0.5;
                     for d in 1..=limit {
-                        let value = read(&contour_alpha, (
-                            center.0 + normal.0 * sign * d as f32,
-                            center.1 + normal.1 * sign * d as f32,
-                        ));
+                        let value = read(
+                            &contour_alpha,
+                            (
+                                center.0 + normal.0 * sign * d as f32,
+                                center.1 + normal.1 * sign * d as f32,
+                            ),
+                        );
                         if entered && value < 0.5 {
                             let fraction = (previous - 0.5) / (previous - value).max(1e-6);
                             sides[side] = d as f32 - 1.0 + fraction;
@@ -738,7 +752,9 @@ fn contour_displacement(
 /// anchor the displacement continuously before reaching frozen pixels.
 fn protection_fade(protected: &[bool], width: usize, height: usize, falloff: f32) -> Vec<f32> {
     protection_distance(protected, width, height)
-        .into_iter().map(|distance| smoothstep(0.0, falloff, distance)).collect()
+        .into_iter()
+        .map(|distance| smoothstep(0.0, falloff, distance))
+        .collect()
 }
 
 fn protection_distance(protected: &[bool], width: usize, height: usize) -> Vec<f32> {
@@ -1094,6 +1110,56 @@ fn geometry_target(source: &RgbaImage, params: &Value, subject_mask: &Value) -> 
     target
 }
 
+/// A part mask grants motion; it is not automatically the optical material
+/// alpha used to separate foreground RGB from the fixed scene. Callers that
+/// have an independently matted moving garment can provide `opticalAlpha` to
+/// keep those two domains distinct. The alpha must remain inside the observed
+/// subject silhouette so a bad source layer cannot paint the background.
+fn optical_alpha(
+    source: &RgbaImage,
+    params: &Value,
+    subject_mask: &Value,
+) -> Result<Option<Vec<f32>>, ImageError> {
+    let Some(value) = params.get("opticalAlpha") else {
+        return Ok(None);
+    };
+    if !value.is_object() {
+        return Err(ImageError::InvalidOperation(
+            "body opticalAlpha must be a raster mask".into(),
+        ));
+    }
+    let alpha = rasterize_mask(value, source.width, source.height);
+    let subject = rasterize_mask(subject_mask, source.width, source.height);
+    if alpha.iter().zip(&subject).any(|(&a, &s)| a > s + 1e-3) {
+        return Err(ImageError::InvalidOperation(
+            "body opticalAlpha must be contained by subjectMask".into(),
+        ));
+    }
+    Ok(Some(alpha))
+}
+
+/// When a caller supplies a semantic part mask but no separately matted
+/// optical layer, keep the material domain bounded by the detector's observed
+/// part. `geometry_target` may refine a motion domain across a color-line
+/// transition; using that expanded domain as foreground is what allowed a
+/// torso edit to ingest sleeves, coat pixels, or background gaps. The raw
+/// part mask is deliberately conservative and never invents material.
+fn default_material_alpha(source: &RgbaImage, params: &Value, subject_mask: &Value) -> Vec<f32> {
+    let subject = crate::face_matting::refine_alpha(
+        source,
+        &rasterize_mask(subject_mask, source.width, source.height),
+    );
+    if let Some(part) = params.get("partMask").filter(|value| value.is_object()) {
+        let raw = rasterize_mask(part, source.width, source.height);
+        return raw
+            .into_iter()
+            .zip(subject)
+            .map(|(part, subject)| part.min(subject))
+            .collect();
+    }
+    geometry_target(source, params, subject_mask)
+}
+
 struct BodyMotionControls {
     selected: Vec<f32>,
     user_protected: Vec<bool>,
@@ -1177,7 +1243,12 @@ fn motion_controls(
         height,
         (max_shift * 1.8 + 3.0).max(8.0),
     );
-    BodyMotionControls { selected, user_protected, measured, protect_fade }
+    BodyMotionControls {
+        selected,
+        user_protected,
+        measured,
+        protect_fade,
+    }
 }
 
 fn finish_body_blend(source: &RgbaImage, result: &mut RgbaImage, params: &Value) {
@@ -1215,16 +1286,21 @@ fn separated_adjust(
     let height = source.height as usize;
     let count = width * height;
     let target = geometry_target(source, params, subject_mask);
+    let material_alpha = optical_alpha(source, params, subject_mask)?
+        .unwrap_or_else(|| default_material_alpha(source, params, subject_mask));
+    let has_independent_material = params.get("opticalAlpha").is_some();
     let controls = motion_controls(source, params, warps, subject_mask, &target);
     let field = build_motion_field(source, region, &controls)?;
     let user_protected = &controls.user_protected;
-    let matte_layers = body_layer_colors(source, &target);
+    let matte_layers = body_layer_colors(source, &material_alpha);
+    #[cfg(test)]
+    trace_body_scalar("target", &target, width, height);
     let mut foreground = matte_layers
         .as_ref()
         .map(|layers| layers.0.clone())
         .unwrap_or_else(|| source.clone());
-    for (i, &alpha) in target.iter().enumerate() {
-        // Only the selected semantic part is sampled. The underlying torso,
+    for (i, &alpha) in material_alpha.iter().enumerate() {
+        // Only the independently matted material is sampled. The underlying torso,
         // the other leg and the backdrop remain a fixed context layer.
         if alpha >= 1.0 - 1e-6 {
             foreground.pixels[i * 4..i * 4 + 3].copy_from_slice(&source.pixels[i * 4..i * 4 + 3]);
@@ -1232,8 +1308,13 @@ fn separated_adjust(
         foreground.pixels[i * 4 + 3] = byte(source.pixels[i * 4 + 3] as f32 * alpha);
     }
     let mut warped = foreground.clone();
+    #[cfg(test)]
+    trace_body_image("foreground-before-warp", &foreground);
     let mut warped_alpha = vec![0.0; count];
-    let mut warped_subject = target.clone();
+    // Transported coverage of the moving material is distinct from `target`,
+    // which only defines the anatomical motion domain. This prevents a broad
+    // body selection from displacing pixels that contain no selected garment.
+    let mut warped_material = material_alpha.clone();
     let mut changed = vec![false; count];
     let mut holes = vec![false; count];
     let pure_contraction = warps.iter().all(|warp| warp.amount >= 0.0);
@@ -1251,16 +1332,27 @@ fn separated_adjust(
             if d.0.abs() + d.1.abs() < 1e-6 {
                 continue;
             }
-            let (pixel, alpha) = sample_with_alpha(&foreground, x as f32 + d.0, y as f32 + d.1);
+            let sample_x = x as f32 + d.0;
+            let sample_y = y as f32 + d.1;
+            let (pixel, alpha) = sample_with_alpha(&foreground, sample_x, sample_y);
+            let sampled_material =
+                sample_coverage(&material_alpha, width, height, sample_x, sample_y);
+            let material_changed = (material_alpha[i] - sampled_material).abs() > 1.0 / 255.0;
             // Identity samples stay bit-exact, especially in the untouched
-            // background gaps inside a whole-body pose hull.
-            if pixel == foreground.pixels[i * 4..i * 4 + 4] {
+            // background gaps inside a whole-body pose hull. When the caller
+            // supplies an independent optical alpha, target pixels with no
+            // moving material remain fixed context even if their geometry is
+            // inside the wider motion selection.
+            if (!has_independent_material && pixel == foreground.pixels[i * 4..i * 4 + 4])
+                || (has_independent_material && !material_changed && alpha <= 1e-6)
+            {
                 continue;
             }
-            warped.pixels[i * 4..i * 4 + 4].copy_from_slice(&pixel);
+            if alpha > 1e-6 {
+                warped.pixels[i * 4..i * 4 + 4].copy_from_slice(&pixel);
+            }
             warped_alpha[i] = alpha;
-            warped_subject[i] =
-                sample_coverage(&target, width, height, x as f32 + d.0, y as f32 + d.1);
+            warped_material[i] = sampled_material;
             changed[i] = true;
             // Only the newly uncovered contour strip requires background.
             // Pixels fully covered by the new foreground need no fill.
@@ -1268,8 +1360,8 @@ fn separated_adjust(
             // Reconstruct only newly revealed coverage. Marking every mixed
             // output sample as a hole also filled pixels whose foreground
             // coverage *increased*, including tiny enclosed seam islands.
-            holes[i] = target[i] > 1.0 / 255.0
-                && warped_subject[i] < target[i] - 1.0 / 255.0
+            holes[i] = material_alpha[i] > 1.0 / 255.0
+                && warped_material[i] < material_alpha[i] - 1.0 / 255.0
                 && !user_protected[i];
         }
     }
@@ -1277,22 +1369,50 @@ fn separated_adjust(
         .as_ref()
         .map(|layers| layers.1.clone())
         .unwrap_or_else(|| source.clone());
-    for (i, &alpha) in target.iter().enumerate() {
+    #[cfg(test)]
+    {
+        trace_body_image("background-estimated", &background);
+        trace_body_image("foreground-warped", &warped);
+        trace_body_scalar("warped-material", &warped_material, width, height);
+        trace_body_scalar("warped-alpha", &warped_alpha, width, height);
+        trace_body_scalar(
+            "holes",
+            &holes
+                .iter()
+                .map(|&v| if v { 1.0 } else { 0.0 })
+                .collect::<Vec<_>>(),
+            width,
+            height,
+        );
+        trace_body_scalar(
+            "changed",
+            &changed
+                .iter()
+                .map(|&v| if v { 1.0 } else { 0.0 })
+                .collect::<Vec<_>>(),
+            width,
+            height,
+        );
+    }
+    for (i, &alpha) in material_alpha.iter().enumerate() {
         if alpha <= 1.0 / 255.0 {
             background.pixels[i * 4..i * 4 + 4].copy_from_slice(&source.pixels[i * 4..i * 4 + 4]);
         }
     }
     if holes.iter().any(|v| *v) {
-        let targets = reconstruction_targets(&holes, &target, &user_protected, width, height)?;
+        let targets =
+            reconstruction_targets(&holes, &material_alpha, &user_protected, width, height)?;
         // Remove the revealed strip from donor protection while retaining all
         // remaining original foreground and every user-protected pixel.
-        let donor_protected: Vec<bool> = target
+        let donor_protected: Vec<bool> = material_alpha
             .iter()
             .enumerate()
             .map(|(i, &alpha)| (alpha > 1.0 / 255.0 && !targets[i]) || user_protected[i])
             .collect();
         background = fill_revealed_background(&background, &targets, &donor_protected)?;
     }
+    #[cfg(test)]
+    trace_body_image("background-final", &background);
     let mut result = source.clone();
     for i in 0..count {
         if !changed[i] || user_protected[i] {
@@ -1305,7 +1425,7 @@ fn separated_adjust(
         // The complete soft foreground fringe must move with the contour.
         // Freezing its alpha<.5 half leaves the old edge as a dotted ghost.
         // Only known background is immutable during contraction.
-        if target[i] <= 0.01 && warped_subject[i] <= target[i] {
+        if target[i] <= 0.01 && warped_material[i] <= material_alpha[i] {
             continue;
         }
         // The background is never displaced. Only reconstructed contour
@@ -1315,7 +1435,7 @@ fn separated_adjust(
         // Segmentation coverage partitions one source layer; RGBA alpha is
         // not that coverage. Using (1-fg_alpha) here would incorrectly make
         // the same half-transparent photo more opaque after a contour edit.
-        let uncovered = 1.0 - warped_subject[i];
+        let uncovered = 1.0 - warped_material[i];
         let alpha = fg_alpha + bg_alpha * uncovered;
         for c in 0..3 {
             result.pixels[i * 4 + c] = if alpha > 1e-6 {
@@ -1332,6 +1452,46 @@ fn separated_adjust(
     }
     finish_body_blend(source, &mut result, params);
     Ok(result)
+}
+
+#[cfg(test)]
+fn trace_body_scalar(name: &str, values: &[f32], width: usize, height: usize) {
+    let Ok(directory) = std::env::var("IMG_BODY_TRACE_OUTPUT") else {
+        return;
+    };
+    let directory = std::path::Path::new(&directory);
+    std::fs::write(
+        directory.join(format!("{name}.f32")),
+        values
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let gray = values.iter().map(|&v| byte(v * 255.0)).collect::<Vec<_>>();
+    image::save_buffer(
+        directory.join(format!("{name}.png")),
+        &gray,
+        width as u32,
+        height as u32,
+        image::ColorType::L8,
+    )
+    .unwrap();
+}
+
+#[cfg(test)]
+fn trace_body_image(name: &str, image: &RgbaImage) {
+    let Ok(directory) = std::env::var("IMG_BODY_TRACE_OUTPUT") else {
+        return;
+    };
+    image::save_buffer(
+        std::path::Path::new(&directory).join(format!("{name}.png")),
+        &image.pixels,
+        image.width,
+        image.height,
+        image::ColorType::Rgba8,
+    )
+    .unwrap();
 }
 
 /// Width adjustments act only on their semantic region and add independently.
@@ -1397,8 +1557,10 @@ fn adjustment_warps(source: &RgbaImage, params: &Value) -> (Region, Vec<Warp>) {
     let mut combined: Vec<Warp> = Vec::with_capacity(warps.len());
     for warp in warps {
         if let Some(existing) = combined.iter_mut().find(|other| {
-            other.axis == warp.axis && other.center == warp.center
-                && other.extent == warp.extent && other.limb == warp.limb
+            other.axis == warp.axis
+                && other.center == warp.center
+                && other.extent == warp.extent
+                && other.limb == warp.limb
         }) {
             existing.amount += warp.amount;
         } else {
@@ -1430,12 +1592,19 @@ fn build_motion_field(
 ) -> Result<Vec<[f32; 2]>, ImageError> {
     let width = source.width as usize;
     let height = source.height as usize;
-    let fixed: Vec<bool> = controls.selected.iter().enumerate().map(|(i, &weight)| {
-        weight <= 1e-6 || controls.user_protected[i] || !region.contains(
-            ((i % width) as f32 + 0.5) / width as f32,
-            ((i / width) as f32 + 0.5) / height as f32,
-        )
-    }).collect();
+    let fixed: Vec<bool> = controls
+        .selected
+        .iter()
+        .enumerate()
+        .map(|(i, &weight)| {
+            weight <= 1e-6
+                || controls.user_protected[i]
+                || !region.contains(
+                    ((i % width) as f32 + 0.5) / width as f32,
+                    ((i / width) as f32 + 0.5) / height as f32,
+                )
+        })
+        .collect();
     let boundary_distance = protection_distance(&fixed, width, height);
     let mut field = vec![[0.0, 0.0]; width * height];
     for (i, d) in field.iter_mut().enumerate() {
@@ -1465,7 +1634,11 @@ fn build_motion_field(
     Ok(field)
 }
 
-fn validate_inverse_field(field: &[[f32; 2]], width: usize, height: usize) -> Result<(), ImageError> {
+fn validate_inverse_field(
+    field: &[[f32; 2]],
+    width: usize,
+    height: usize,
+) -> Result<(), ImageError> {
     // For a bilinear inverse field the determinant is affine over each cell,
     // so checking all four corners covers its whole interior. A radial proof
     // alone cannot cover sums of different anatomical axes or mask products.
@@ -1473,20 +1646,30 @@ fn validate_inverse_field(field: &[[f32; 2]], width: usize, height: usize) -> Re
     for y in 0..height.saturating_sub(1) {
         for x in 0..width.saturating_sub(1) {
             let i = y * width + x;
-            let difference = |a: usize, b: usize, horizontal: bool| [
-                field[b][0] as f64 - field[a][0] as f64 + if horizontal { 1.0 } else { 0.0 },
-                field[b][1] as f64 - field[a][1] as f64 + if horizontal { 0.0 } else { 1.0 },
+            let difference = |a: usize, b: usize, horizontal: bool| {
+                [
+                    field[b][0] as f64 - field[a][0] as f64 + if horizontal { 1.0 } else { 0.0 },
+                    field[b][1] as f64 - field[a][1] as f64 + if horizontal { 0.0 } else { 1.0 },
+                ]
+            };
+            let horizontal = [
+                difference(i, i + 1, true),
+                difference(i + width, i + width + 1, true),
             ];
-            let horizontal = [difference(i, i + 1, true), difference(i + width, i + width + 1, true)];
-            let vertical = [difference(i, i + width, false), difference(i + 1, i + width + 1, false)];
-            for dx in horizontal { for dy in vertical {
-                let jacobian = dx[0] * dy[1] - dx[1] * dy[0];
-                if !jacobian.is_finite() || jacobian <= 0.0 {
-                    return Err(ImageError::InvalidOperation(format!(
+            let vertical = [
+                difference(i, i + width, false),
+                difference(i + 1, i + width + 1, false),
+            ];
+            for dx in horizontal {
+                for dy in vertical {
+                    let jacobian = dx[0] * dy[1] - dx[1] * dy[0];
+                    if !jacobian.is_finite() || jacobian <= 0.0 {
+                        return Err(ImageError::InvalidOperation(format!(
                         "body geometry folds near ({x},{y}); requested adjustments and fixed selection/protection are incompatible"
                     )));
+                    }
                 }
-            }}
+            }
         }
     }
     Ok(())
@@ -1503,7 +1686,10 @@ pub(crate) fn adjust_with_layered_source(
     layers.validate_source_with_reconstruction(source, reconstruction)?;
     let field = prepare_inverse_displacement(source, params)?;
     let mut result = crate::composite_body_source_layers_with_reconstruction(
-        source, layers, &field, reconstruction,
+        source,
+        layers,
+        &field,
+        reconstruction,
     )?;
     finish_body_blend(source, &mut result, params);
     Ok(result)
@@ -1517,7 +1703,13 @@ pub(crate) fn prepare_inverse_displacement(
     Ok(if warps.is_empty() {
         vec![[0.0, 0.0]; source.width as usize * source.height as usize]
     } else {
-        source_motion_field(source, params, region, &warps, required_subject_mask(params)?)?
+        source_motion_field(
+            source,
+            params,
+            region,
+            &warps,
+            required_subject_mask(params)?,
+        )?
     })
 }
 
@@ -1537,22 +1729,76 @@ mod tests {
     use super::*;
     use serde_json::json;
     #[test]
+    #[ignore = "explicit local photograph trace; inputs supplied by environment"]
+    fn trace_frozen_ordinary_body_material_stages() {
+        let source_path = std::env::var("IMG_BODY_TRACE_SOURCE").unwrap();
+        let graph_path = std::env::var("IMG_BODY_TRACE_GRAPH").unwrap();
+        let output = std::env::var("IMG_BODY_TRACE_ROOT").unwrap();
+        let decoded = image::open(source_path).unwrap().into_rgba8();
+        let source = RgbaImage::new(decoded.width(), decoded.height(), decoded.into_raw()).unwrap();
+        let graph: crate::EditGraph =
+            serde_json::from_slice(&std::fs::read(graph_path).unwrap()).unwrap();
+        for amount in [-30, 30] {
+            let directory = std::path::Path::new(&output).join(format!("{amount:+}"));
+            std::fs::create_dir_all(&directory).unwrap();
+            std::env::set_var("IMG_BODY_TRACE_OUTPUT", &directory);
+            let mut params = graph.operations[0].params.clone();
+            params["adjustments"] = json!({"waist":amount});
+            let result = adjust(&source, &params).unwrap();
+            trace_body_image("result", &result);
+            let field = prepare_inverse_displacement(&source, &params).unwrap();
+            std::fs::write(
+                directory.join("field.f32"),
+                field
+                    .iter()
+                    .flatten()
+                    .flat_map(|v| v.to_le_bytes())
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap();
+        }
+        std::env::remove_var("IMG_BODY_TRACE_OUTPUT");
+    }
+    #[test]
     fn exterior_motion_tail_joins_with_zero_displacement_derivative() {
         let mut alpha = vec![0.0; 100 * 100];
-        for y in 0..100 { for x in 30..70 { alpha[y * 100 + x] = 1.0; }}
+        for y in 0..100 {
+            for x in 30..70 {
+                alpha[y * 100 + x] = 1.0;
+            }
+        }
         for amount in [-1.0f32, -0.6, -0.3, 0.3, 0.6, 1.0, 2.0] {
-            let profile = ContourProfile::new(Warp {
-                axis: Axis {origin:(50.0,10.0),direction:(0.0,1.0),length:80.0,radius:30.0},
-                amount, center:0.5, extent:0.55, limb:false,
-            }, &alpha, 100, 100, false, 4.0, &[]);
+            let profile = ContourProfile::new(
+                Warp {
+                    axis: Axis {
+                        origin: (50.0, 10.0),
+                        direction: (0.0, 1.0),
+                        length: 80.0,
+                        radius: 30.0,
+                    },
+                    amount,
+                    center: 0.5,
+                    extent: 0.55,
+                    limb: false,
+                },
+                &alpha,
+                100,
+                100,
+                false,
+                4.0,
+                &[],
+            );
             let radius = 20.0f32;
             let target = radius * (1.0 - amount * 0.26);
             let start = radius.max(target) + 4.0;
             let end = start + 4.0f32.max(2.0 * (radius - target).abs());
-            let shift = |across:f32| profile.displacement((50.0 - across,50.0)).0;
-            for boundary in [start,end] {
+            let shift = |across: f32| profile.displacement((50.0 - across, 50.0)).0;
+            for boundary in [start, end] {
                 let derivative = (shift(boundary + 0.01) - shift(boundary - 0.01)) / 0.02;
-                assert!(derivative.abs() < 0.02, "tail boundary derivative={derivative}, amount={amount}");
+                assert!(
+                    derivative.abs() < 0.02,
+                    "tail boundary derivative={derivative}, amount={amount}"
+                );
             }
             assert_eq!(shift(end + 0.01), 0.0);
         }
@@ -1560,13 +1806,107 @@ mod tests {
 
     #[test]
     fn field_validation_checks_all_bilinear_cell_corners_and_cross_axis_terms() {
-        assert!(validate_inverse_field(&[[0.0,0.0];4],2,2).is_ok());
+        assert!(validate_inverse_field(&[[0.0, 0.0]; 4], 2, 2).is_ok());
         // Top-left is regular, bottom corners fold. Checking only one corner
         // misses this bilinear field defect.
-        assert!(validate_inverse_field(&[[0.0,0.0],[0.0,0.0],[0.0,0.0],[-2.0,0.0]],2,2).is_err());
+        assert!(
+            validate_inverse_field(&[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [-2.0, 0.0]], 2, 2)
+                .is_err()
+        );
         // Each diagonal entry is .4, but the two cross-axis terms make the
         // determinant negative. Per-axis displacement tests are insufficient.
-        assert!(validate_inverse_field(&[[0.0,0.0],[-0.6,0.6],[0.6,-0.6],[0.0,0.0]],2,2).is_err());
+        assert!(
+            validate_inverse_field(&[[0.0, 0.0], [-0.6, 0.6], [0.6, -0.6], [0.0, 0.0]], 2, 2)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn known_diagonal_source_has_no_material_composite_delta_inside_opaque_target() {
+        let width = 96usize;
+        let height = 96usize;
+        let mut pixels = Vec::with_capacity(width * height * 4);
+        let mut mask = vec![0u8; width * height];
+        for y in 0..height {
+            for x in 0..width {
+                let foreground = (18..78).contains(&x)
+                    && (14..82).contains(&y)
+                    && (x as i32 - 18) * 2 + (y as i32 - 14) > 12
+                    && (x as i32 - 18) * 2 + (y as i32 - 14) < 130;
+                let rgb = if foreground {
+                    [230, 40, 60]
+                } else {
+                    [15, 170, 215]
+                };
+                pixels.extend_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
+                mask[y * width + x] = if foreground { 255 } else { 0 };
+            }
+        }
+        let source = RgbaImage::new(width as u32, height as u32, pixels).unwrap();
+        let params = json!({
+            "bodyPart":"waist",
+            "region":{"x":0.1,"y":0.1,"width":0.8,"height":0.8},
+            "landmarks":[{"x":0.5,"y":0.15},{"x":0.5,"y":0.5},{"x":0.5,"y":0.85}],
+            "mask":{"shape":"polygon","feather":0,"points":[{"x":0.18,"y":0.14},{"x":0.82,"y":0.14},{"x":0.82,"y":0.86},{"x":0.18,"y":0.86}]},
+            "subjectMask":{"shape":"raster","width":width,"height":height,"data":mask},
+            "partMask":{"shape":"raster","width":width,"height":height,"data":mask},
+            "adjustments":{"waist":-55}
+        });
+        let output = adjust(&source, &params).unwrap();
+        let field = prepare_inverse_displacement(&source, &params).unwrap();
+        let target = geometry_target(&source, &params, params.get("subjectMask").unwrap());
+        let sample_rgb = |x: f32, y: f32| -> [u8; 3] {
+            let x = x.clamp(0.0, width as f32 - 1.0);
+            let y = y.clamp(0.0, height as f32 - 1.0);
+            let x0 = x.floor() as usize;
+            let y0 = y.floor() as usize;
+            let x1 = (x0 + 1).min(width - 1);
+            let y1 = (y0 + 1).min(height - 1);
+            let dx = x - x0 as f32;
+            let dy = y - y0 as f32;
+            std::array::from_fn(|c| {
+                let p = |xx: usize, yy: usize| source.pixels[(yy * width + xx) * 4 + c] as f32;
+                byte(
+                    (p(x0, y0) * (1.0 - dx) * (1.0 - dy)
+                        + p(x1, y0) * dx * (1.0 - dy)
+                        + p(x0, y1) * (1.0 - dx) * dy
+                        + p(x1, y1) * dx * dy)
+                        .round(),
+                )
+            })
+        };
+        let mut checked = 0;
+        let mut largest = 0u8;
+        for y in 0..height {
+            for x in 0..width {
+                let i = y * width + x;
+                if target[i] < 0.98 {
+                    continue;
+                }
+                let dx = field[i][0];
+                let dy = field[i][1];
+                let sx = x as f32 + dx;
+                let sy = y as f32 + dy;
+                let sample_target = sample_coverage(&target, width, height, sx, sy);
+                if sample_target < 0.98 {
+                    continue;
+                }
+                let expected = sample_rgb(sx, sy);
+                let actual = &output.pixels[i * 4..i * 4 + 3];
+                let error = (0..3)
+                    .map(|c| actual[c].abs_diff(expected[c]))
+                    .max()
+                    .unwrap();
+                checked += 1;
+                largest = largest.max(error);
+                assert!(error <= 1, "opaque target composite differs from frozen RGB field at ({x},{y}), error={error}");
+            }
+        }
+        assert!(
+            checked > 500,
+            "synthetic diagonal did not exercise opaque target: {checked}"
+        );
+        assert!(largest <= 1);
     }
     #[test]
     fn missing_bone_core_does_not_pin_visible_material_at_the_same_height() {
@@ -1603,8 +1943,10 @@ mod tests {
         // The valid silhouette keeps a visible edit; this does not freeze
         // the whole shirt to conceal the broken transition.
         assert!(profile.displacement((80.0, 75.0)).0.abs() > 3.0);
-        assert!(profile.displacement((80.0, 105.0)).0.abs() > 3.0,
-            "only actual fixed pixels anchor motion, not an occluded skeleton");
+        assert!(
+            profile.displacement((80.0, 105.0)).0.abs() > 3.0,
+            "only actual fixed pixels anchor motion, not an occluded skeleton"
+        );
         let shifts: Vec<f32> = (85..126)
             .map(|y| profile.displacement((80.0, y as f32)).0)
             .collect();
@@ -1668,6 +2010,126 @@ mod tests {
         assert!(error.to_string().contains("real subjectMask"));
         params["adjustments"]["waist"] = json!(0);
         assert_eq!(adjust(&source, &params).unwrap(), source);
+    }
+
+    #[test]
+    fn optical_alpha_must_be_contained_by_the_subject_silhouette() {
+        let source = RgbaImage::new(8, 8, vec![120; 8 * 8 * 4]).unwrap();
+        let subject = json!({
+            "shape":"raster", "width":8, "height":8,
+            "data": vec![0u8; 8 * 8]
+        });
+        let mut outside = vec![0u8; 8 * 8];
+        outside[3 * 8 + 3] = 255;
+        let params = json!({
+            "opticalAlpha": {"shape":"raster", "width":8, "height":8, "data":outside}
+        });
+        let error = optical_alpha(&source, &params, &subject).unwrap_err();
+        assert!(error.to_string().contains("contained by subjectMask"));
+    }
+
+    #[test]
+    fn independent_optical_alpha_keeps_nonmaterial_target_context_fixed() {
+        let width = 100usize;
+        let height = 160usize;
+        let mut pixels = Vec::with_capacity(width * height * 4);
+        let mut subject = vec![0u8; width * height];
+        let mut material = vec![0u8; width * height];
+        for y in 0..height {
+            for x in 0..width {
+                let inside = (25..75).contains(&x) && (24..136).contains(&y);
+                let moving = (25..50).contains(&x) && (24..136).contains(&y);
+                let i = y * width + x;
+                subject[i] = if inside { 255 } else { 0 };
+                material[i] = if moving { 255 } else { 0 };
+                pixels.extend_from_slice(if inside {
+                    &[220, 60, 80, 255]
+                } else {
+                    &[20, 90, 180, 255]
+                });
+            }
+        }
+        let source = RgbaImage::new(width as u32, height as u32, pixels).unwrap();
+        let params = json!({
+            "bodyPart":"waist",
+            "region":{"x":0.12,"y":0.1,"width":0.76,"height":0.8},
+            "landmarks":[{"x":0.5,"y":0.15},{"x":0.5,"y":0.5},{"x":0.5,"y":0.85}],
+            "subjectMask":{"shape":"raster","width":width,"height":height,"data":subject},
+            "opticalAlpha":{"shape":"raster","width":width,"height":height,"data":material},
+            "adjustments":{"waist":70}
+        });
+        let output = adjust(&source, &params).unwrap();
+        // The selected body target is wider than the moving garment. The
+        // right half contains no optical material and must remain byte exact.
+        for y in 24..136 {
+            for x in 50..75 {
+                let i = (y * width + x) * 4;
+                assert_eq!(
+                    &output.pixels[i..i + 4],
+                    &source.pixels[i..i + 4],
+                    "nonmaterial target context changed at ({x},{y})"
+                );
+            }
+        }
+        assert_ne!(output, source, "independently matted material did not move");
+    }
+
+    #[test]
+    fn semantic_part_mask_is_conservative_material_fallback() {
+        let width = 100usize;
+        let height = 120usize;
+        let mut pixels = Vec::with_capacity(width * height * 4);
+        let mut subject = vec![0u8; width * height];
+        let mut part = vec![0u8; width * height];
+        for y in 0..height {
+            for x in 0..width {
+                let i = y * width + x;
+                let inside = (20..100).contains(&y) && (20..80).contains(&x);
+                let moving = inside && (35..65).contains(&x);
+                subject[i] = if inside { 255 } else { 0 };
+                part[i] = if moving { 255 } else { 0 };
+                let rgb = if moving {
+                    [226, 54, 72]
+                } else if inside {
+                    [42, 208, 92]
+                } else {
+                    [18, 86, 176]
+                };
+                pixels.extend_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
+            }
+        }
+        let source = RgbaImage::new(width as u32, height as u32, pixels).unwrap();
+        let raster = |data: &[u8]| {
+            json!({"shape":"raster","width":width,"height":height,"data":data})
+        };
+        let params = json!({
+            "bodyPart":"waist",
+            "region":{"x":0.1,"y":0.1,"width":0.8,"height":0.8},
+            "landmarks":[{"x":0.5,"y":0.15},{"x":0.5,"y":0.5},{"x":0.5,"y":0.85}],
+            "subjectMask":raster(&subject),
+            "partMask":raster(&part),
+            "adjustments":{"waist":70}
+        });
+        let output = adjust(&source, &params).unwrap();
+        for y in 20..100 {
+            for x in 20..35 {
+                let i = (y * width + x) * 4;
+                assert_eq!(
+                    &output.pixels[i..i + 4],
+                    &source.pixels[i..i + 4],
+                    "semantic target context changed at ({x},{y})"
+                );
+            }
+            for x in 65..80 {
+                let i = (y * width + x) * 4;
+                assert_eq!(
+                    &output.pixels[i..i + 4],
+                    &source.pixels[i..i + 4],
+                    "semantic target context changed at ({x},{y})"
+                );
+            }
+        }
+        assert_ne!(output, source, "semantic part material did not move");
     }
     #[test]
     fn arm_touching_torso_uses_its_free_side_radius_and_moves_visible_edge() {

@@ -355,7 +355,9 @@ fn eye_geometry(value: &Value, params: &Value) -> Result<(), ImageError> {
     let semantic_masks = params
         .get("semanticMasks")
         .and_then(Value::as_object)
-        .ok_or_else(|| error("eyeGeometry requires semanticMasks with source eye apertures".to_owned()))?;
+        .ok_or_else(|| {
+            error("eyeGeometry requires semanticMasks with source eye apertures".to_owned())
+        })?;
     keys(value, EYES, "eyeGeometry")?;
     if object(value, "eyeGeometry")?.is_empty() {
         return Err(error(
@@ -395,9 +397,11 @@ fn eye_geometry(value: &Value, params: &Value) -> Result<(), ImageError> {
         if determinant.abs() <= f64::EPSILON {
             return Err(error(format!("{name}: degenerate iris projection")));
         }
-        let aperture = semantic_masks
-            .get(name)
-            .ok_or_else(|| error(format!("{name}: measured iris requires a source aperture polygon")))?;
+        let aperture = semantic_masks.get(name).ok_or_else(|| {
+            error(format!(
+                "{name}: measured iris requires a source aperture polygon"
+            ))
+        })?;
         if aperture
             .get("shape")
             .or_else(|| aperture.get("kind"))
@@ -413,10 +417,11 @@ fn eye_geometry(value: &Value, params: &Value) -> Result<(), ImageError> {
         }
         mask(aperture)?;
     }
-    if ["eyeWidth", "eyeHeight"]
-        .iter()
-        .any(|key| params["adjustments"][*key].as_f64().is_some_and(|v| v != 0.0))
-    {
+    if ["eyeWidth", "eyeHeight"].iter().any(|key| {
+        params["adjustments"][*key]
+            .as_f64()
+            .is_some_and(|v| v != 0.0)
+    }) {
         for name in EYES {
             if semantic_masks.get(*name).is_some() && value.get(*name).is_none() {
                 return Err(error(format!("{name}: every active eye requires measured iris geometry when eyeGeometry is supplied")));
@@ -452,6 +457,10 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
             "semanticMasks",
             "subjectMask",
             "partMask",
+            // Body source layers may provide an independently matted optical
+            // aperture. The semantic branch below rejects it for face and
+            // clothing operations instead of silently accepting unused data.
+            "opticalAlpha",
         ],
         "skin.retouch" => &[
             "smooth",
@@ -588,6 +597,14 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
                 if op.kind != "body.adjust" || op.params.get("bodyPart").is_none() {
                     return Err(error(
                         "partMask requires a semantic body.adjust operation".into(),
+                    ));
+                }
+                mask(value)?;
+            }
+            "opticalAlpha" => {
+                if op.kind != "body.adjust" || op.params.get("bodyPart").is_none() {
+                    return Err(error(
+                        "opticalAlpha requires a semantic body.adjust operation".into(),
                     ));
                 }
                 mask(value)?;
@@ -742,6 +759,22 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
                 op.kind, key
             )));
         }
+    }
+    // A vertical eye edit is admitted only when the measured ocular source
+    // layer is present. Reject it here, before generic feature detection
+    // requirements, so legacy graphs receive the same explicit
+    // "no validated algorithm" response as the other unfinished controls.
+    if op.kind == "feature.adjust"
+        && adjustments
+            .get("eyeHeight")
+            .and_then(Value::as_f64)
+            .is_some_and(|v| v.abs() > 1e-6)
+        && op.params.get("eyeGeometry").is_none()
+    {
+        return Err(error(
+            "feature.adjust.eyeHeight has no validated algorithm without measured eyeGeometry"
+                .to_owned(),
+        ));
     }
     let active = adjustments.as_object().is_some_and(|values| {
         values.iter().any(|(key, value)| {
@@ -1050,7 +1083,7 @@ pub(crate) fn operation(op: &GraphOperation) -> Result<(), ImageError> {
                     .is_some_and(|v| v.abs() > 1e-6)
             {
                 return Err(error(
-                    "feature.adjust.eyeHeight requires measured eyeGeometry to protect iris and lid materials".to_owned(),
+                    "feature.adjust.eyeHeight has no validated algorithm without measured eyeGeometry; measured eyeGeometry is required to protect iris and lid materials".to_owned(),
                 ));
             }
         }
@@ -1344,5 +1377,37 @@ mod tests {
         op.kind = "feature.adjust".into();
         op.params = json!({"subjectMask":{"shape":"raster","width":1,"height":1,"data":[255]}});
         assert!(operation(&op).is_err());
+    }
+
+    #[test]
+    fn optical_alpha_is_only_a_body_source_layer_and_is_validated_as_a_mask() {
+        let optical = json!({
+            "shape":"raster", "width":2, "height":1, "data":[255, 0]
+        });
+        let subject = json!({
+            "shape":"raster", "width":2, "height":1, "data":[255, 255]
+        });
+        let mut body = GraphOperation {
+            id: "body-source".into(),
+            kind: "body.adjust".into(),
+            enabled: true,
+            params: json!({
+                "bodyPart":"waist",
+                "adjustments":{"waist":0},
+                "subjectMask":subject,
+                "opticalAlpha":optical,
+            }),
+            control_points: vec![],
+        };
+        assert!(operation(&body).is_ok());
+        body.kind = "face.adjust".into();
+        body.params.as_object_mut().unwrap().remove("bodyPart");
+        assert!(operation(&body).is_err());
+        body.kind = "body.adjust".into();
+        body.params["bodyPart"] = json!("waist");
+        body.params["opticalAlpha"] = json!({"shape":"rect"});
+        assert!(operation(&body).is_ok());
+        body.params["opticalAlpha"] = json!("bad");
+        assert!(operation(&body).is_err());
     }
 }
