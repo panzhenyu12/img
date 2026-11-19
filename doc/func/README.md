@@ -122,3 +122,5 @@ FUNC-编号-功能短名.md
 - [FUNC-078 眼部源材料人工修正（独立算法，自动识别失败仍保留）](FUNC-078-eye-source-material-correction.md)
 - [FUNC-079 普通 Rust 眼部轻闭合（源准备一次、整数轻档候选，迁移待验收）](FUNC-079-native-eye-closure.md)
 - [FUNC-080 同源瘦脸背景重建复用（保持RGBA，重复调用约5.40→2.43秒）](FUNC-080-source-background-cache.md)
+- [FUNC-081 眼镜与耳饰的完整组件源运动许可](FUNC-081-source-attachment-subtypes.md)
+- [FUNC-082 固定附件侧脸曲线的数值可行性（真实双向失败修复）](FUNC-082-face-curve-source-witness.md)

@@ -347,19 +347,23 @@ pub(super) fn project_side_curve(
     if n < 3 {
         return Ok(samples.iter().map(|s| s.2).collect());
     }
+    // Solve for displacement d = target - source, in one f64 coordinate
+    // system. The original source is the explicit zero witness even when
+    // adjacent fixed observations span very different lateral coordinates.
+    // Subtracting in f32 before building f64 constraints could round a bound
+    // inward and make three exact source attachments mutually infeasible.
+    let source: Vec<f64> = samples.iter().map(|s| s.1 as f64).collect();
     let mut p = vec![vec![0.0_f64; n]; n];
     let mut q = vec![0.0_f64; n];
     for i in 0..n {
         p[i][i] = 2.0;
-        q[i] = -2.0 * samples[i].2 as f64;
+        q[i] = -2.0 * (samples[i].2 as f64 - source[i]);
     }
     // Bending regularization acts on displacement, not on original anatomy.
     for i in 0..n - 2 {
         let indices = [i, i + 1, i + 2];
         let coefficients = [1.0, -2.0, 1.0];
-        let old = (samples[i].1 - 2.0 * samples[i + 1].1 + samples[i + 2].1) as f64;
         for (&a, &ca) in indices.iter().zip(&coefficients) {
-            q[a] -= 2.0 * 3.0 * old * ca;
             for (&b, &cb) in indices.iter().zip(&coefficients) {
                 p[a][b] += 2.0 * 3.0 * ca * cb;
             }
@@ -373,13 +377,14 @@ pub(super) fn project_side_curve(
             let mut row = vec![0.0; n];
             row[i] = 1.0;
             rows.push(row);
-            bounds.push(samples[i].1 as f64);
+            bounds.push(0.0);
             equalities += 1;
         }
     }
     for i in 0..n {
-        let lo = samples[i].1.min(samples[i].3) as f64;
-        let hi = samples[i].1.max(samples[i].3) as f64;
+        let requested = samples[i].3 as f64 - source[i];
+        let lo = requested.min(0.0);
+        let hi = requested.max(0.0);
         let mut row = vec![0.0; n];
         row[i] = 1.0;
         rows.push(row);
@@ -390,24 +395,24 @@ pub(super) fn project_side_curve(
         bounds.push(-lo);
     }
     for i in 0..n - 1 {
-        let old = samples[i + 1].1 - samples[i].1;
+        let old = source[i + 1] - source[i];
         let mut row = vec![0.0; n];
         row[i] = 1.0;
         row[i + 1] = -1.0;
         rows.push(row);
-        bounds.push(-old.min(0.0) as f64);
+        // x_i - x_(i+1) <= -min(source_delta, 0), translated to d.
+        bounds.push(old.max(0.0));
     }
     for i in 0..n - 2 {
-        let h0 = (samples[i + 1].0 - samples[i].0).max(0.1) as f64;
-        let h1 = (samples[i + 2].0 - samples[i + 1].0).max(0.1) as f64;
-        let old = (samples[i + 2].1 - samples[i + 1].1) as f64 / h1
-            - (samples[i + 1].1 - samples[i].1) as f64 / h0;
+        let h0 = (samples[i + 1].0 as f64 - samples[i].0 as f64).max(0.1_f32 as f64);
+        let h1 = (samples[i + 2].0 as f64 - samples[i + 1].0 as f64).max(0.1_f32 as f64);
+        let old = (source[i + 2] - source[i + 1]) / h1 - (source[i + 1] - source[i]) / h0;
         let mut row = vec![0.0; n];
         row[i] = -1.0 / h0;
         row[i + 1] = 1.0 / h0 + 1.0 / h1;
         row[i + 2] = -1.0 / h1;
         rows.push(row);
-        bounds.push(-old.min(0.0));
+        bounds.push(old.max(0.0));
     }
     let inequalities = rows.len() - equalities;
     let cones = vec![ZeroConeT(equalities), NonnegativeConeT(inequalities)];
@@ -431,12 +436,138 @@ pub(super) fn project_side_curve(
     ) {
         return Err(format!("side curve QP status {:?}", solver.solution.status));
     }
-    Ok(solver.solution.x.iter().map(|&v| v as f32).collect())
+    Ok(solver
+        .solution
+        .x
+        .iter()
+        .zip(source)
+        .map(|(&d, s)| (s + d) as f32)
+        .collect())
 }
 
 #[cfg(test)]
 mod curve_tests {
     use super::*;
+
+    #[test]
+    fn observed_fixed_glasses_curve_retains_a_feasible_source_witness() {
+        // Exact f32 observations from the ordinary source-layer entry, both
+        // edit directions. No photo, cached field or hidden color is input.
+        // Source curvature row 95 formerly conflicted with fixed points 4/5/6
+        // by 1.2348133396e-6 because its source differences rounded in f32.
+        let cases: [[(u32, u32, u32, u32, bool); 28]; 2] = [
+            [
+                (1100299699, 3256061424, 3256061424, 3254543280, true),
+                (1104833194, 3271704514, 3271667357, 3271146475, false),
+                (1105803157, 3257630784, 3257630784, 3256219908, true),
+                (1107111342, 3272127417, 3271994262, 3271774700, false),
+                (1107918660, 3270521508, 3270517472, 3269816074, true),
+                (1108728499, 3260041639, 3260041639, 3258630772, true),
+                (1110060750, 3269295121, 3269282210, 3268589688, true),
+                (1110304096, 3262842582, 3262832627, 3261431715, true),
+                (1110450016, 3272063480, 3271938800, 3271710765, false),
+                (1110899737, 3267802951, 3267794839, 3267097520, true),
+                (1111084417, 3266177331, 3266158018, 3265471897, true),
+                (1111269098, 3264551711, 3264514788, 3263846278, false),
+                (1113695193, 3271995736, 3271676558, 3271643018, false),
+                (1116303395, 3271898083, 3271533614, 3271533614, false),
+                (1117891436, 3271718298, 3271174041, 3271174041, false),
+                (1119479476, 3271519906, 3270814470, 3270814470, false),
+                (1121087205, 3271331513, 3270626078, 3270626078, false),
+                (1122642060, 3270883382, 3270177949, 3270177949, false),
+                (1124150558, 3270577594, 3269872159, 3269872159, false),
+                (1124930086, 3270151114, 3269445681, 3269445681, false),
+                (1125690501, 3269603491, 3268898059, 3268898059, false),
+                (1126415710, 3268871754, 3268166320, 3268166320, false),
+                (1127097584, 3267982180, 3267276746, 3267276746, false),
+                (1127779463, 3267092603, 3266387170, 3266387170, false),
+                (1128497813, 3266340447, 3265645792, 3265645792, false),
+                (1129129781, 3265320284, 3264798634, 3264798634, false),
+                (1129740740, 3264244141, 3263929485, 3263929485, false),
+                (1130303558, 3262968035, 3262641286, 3262641286, false),
+            ],
+            [
+                (1100299699, 3256061424, 3256061424, 3257461256, true),
+                (1104833194, 3271704514, 3271741671, 3272057231, false),
+                (1105803157, 3257630784, 3257630784, 3259041651, true),
+                (1107111342, 3272127417, 3272260571, 3272480134, false),
+                (1107918660, 3270521508, 3270525543, 3271226943, true),
+                (1108728499, 3260041639, 3260041639, 3261452507, true),
+                (1110060750, 3269295121, 3269308033, 3270000557, true),
+                (1110304096, 3262842582, 3262852536, 3263710981, true),
+                (1110450016, 3272063480, 3272188161, 3272416199, false),
+                (1110899737, 3267802951, 3267811063, 3268508387, true),
+                (1111084417, 3266177331, 3266196644, 3266882764, true),
+                (1111269098, 3264551711, 3264588634, 3265257145, false),
+                (1113695193, 3271995736, 3272314912, 3272348452, false),
+                (1116303395, 3271898083, 3272250801, 3272250801, false),
+                (1117891436, 3271718298, 3272071015, 3272071015, false),
+                (1119479476, 3271519906, 3271891230, 3271891230, false),
+                (1121087205, 3271331513, 3271797034, 3271797034, false),
+                (1122642060, 3270883382, 3271572968, 3271572968, false),
+                (1124150558, 3270577594, 3271283027, 3271283027, false),
+                (1124930086, 3270151114, 3270856550, 3270856550, false),
+                (1125690501, 3269603491, 3270308926, 3270308926, false),
+                (1126415710, 3268871754, 3269577189, 3269577189, false),
+                (1127097584, 3267982180, 3268687615, 3268687615, false),
+                (1127779463, 3267092603, 3267798038, 3267798038, false),
+                (1128497813, 3266340447, 3267035103, 3267035103, false),
+                (1129129781, 3265320284, 3265841938, 3265841938, false),
+                (1129740740, 3264244141, 3264558801, 3264558801, false),
+                (1130303558, 3262968035, 3263231651, 3263231651, false),
+            ],
+        ];
+        for bits in cases {
+            let samples: Vec<_> = bits
+                .iter()
+                .map(|s| {
+                    (
+                        f32::from_bits(s.0),
+                        f32::from_bits(s.1),
+                        f32::from_bits(s.2),
+                        f32::from_bits(s.3),
+                        s.4,
+                    )
+                })
+                .collect();
+            let result =
+                project_side_curve(&samples).expect("observed fixed source must remain feasible");
+            let mut moved = false;
+            for (&actual, s) in result.iter().zip(&samples) {
+                assert!(actual.is_finite());
+                if s.4 {
+                    assert_eq!(
+                        actual.to_bits(),
+                        s.1.to_bits(),
+                        "hard material attachment moved"
+                    );
+                }
+                assert!(actual >= s.1.min(s.3) - 1e-4 && actual <= s.1.max(s.3) + 1e-4);
+                moved |= !s.4 && (actual - s.1).abs() > 0.1;
+            }
+            assert!(moved, "feasible free contour controls must still respond");
+        }
+    }
+
+    #[test]
+    fn exact_fixed_source_coordinates_remain_a_feasible_curve() {
+        // The source is always an admissible solution, including a sharp
+        // pre-existing contour turn. With the f32 source values promoted to
+        // f64, the first lateral difference is -139.80000686645508. Rounding
+        // that difference in f32 first instead produces -139.8000030517578,
+        // excluding the two exact fixed observations by 3.814697e-6 pixels.
+        let samples = [
+            (0., 180.1, 180.1, 180.1, true),
+            (10., 40.3, 40.3, 40.3, true),
+            (20., 35.1, 35.1, 35.1, true),
+            (30., 30.2, 30.2, 30.2, true),
+        ];
+        let projected = project_side_curve(&samples)
+            .expect("an unchanged fully fixed source cannot be geometrically infeasible");
+        for (actual, source) in projected.iter().zip(samples) {
+            assert!((actual - source.1).abs() <= 1e-4);
+        }
+    }
 
     #[test]
     fn fixed_attachments_cannot_create_a_new_expansion_lobe() {
