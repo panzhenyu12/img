@@ -119,3 +119,4 @@ FUNC-编号-功能短名.md
 - [FUNC-075 Rust 内存前后材质分层合成](FUNC-075-body-layered-compositor.md)
 - [FUNC-076 源轮廓混色与背景上下文配对修正（隔离实拍候选）](FUNC-076-source-optical-context-repair.md)
 - [FUNC-077 显式字节量化源重建（普通Rust入口，瑜伽轻度收腰验证）](FUNC-077-quantized-source-reconstruction.md)
+- [FUNC-078 眼部源材料人工修正（独立算法，自动识别失败仍保留）](FUNC-078-eye-source-material-correction.md)
