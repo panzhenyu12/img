@@ -106,7 +106,7 @@ fn mid(a: Point, b: Point) -> Point {
     ((a.0 + b.0) * 0.5, (a.1 + b.1) * 0.5)
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct Axis {
     origin: Point,
     direction: Point,
@@ -659,21 +659,34 @@ impl ContourProfile {
         let target = radius * (1.0 - self.warp.amount * 0.26 * profile);
         let core = radius * 0.30;
         let output = across.abs();
-        if output <= core || output > radius.max(target) + self.fringe {
+        if output <= core {
+            return (0.0, 0.0);
+        }
+        let outer_start = radius.max(target) + self.fringe;
+        let tail_width = self.fringe.max(2.0 * (radius - target).abs()).max(1.0);
+        if output >= outer_start + tail_width {
             return (0.0, 0.0);
         }
         // Piecewise harmonic extension between fixed bone-core pixels and
         // the prescribed silhouette. This is a monotone inverse map: no
-        // folds, no global photo stretch, exact control of contour shrinkage.
+        // folds in this radial map, exact control of contour shrinkage.
         let input = if output <= target {
-            core + (output - core) * (radius - core) / (target - core).max(1.0)
+            core + (output - core) * (radius - core) / (target - core).max(f32::MIN_POSITIVE)
         } else {
             radius + output - target
         };
         let anchor0 = side(self.section_anchors[first]);
         let anchor1 = side(self.section_anchors[last]);
         let anchor = anchor0 + (anchor1 - anchor0) * (slot - first as f32);
-        let shift = (input - output) * across.signum() * anchor;
+        // Returning directly to identity at outer_start cut real material
+        // whenever a coarse semantic contour lay inside its optical edge.
+        // Hermite's maximum derivative is 1.5; width >= 2*|radius-target|
+        // bounds the tail's radial displacement derivative by .75. Thus the
+        // inverse radial coordinate retains derivative >= .25, with zero
+        // displacement derivative at both ends of this outer transition.
+        // Selection/protection are separate constraints applied afterward.
+        let tail = 1.0 - smoothstep(outer_start, outer_start + tail_width, output);
+        let shift = (input - output) * across.signum() * anchor * tail;
         let n = self.warp.axis.normal();
         (n.0 * shift, n.1 * shift)
     }
@@ -691,11 +704,10 @@ fn contour_displacement(
     if protection_fade <= 1e-6 || selected <= 1e-6 || !region.contains(p.0 / w, p.1 / h) {
         return (0.0, 0.0);
     }
-    let edge = (p.0 - region.x * w)
-        .min((region.x + region.width) * w - p.0)
-        .min(p.1 - region.y * h)
-        .min((region.y + region.height) * h - p.1);
-    let feather = smoothstep(0.0, 3.0, edge) * selected * protection_fade;
+    // Fixed selection/ROI boundaries are handled by the common field builder
+    // using the local requested displacement. A separate fixed 3px multiplier
+    // here can itself fold a large motion before it reaches that boundary.
+    let feather = selected * protection_fade;
     let mut result = (0.0, 0.0);
     for profile in profiles {
         let d = profile.displacement(p);
@@ -713,8 +725,13 @@ fn contour_displacement(
 /// tear even when both endpoint pixels are legal. Use a distance field to
 /// anchor the displacement continuously before reaching frozen pixels.
 fn protection_fade(protected: &[bool], width: usize, height: usize, falloff: f32) -> Vec<f32> {
+    protection_distance(protected, width, height)
+        .into_iter().map(|distance| smoothstep(0.0, falloff, distance)).collect()
+}
+
+fn protection_distance(protected: &[bool], width: usize, height: usize) -> Vec<f32> {
     if !protected.iter().any(|p| *p) {
-        return vec![1.0; protected.len()];
+        return vec![f32::INFINITY; protected.len()];
     }
     let mut distance: Vec<f32> = protected
         .iter()
@@ -755,9 +772,6 @@ fn protection_fade(protected: &[bool], width: usize, height: usize, falloff: f32
         }
     }
     distance
-        .into_iter()
-        .map(|d| smoothstep(0.0, falloff, d))
-        .collect()
 }
 
 /// Rasterize once per edit. Brush stamps have a finite pixel footprint;
@@ -1188,8 +1202,9 @@ fn separated_adjust(
     let height = source.height as usize;
     let count = width * height;
     let target = geometry_target(source, params, subject_mask);
-    let BodyMotionControls { selected, user_protected, measured, protect_fade } =
-        motion_controls(source, params, warps, subject_mask, &target);
+    let controls = motion_controls(source, params, warps, subject_mask, &target);
+    let field = build_motion_field(source, region, &controls)?;
+    let user_protected = &controls.user_protected;
     let matte_layers = body_layer_colors(source, &target);
     let mut foreground = matte_layers
         .as_ref()
@@ -1219,15 +1234,7 @@ fn separated_adjust(
             if pure_contraction && target[i] <= 0.01 {
                 continue;
             }
-            let d = contour_displacement(
-                region,
-                &measured,
-                (x as f32 + 0.5, y as f32 + 0.5),
-                selected[i],
-                protect_fade[i],
-                width as f32,
-                height as f32,
-            );
+            let d = (field[i][0], field[i][1]);
             if d.0.abs() + d.1.abs() < 1e-6 {
                 continue;
             }
@@ -1325,6 +1332,25 @@ fn adjust_impl(
     params: &Value,
     layers: Option<&source_layers::PreparedSourceLayers<'_>>,
 ) -> Result<RgbaImage, ImageError> {
+    let (region, warps) = adjustment_warps(source, params);
+    if warps.is_empty() {
+        return Ok(source.clone());
+    }
+    let subject_mask = required_subject_mask(params)?;
+    if let Some(layers) = layers {
+        source_layers::render(source, params, region, &warps, subject_mask, layers)
+    } else {
+        separated_adjust(source, params, region, &warps, subject_mask)
+    }
+}
+
+fn required_subject_mask(params: &Value) -> Result<&Value, ImageError> {
+    params.get("subjectMask").filter(|mask| mask.is_object()).ok_or_else(|| {
+        ImageError::InvalidOperation("body contour edits require a real subjectMask; detect the person or draw the foreground silhouette manually".into())
+    })
+}
+
+fn adjustment_warps(source: &RgbaImage, params: &Value) -> (Region, Vec<Warp>) {
     let region = Region::read(params.get("region"));
     let values = params.get("adjustments").unwrap_or(params);
     let part = params
@@ -1351,15 +1377,132 @@ fn adjust_impl(
             _ => limb_warps(&mut warps, axis, part, values),
         }
     }
-    if warps.is_empty() {
-        return Ok(source.clone());
+    // Controls such as legs+thighs address the very same contour. Combine
+    // their target displacement before inversion: summing two inverse fields
+    // doubles a tail's slope and does not cancel opposite requested widths.
+    // Other axes or anatomical envelopes remain independent.
+    let mut combined: Vec<Warp> = Vec::with_capacity(warps.len());
+    for warp in warps {
+        if let Some(existing) = combined.iter_mut().find(|other| {
+            other.axis == warp.axis && other.center == warp.center
+                && other.extent == warp.extent && other.limb == warp.limb
+        }) {
+            existing.amount += warp.amount;
+        } else {
+            combined.push(warp);
+        }
     }
-    let subject_mask=params.get("subjectMask").filter(|mask|mask.is_object()).ok_or_else(||ImageError::InvalidOperation("body contour edits require a real subjectMask; detect the person or draw the foreground silhouette manually".into()))?;
-    if let Some(layers) = layers {
-        source_layers::render(source, params, region, &warps, subject_mask, layers)
+    combined.retain(|warp| warp.amount.abs() > 1e-6);
+    (region, combined)
+}
+
+/// One anatomical field for all body renderers. Layer colors and
+/// optical coverage never grant movement outside selection/protection policy.
+fn source_motion_field(
+    source: &RgbaImage,
+    params: &Value,
+    region: Region,
+    warps: &[Warp],
+    subject_mask: &Value,
+) -> Result<Vec<[f32; 2]>, ImageError> {
+    let target = geometry_target(source, params, subject_mask);
+    let controls = motion_controls(source, params, warps, subject_mask, &target);
+    build_motion_field(source, region, &controls)
+}
+
+fn build_motion_field(
+    source: &RgbaImage,
+    region: Region,
+    controls: &BodyMotionControls,
+) -> Result<Vec<[f32; 2]>, ImageError> {
+    let width = source.width as usize;
+    let height = source.height as usize;
+    let fixed: Vec<bool> = controls.selected.iter().enumerate().map(|(i, &weight)| {
+        weight <= 1e-6 || controls.user_protected[i] || !region.contains(
+            ((i % width) as f32 + 0.5) / width as f32,
+            ((i / width) as f32 + 0.5) / height as f32,
+        )
+    }).collect();
+    let boundary_distance = protection_distance(&fixed, width, height);
+    let mut field = vec![[0.0, 0.0]; width * height];
+    for (i, d) in field.iter_mut().enumerate() {
+        if controls.user_protected[i] {
+            continue;
+        }
+        let displacement = contour_displacement(
+            region,
+            &controls.measured,
+            ((i % width) as f32 + 0.5, (i / width) as f32 + 0.5),
+            controls.selected[i],
+            controls.protect_fade[i],
+            width as f32,
+            height as f32,
+        );
+        // Only a request that cannot reach a fixed boundary continuously is
+        // limited there. A max-shift-wide global feather suppressed narrow
+        // limb selections even when their actual displacement was small.
+        // The local cap leaves room for a monotone approach to fixed pixels;
+        // the complete field is checked below, including all mask products.
+        let length = displacement.0.hypot(displacement.1);
+        let cap = boundary_distance[i] * 0.5;
+        let scale = if length > cap { cap / length } else { 1.0 };
+        *d = [displacement.0 * scale, displacement.1 * scale];
+    }
+    validate_inverse_field(&field, width, height)?;
+    Ok(field)
+}
+
+fn validate_inverse_field(field: &[[f32; 2]], width: usize, height: usize) -> Result<(), ImageError> {
+    // For a bilinear inverse field the determinant is affine over each cell,
+    // so checking all four corners covers its whole interior. A radial proof
+    // alone cannot cover sums of different anatomical axes or mask products.
+    // Report incompatible requests; never silently lower the slider amount.
+    for y in 0..height.saturating_sub(1) {
+        for x in 0..width.saturating_sub(1) {
+            let i = y * width + x;
+            let difference = |a: usize, b: usize, horizontal: bool| [
+                field[b][0] as f64 - field[a][0] as f64 + if horizontal { 1.0 } else { 0.0 },
+                field[b][1] as f64 - field[a][1] as f64 + if horizontal { 0.0 } else { 1.0 },
+            ];
+            let horizontal = [difference(i, i + 1, true), difference(i + width, i + width + 1, true)];
+            let vertical = [difference(i, i + width, false), difference(i + 1, i + width + 1, false)];
+            for dx in horizontal { for dy in vertical {
+                let jacobian = dx[0] * dy[1] - dx[1] * dy[0];
+                if !jacobian.is_finite() || jacobian <= 0.0 {
+                    return Err(ImageError::InvalidOperation(format!(
+                        "body geometry folds near ({x},{y}); requested adjustments and fixed selection/protection are incompatible"
+                    )));
+                }
+            }}
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn adjust_with_layered_source(
+    source: &RgbaImage,
+    params: &Value,
+    layers: &crate::BodyLayeredSource<'_>,
+) -> Result<RgbaImage, ImageError> {
+    // Validate before reading source pixels in the geometric matte refinement,
+    // and also for zero requests. Invalid prepared material is never ignored.
+    layers.validate_source(source)?;
+    let field = prepare_inverse_displacement(source, params)?;
+    let mut result = crate::composite_body_source_layers(source, layers, &field)?;
+    finish_body_blend(source, &mut result, params);
+    Ok(result)
+}
+
+pub(crate) fn prepare_inverse_displacement(
+    source: &RgbaImage,
+    params: &Value,
+) -> Result<Vec<[f32; 2]>, ImageError> {
+    let (region, warps) = adjustment_warps(source, params);
+    Ok(if warps.is_empty() {
+        vec![[0.0, 0.0]; source.width as usize * source.height as usize]
     } else {
-        separated_adjust(source, params, region, &warps, subject_mask)
-    }
+        source_motion_field(source, params, region, &warps, required_subject_mask(params)?)?
+    })
 }
 
 /// Internal memory-only entry point. Optical source layers never replace the
@@ -1377,6 +1520,38 @@ pub(crate) fn adjust_with_source_layers(
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn exterior_motion_tail_joins_with_zero_displacement_derivative() {
+        let mut alpha = vec![0.0; 100 * 100];
+        for y in 0..100 { for x in 30..70 { alpha[y * 100 + x] = 1.0; }}
+        for amount in [-1.0f32, -0.6, -0.3, 0.3, 0.6, 1.0, 2.0] {
+            let profile = ContourProfile::new(Warp {
+                axis: Axis {origin:(50.0,10.0),direction:(0.0,1.0),length:80.0,radius:30.0},
+                amount, center:0.5, extent:0.55, limb:false,
+            }, &alpha, 100, 100, false, 4.0);
+            let radius = 20.0f32;
+            let target = radius * (1.0 - amount * 0.26);
+            let start = radius.max(target) + 4.0;
+            let end = start + 4.0f32.max(2.0 * (radius - target).abs());
+            let shift = |across:f32| profile.displacement((50.0 - across,50.0)).0;
+            for boundary in [start,end] {
+                let derivative = (shift(boundary + 0.01) - shift(boundary - 0.01)) / 0.02;
+                assert!(derivative.abs() < 0.02, "tail boundary derivative={derivative}, amount={amount}");
+            }
+            assert_eq!(shift(end + 0.01), 0.0);
+        }
+    }
+
+    #[test]
+    fn field_validation_checks_all_bilinear_cell_corners_and_cross_axis_terms() {
+        assert!(validate_inverse_field(&[[0.0,0.0];4],2,2).is_ok());
+        // Top-left is regular, bottom corners fold. Checking only one corner
+        // misses this bilinear field defect.
+        assert!(validate_inverse_field(&[[0.0,0.0],[0.0,0.0],[0.0,0.0],[-2.0,0.0]],2,2).is_err());
+        // Each diagonal entry is .4, but the two cross-axis terms make the
+        // determinant negative. Per-axis displacement tests are insufficient.
+        assert!(validate_inverse_field(&[[0.0,0.0],[-0.6,0.6],[0.6,-0.6],[0.0,0.0]],2,2).is_err());
+    }
     #[test]
     fn an_occluder_crossing_the_bone_core_anchors_adjacent_sections_continuously() {
         let width = 100;

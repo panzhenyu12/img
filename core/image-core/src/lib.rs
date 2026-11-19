@@ -57,6 +57,36 @@ pub fn adjust_body_with_source_layers(
     body::adjust_with_source_layers(source, params, layers)
 }
 
+/// Apply normal body.adjust parameters to a prepared moving rear material,
+/// while keeping the front material and scene stationary. Uses the same
+/// anatomical contour driver, selection and protection as the single-layer
+/// API. Source layers must be prepared separately; no segmentation or hidden
+/// content inference is performed here.
+pub fn adjust_body_with_layered_source(
+    source: &RgbaImage,
+    params: &serde_json::Value,
+    layers: &BodyLayeredSource<'_>,
+) -> Result<RgbaImage, ImageError> {
+    validate_layer_operation("body.adjust", params)?;
+    body::adjust_with_layered_source(source, params, layers)
+}
+
+/// Prepare the ordinary anatomical inverse field in source-pixel coordinates,
+/// independently of the renderer. Useful for inspecting motion or applying
+/// the same requested geometry to explicitly prepared material layers.
+pub fn prepare_body_inverse_displacement(
+    source: &RgbaImage,
+    params: &serde_json::Value,
+) -> Result<Vec<[f32; 2]>, ImageError> {
+    validate_layer_operation("body.adjust", params)?;
+    let count = (source.width as usize).checked_mul(source.height as usize)
+        .and_then(|n| n.checked_mul(4));
+    if source.width == 0 || source.height == 0 || count != Some(source.pixels.len()) {
+        return Err(ImageError::InvalidDimensions);
+    }
+    body::prepare_inverse_displacement(source, params)
+}
+
 fn validate_layer_operation(kind: &str, params: &serde_json::Value) -> Result<(), ImageError> {
     // Use the same domain/schema checks as graph execution. No extra JSON
     // switch can silently choose a research algorithm through this API.

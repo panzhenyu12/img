@@ -37,7 +37,7 @@ fn arithmetic_error(scale: f64) -> f64 {
 }
 
 impl BodyLayeredSource<'_> {
-    fn validate(&self, source: &RgbaImage, field: &[[f32; 2]]) -> Result<usize, ImageError> {
+    pub(crate) fn validate_source(&self, source: &RgbaImage) -> Result<usize, ImageError> {
         let count = (source.width as usize)
             .checked_mul(source.height as usize)
             .filter(|&n| n > 0)
@@ -52,14 +52,13 @@ impl BodyLayeredSource<'_> {
             || self.height != source.height
             || self.front_alpha.len() != count
             || self.rear_alpha.len() != count
-            || field.len() != count
             || self.front_rgb.len() != rgb_count
             || self.rear_source_rgb.len() != rgb_count
             || self.scene_rgb.len() != rgb_count
             || source.pixels.len() != rgba_count
         {
             return Err(invalid(
-                "layered body arrays and field must match the source dimensions",
+                "layered body arrays must match the source dimensions",
             ));
         }
         if source.pixels.chunks_exact(4).any(|p| p[3] != 255) {
@@ -72,10 +71,9 @@ impl BodyLayeredSource<'_> {
             .iter()
             .chain(self.rear_alpha)
             .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
-            || field.iter().flatten().any(|v| !v.is_finite())
         {
             return Err(invalid(
-                "layered body coverage and inverse field must be finite; coverage must be in [0,1]",
+                "layered body coverage must be finite and in [0,1]",
             ));
         }
         if self
@@ -134,7 +132,12 @@ pub fn composite_body_source_layers(
     layers: &BodyLayeredSource<'_>,
     inverse_displacement: &[[f32; 2]],
 ) -> Result<RgbaImage, ImageError> {
-    let count = layers.validate(source, inverse_displacement)?;
+    let count = layers.validate_source(source)?;
+    if inverse_displacement.len() != count
+        || inverse_displacement.iter().flatten().any(|v| !v.is_finite())
+    {
+        return Err(invalid("layered body inverse field must be finite and match the source dimensions"));
+    }
     let width = source.width as usize;
     let height = source.height as usize;
     let mut result = source.clone();

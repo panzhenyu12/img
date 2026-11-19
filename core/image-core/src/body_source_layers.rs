@@ -126,25 +126,13 @@ pub(super) fn render(
 ) -> Result<RgbaImage, ImageError> {
     let width = source.width as usize;
     let height = source.height as usize;
-    let target = super::geometry_target(source, params, subject_mask);
-    let controls = super::motion_controls(source, params, warps, subject_mask, &target);
+    let field = super::source_motion_field(source, params, region, warps, subject_mask)?;
     let mut result = source.clone();
     for y in 0..height {
         for x in 0..width {
             let i = y * width + x;
-            if controls.user_protected[i] {
-                continue;
-            }
-            let d = super::contour_displacement(
-                region,
-                &controls.measured,
-                (x as f32 + 0.5, y as f32 + 0.5),
-                controls.selected[i],
-                controls.protect_fade[i],
-                width as f32,
-                height as f32,
-            );
-            if d.0 == 0.0 && d.1 == 0.0 {
+            let d = field[i];
+            if d == [0.0, 0.0] {
                 continue;
             }
             // Geometric selection and explicit protection govern motion.
@@ -155,8 +143,8 @@ pub(super) fn render(
                 source,
                 layers.alpha,
                 &layers.background,
-                (x as f32 + d.0).clamp(0.0, source.width as f32 - 1.0),
-                (y as f32 + d.1).clamp(0.0, source.height as f32 - 1.0),
+                (x as f32 + d[0]).clamp(0.0, source.width as f32 - 1.0),
+                (y as f32 + d[1]).clamp(0.0, source.height as f32 - 1.0),
             );
             for c in 0..3 {
                 result.pixels[i * 4 + c] = super::byte(
