@@ -429,6 +429,19 @@ fn vertical_contour_offset(frame: Frame, p: Point, values: &Value) -> f32 {
             - percent(values, "forehead") * 0.060 * (1.0 - smoothstep(0.0, 0.30, y)))
 }
 
+/// Bound the accumulated anatomical lateral request without introducing the
+/// derivative jump of `clamp`. Multiple controls can legitimately overlap
+/// (for example faceWidth + jaw + cheekbones); a hard cap at that join creates
+/// a visible curvature kink which a later transport field cannot remove.
+/// `tanh` keeps the small-request slope unchanged while approaching the same
+/// safety bound smoothly for extreme combinations.
+fn smooth_lateral_limit(value: f32, limit: f32) -> f32 {
+    if !value.is_finite() || !limit.is_finite() || limit <= 0.0 {
+        return 0.0;
+    }
+    limit * libm::tanhf(value / limit)
+}
+
 fn target_contour(polygon: &[Point], frame: Frame, values: &Value) -> Vec<Point> {
     polygon
         .iter()
@@ -448,7 +461,7 @@ fn target_contour(polygon: &[Point], frame: Frame, values: &Value) -> Vec<Point>
             inward -= percent(values, "foreheadWidth") * 0.060 * profile(y, 0.0, 0.16, 0.36);
             inward -= percent(values, "chinWidth") * 0.050 * profile(y, 0.69, 0.89, 1.04);
             inward += percent(values, "chinPoint") * 0.055 * profile(y, 0.72, 0.93, 1.02);
-            let du = -side * frame.width() * inward.clamp(-0.11, 0.11) * lateral;
+            let du = -side * frame.width() * smooth_lateral_limit(inward, 0.11) * lateral;
             let dv = vertical_contour_offset(frame, p, values);
             frame.position(u + du, v + dv)
         })
@@ -507,6 +520,17 @@ struct ContourGrid {
     height: usize,
     samples: Vec<Option<(Point, f32)>>,
 }
+
+/// Blend the exact contour transport into the cached grid transport over a
+/// finite band. A hard branch at the old contour cutoff makes neighbouring
+/// pixels use unrelated inverse positions and is a direct source of one-pixel
+/// cracks. Both inputs are displacement vectors in the same destination frame.
+fn blend_grid_motion(exact: Point, grid: Point, distance: f32, step: f32) -> Point {
+    let cutoff = 3.0 + step * 2.0_f32.sqrt();
+    let transition = smoothstep((cutoff - step).max(0.0), cutoff + step, distance);
+    add(scale(exact, 1.0 - transition), scale(grid, transition))
+}
+
 impl ContourGrid {
     fn new(origin: Point, w: usize, h: usize) -> Self {
         let step = 4.0;
@@ -528,7 +552,6 @@ impl ContourGrid {
         let (x1, y1) = ((x0 + 1).min(self.width - 1), (y0 + 1).min(self.height - 1));
         let (tx, ty) = (x - x0 as f32, y - y0 as f32);
         let mut movement = (0.0, 0.0);
-        let mut distance = 0.0;
         for (x, y, weight) in [
             (x0, y0, (1.0 - tx) * (1.0 - ty)),
             (x1, y0, tx * (1.0 - ty)),
@@ -543,11 +566,9 @@ impl ContourGrid {
                 ))
             });
             movement = add(movement, scale(sample.0, weight));
-            distance += sample.1 * weight;
         }
-        if distance < 3.0 + self.step * 2.0_f32.sqrt() {
-            movement = field.inverse_unanchored(p).0;
-        }
+        let exact = field.inverse_unanchored(p);
+        movement = blend_grid_motion(exact.0, movement, exact.1, self.step);
         scale(movement, field.anchor_weight(p))
     }
 }
@@ -5123,6 +5144,38 @@ mod tests {
             params["adjustments"] = json!({key:0});
             assert_eq!(adjust(&source, &params).unwrap(), source);
         }
+    }
+
+    #[test]
+    fn lateral_limit_is_smooth_when_multiple_face_controls_reach_the_bound() {
+        let limit = 0.11;
+        let samples = [-0.111_f32, -0.11, -0.109, 0.109, 0.11, 0.111];
+        let values: Vec<_> = samples
+            .into_iter()
+            .map(|value| smooth_lateral_limit(value, limit))
+            .collect();
+        // The bounded target remains strictly monotone in both directions;
+        // a hard clamp would make the slope exactly zero after the cap.
+        assert!(values.windows(2).all(|pair| pair[1] > pair[0]));
+        let left_slope = (values[2] - values[1]) / 0.001;
+        let right_slope = (values[4] - values[3]) / 0.001;
+        assert!(left_slope > 0.25 && right_slope > 0.25);
+        assert!(values.iter().all(|value| value.abs() < limit));
+    }
+
+    #[test]
+    fn contour_grid_transport_has_no_cutoff_jump() {
+        let exact = (2.0, -1.0);
+        let grid = (2.8, -0.4);
+        let step = 4.0;
+        let cutoff = 3.0 + step * 2.0_f32.sqrt();
+        let left = blend_grid_motion(exact, grid, cutoff - 1e-3, step);
+        let right = blend_grid_motion(exact, grid, cutoff + 1e-3, step);
+        let jump = sub(right, left).0.hypot(sub(right, left).1);
+        assert!(jump < 0.001, "grid/exact cutoff jump was {jump}");
+        let far = blend_grid_motion(exact, grid, cutoff + step * 2.0, step);
+        assert!((far.0 - grid.0).abs() < 1e-5);
+        assert!((far.1 - grid.1).abs() < 1e-5);
     }
 
     #[test]
