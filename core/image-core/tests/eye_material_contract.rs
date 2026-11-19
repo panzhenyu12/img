@@ -12,7 +12,7 @@ fn fixture() -> (RgbaImage, Value) {
         let points: Vec<_> = (0..32)
             .map(|i| {
                 let angle = i as f64 * std::f64::consts::TAU / 32.0;
-                json!({"x":(cx+24.0*angle.cos())/256.0,"y":(76.0+6.0*angle.sin())/160.0})
+                json!({"x":(cx+24.0*angle.cos())/256.0,"y":(76.0+14.0*angle.sin())/160.0})
             })
             .collect();
         json!({"shape":"polygon","points":points,"feather":0})
@@ -126,6 +126,38 @@ fn measured_width_composition_keeps_size_motion_without_extra_iris_stretch() {
             }
             assert!(size_changes > 20, "eyeSize still changes iris material");
         }
+    }
+}
+
+#[test]
+fn measured_height_public_graph_moves_lid_without_stretching_observed_iris() {
+    let (source, mut params) = fixture();
+    for amount in [-30, 30] {
+        params["adjustments"] = json!({"eyeHeight": amount});
+        let output = run(&source, "feature.adjust", &params).unwrap();
+        let mut observed = 0;
+        let mut changed_lid = 0;
+        for (cx, iris_cy) in [(80, 76), (176, 76)] {
+            for y in iris_cy - 7..=iris_cy + 7 {
+                for x in cx - 7..=cx + 7 {
+                    let dx = (x - cx) as f64;
+                    let dy = (y - iris_cy) as f64;
+                    if dx * dx + dy * dy < 36.0 {
+                        let i = (y * 256 + x) as usize * 4;
+                        observed += 1;
+                        assert_eq!(&output.pixels[i..i + 4], &source.pixels[i..i + 4]);
+                    }
+                }
+            }
+            for y in [iris_cy - 12, iris_cy + 12] {
+                for x in cx - 12..=cx + 12 {
+                    let i = (y * 256 + x) as usize * 4;
+                    changed_lid += usize::from(output.pixels[i..i + 4] != source.pixels[i..i + 4]);
+                }
+            }
+        }
+        assert!(observed > 100);
+        assert!(changed_lid > 10, "eyeHeight must move the lid support");
     }
 }
 

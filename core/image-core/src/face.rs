@@ -158,6 +158,30 @@ fn profile(y: f32, start: f32, peak: f32, end: f32) -> f32 {
         1.0 - smoothstep(peak, end, y)
     }
 }
+
+/// The adaptive contour profile is safe to select only when the browser has
+/// supplied an observed contour and independent eye/lip landmarks. Legacy
+/// hand-drawn or synthetic face polygons do not contain enough anatomy to
+/// infer local radii, so they retain the conservative axial profile.
+fn adaptive_face_evidence(semantics: Option<&Value>) -> bool {
+    let Some(masks) = semantics.and_then(Value::as_object) else {
+        return false;
+    };
+    let polygon_with_points = |name: &str, minimum_points: usize| {
+        masks
+            .get(name)
+            .filter(|mask| mask.get("shape").and_then(Value::as_str) == Some("polygon"))
+            .and_then(|mask| mask.get("points"))
+            .and_then(Value::as_array)
+            .is_some_and(|points| points.len() >= minimum_points)
+    };
+    // A short hand drawn polygon does not contain enough curvature samples to
+    // estimate section radii; keep the legacy path for those explicit inputs.
+    polygon_with_points("faceContour", 24)
+        && polygon_with_points("leftEye", 3)
+        && polygon_with_points("rightEye", 3)
+        && polygon_with_points("lips", 3)
+}
 fn points(mask: &Value, w: f32, h: f32) -> Vec<Point> {
     mask.get("points")
         .and_then(Value::as_array)
@@ -2052,16 +2076,11 @@ fn adjust_impl(
             return Ok(output);
         }
     }
-    let target = target_contour(&polygon, frame, values);
-    // Native research replay only. The parameter is deliberately absent from
-    // the public protocol and this branch does not exist in production builds.
-    #[cfg(test)]
-    let target = if params
-        .get("experimentalFaceProfile")
-        .and_then(Value::as_str)
-        == Some("segmented-lateral-v1")
+    let legacy_target = target_contour(&polygon, frame, values);
+    let target = if adaptive_face_evidence(semantics)
+        && params.get("__legacyFaceTarget").and_then(Value::as_bool) != Some(true)
     {
-        crate::face_profile::target_contour(
+        crate::face_profile::target_contour_adaptive(
             &polygon,
             (
                 frame.origin,
@@ -2077,6 +2096,43 @@ fn adjust_impl(
             h,
             values,
         )
+        .unwrap_or_else(|_| legacy_target.clone())
+    } else {
+        legacy_target
+    };
+    // Native research replay only. The parameter is deliberately absent from
+    // the public protocol and this branch does not exist in production builds.
+    #[cfg(test)]
+    let target = if params
+        .get("experimentalFaceProfile")
+        .and_then(Value::as_str)
+        == Some("segmented-lateral-v1")
+            || params
+                .get("experimentalFaceProfile")
+                .and_then(Value::as_str)
+                == Some("adaptive-lateral-v2")
+    {
+        let frame_tuple = (
+            frame.origin,
+            frame.across,
+            frame.down,
+            frame.left,
+            frame.right,
+            frame.top,
+            frame.bottom,
+        );
+        let mode = params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str);
+        if mode == Some("adaptive-lateral-v2") {
+            crate::face_profile::target_contour_adaptive(
+                &polygon, frame_tuple, semantics, w, h, values,
+            )
+        } else {
+            crate::face_profile::target_contour(
+                &polygon, frame_tuple, semantics, w, h, values,
+            )
+        }
         .map_err(invalid)?
     } else {
         target

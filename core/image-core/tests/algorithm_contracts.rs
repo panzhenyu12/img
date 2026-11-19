@@ -208,7 +208,15 @@ fn ocular_occlusion_controls_do_not_export_the_generic_iris_stretch() {
             let graph = json!({"operations":[{"type":"feature.adjust",
                 "params":feature_params(key, amount, "leftEye")}]}).to_string();
             let error = apply_graph_json(&src, &graph).unwrap_err();
-            assert!(error.to_string().contains(&format!("feature.adjust.{key} has no validated algorithm")));
+            if key == "eyeHeight" {
+                assert!(error
+                    .to_string()
+                    .contains("feature.adjust.eyeHeight requires measured eyeGeometry"));
+            } else {
+                assert!(error
+                    .to_string()
+                    .contains(&format!("feature.adjust.{key} has no validated algorithm")));
+            }
         }
     }
 }
@@ -326,6 +334,18 @@ fn eye_and_mouth_size_controls_expand_real_silhouettes() {
         p["semanticMasks"][name] = rect(0.43, 0.43, 0.14, 0.14);
         if key.starts_with("eye") {
             p["semanticMasks"]["rightEye"] = rect(0.85, 0.43, 0.1, 0.14);
+            if key == "eyeHeight" {
+                p["eyeGeometry"] = json!({
+                    "leftEye": {"iris": {"center": {"x": 0.5, "y": 0.5}, "boundary": [
+                        {"x": 0.54, "y": 0.5}, {"x": 0.5, "y": 0.46},
+                        {"x": 0.46, "y": 0.5}, {"x": 0.5, "y": 0.54}
+                    ]}},
+                    "rightEye": {"iris": {"center": {"x": 0.9, "y": 0.5}, "boundary": [
+                        {"x": 0.94, "y": 0.5}, {"x": 0.9, "y": 0.46},
+                        {"x": 0.86, "y": 0.5}, {"x": 0.9, "y": 0.54}
+                    ]}}
+                });
+            }
         }
         let larger = run(&src, "feature.adjust", p.clone());
         p["adjustments"][key] = json!(-80);

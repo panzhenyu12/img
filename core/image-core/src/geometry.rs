@@ -866,6 +866,7 @@ fn eye_width_material(
     frame: FeatureFrame,
     radius: (f32, f32),
     forward_scale: f32,
+    axis_vertical: bool,
 ) -> Result<Option<(EyeWidthMaterial, (f32, f32))>, String> {
     let Some(raw) = p
         .get("eyeGeometry")
@@ -945,7 +946,10 @@ fn eye_width_material(
     let expansion = forward_scale.exp();
     let requested_extent = points
         .iter()
-        .map(|&(x, y)| (x * expansion / radius.0).hypot(y / radius.1))
+        .map(|&(x, y)| {
+            let (x, y) = if axis_vertical { (x, y * expansion) } else { (x * expansion, y) };
+            (x / radius.0).hypot(y / radius.1)
+        })
         .fold(source_extent, f32::max);
     let outer = requested_extent + (1.0 - source_extent);
     material.support_inner = (requested_extent / outer).powi(2);
@@ -953,10 +957,18 @@ fn eye_width_material(
     for side in [-1.0, 1.0] {
         let &canthus = points
             .iter()
-            .max_by(|a, b| (side * a.0).total_cmp(&(side * b.0)))
+            .max_by(|a, b| {
+                let av = if axis_vertical { side * a.1 } else { side * a.0 };
+                let bv = if axis_vertical { side * b.1 } else { side * b.0 };
+                av.total_cmp(&bv)
+            })
             .unwrap();
         let from = to_world(canthus);
-        let to = to_world((canthus.0 * expansion, canthus.1));
+        let to = if axis_vertical {
+            to_world((canthus.0, canthus.1 * expansion))
+        } else {
+            to_world((canthus.0 * expansion, canthus.1))
+        };
         let a = material.ellipse_coordinate(from);
         let b = material.ellipse_coordinate(to);
         let d = (b.0 - a.0, b.1 - a.1);
@@ -1639,9 +1651,9 @@ pub(crate) fn local_adjust_kind(
             } else {
                 0.0
             };
-            let eye_width_material = if semantic_features && key == "eyeWidth" {
+            let eye_width_material_opt = if semantic_features && key == "eyeWidth" {
                 let name = if cx < 0.5 { "leftEye" } else { "rightEye" };
-                match eye_width_material(p, name, source, frame, radius, -sx * amount) {
+                match eye_width_material(p, name, source, frame, radius, -sx * amount, false) {
                     Ok(Some((material, expanded))) => {
                         radius = expanded;
                         Some(std::sync::Arc::new(material))
@@ -1655,7 +1667,24 @@ pub(crate) fn local_adjust_kind(
             } else {
                 None
             };
-            let protect_width_brows = eye_width_material.is_some();
+            let eye_height_material = if semantic_features && key == "eyeHeight" {
+                let name = if cx < 0.5 { "leftEye" } else { "rightEye" };
+                match eye_width_material(p, name, source, frame, radius, -sy * amount, true) {
+                    Ok(Some((material, expanded))) => {
+                        radius = expanded;
+                        Some(std::sync::Arc::new(material))
+                    }
+                    Ok(None) => None,
+                    Err(error) => {
+                        eye_width_error = Some(error);
+                        return;
+                    }
+                }
+            } else {
+                None
+            };
+            let eye_material = eye_width_material_opt.or(eye_height_material);
+            let protect_width_brows = eye_material.is_some();
             changes.push(LocalWarp {
                 center: frame.center,
                 across: frame.across,
@@ -1667,7 +1696,7 @@ pub(crate) fn local_adjust_kind(
                 whole_eye_size: semantic_features && key == "eyeSize",
                 whole_eye_tilt: semantic_features && key == "eyeTilt",
                 whole_eye_spacing: semantic_features && key == "eyeSpacing",
-                eye_width_material,
+                eye_width_material: eye_material,
                 whole_eye_inner,
                 eye_size_brows: (semantic_features
                     && (matches!(key, "eyeSize" | "eyeTilt" | "eyeSpacing")

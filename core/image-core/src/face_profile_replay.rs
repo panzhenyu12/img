@@ -243,25 +243,44 @@ fn curve_diagnostic(source: &RgbaImage, params: &Value, mode: &str) -> Result<Va
     );
     let values = params.get("adjustments").unwrap_or(params);
     let baseline = target_contour(&polygon, frame, values);
-    let candidate = if mode != "segmented-lateral-v1" {
+    let candidate = if !["segmented-lateral-v1", "adaptive-lateral-v2"].contains(&mode) {
         Ok(baseline.clone())
     } else {
-        crate::face_profile::target_contour(
-            &polygon,
-            (
-                frame.origin,
-                frame.across,
-                frame.down,
-                frame.left,
-                frame.right,
-                frame.top,
-                frame.bottom,
-            ),
-            semantics,
-            w,
-            h,
-            values,
-        )
+        if mode == "adaptive-lateral-v2" {
+            crate::face_profile::target_contour_adaptive(
+                &polygon,
+                (
+                    frame.origin,
+                    frame.across,
+                    frame.down,
+                    frame.left,
+                    frame.right,
+                    frame.top,
+                    frame.bottom,
+                ),
+                semantics,
+                w,
+                h,
+                values,
+            )
+        } else {
+            crate::face_profile::target_contour(
+                &polygon,
+                (
+                    frame.origin,
+                    frame.across,
+                    frame.down,
+                    frame.left,
+                    frame.right,
+                    frame.top,
+                    frame.bottom,
+                ),
+                semantics,
+                w,
+                h,
+                values,
+            )
+        }
     };
     let candidate_metrics = match &candidate {
         Ok(target) => contour_metrics(&polygon, target),
@@ -350,6 +369,7 @@ fn execute(spec_path: &Path) -> Result<(), String> {
         .map_err(|e| format!("invalid replay spec: {e}"))?;
     if ![
         "segmented-lateral-v1",
+        "adaptive-lateral-v2",
         "source-fringe-v1",
         "feature-distance-v1",
         "supported-rbf-v1",
@@ -374,6 +394,7 @@ fn execute(spec_path: &Path) -> Result<(), String> {
     }
     let base = spec_path.parent().unwrap_or_else(|| Path::new("."));
     let current_baseline = [
+        "adaptive-lateral-v2",
         "shared-cheek-v1",
         "shared-cheek-curve-v4",
         "shared-cheek-ear-v1",
@@ -530,6 +551,9 @@ fn execute(spec_path: &Path) -> Result<(), String> {
                     if !current_baseline {
                         params["__legacyUpperShared"] = json!(true);
                     }
+                    // Keep the comparison baseline on the pre-adaptive target
+                    // so a candidate replay measures the contour change itself.
+                    params["__legacyFaceTarget"] = json!(true);
                     let baseline = run_variant(
                         &source,
                         &params,
@@ -551,6 +575,10 @@ fn execute(spec_path: &Path) -> Result<(), String> {
                         .as_object_mut()
                         .unwrap()
                         .remove("__legacyUpperShared");
+                    params
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("__legacyFaceTarget");
                     params["experimentalFaceProfile"] = json!(spec.candidate);
                     if let Some(path) = &case.source_motion_interface {
                         params["__sourceMotionInterface"] = serde_json::from_slice(

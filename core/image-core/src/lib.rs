@@ -14,7 +14,6 @@ mod eye_localize;
 mod face;
 pub(crate) mod face_matting;
 mod face_ownership;
-#[cfg(test)]
 mod face_profile;
 mod face_source_fringe;
 mod face_transport;
