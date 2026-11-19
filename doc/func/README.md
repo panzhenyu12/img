@@ -124,3 +124,4 @@ FUNC-编号-功能短名.md
 - [FUNC-080 同源瘦脸背景重建复用（保持RGBA，重复调用约5.40→2.43秒）](FUNC-080-source-background-cache.md)
 - [FUNC-081 眼镜与耳饰的完整组件源运动许可](FUNC-081-source-attachment-subtypes.md)
 - [FUNC-082 固定附件侧脸曲线的数值可行性（真实双向失败修复）](FUNC-082-face-curve-source-witness.md)
+- [FUNC-083 身形源材料分层与同场因果对照（人工单图轻档通过，自动归属仍失败）](FUNC-083-body-source-material-control.md)
