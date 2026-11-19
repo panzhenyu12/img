@@ -117,3 +117,4 @@ FUNC-编号-功能短名.md
 
 - [FUNC-074 源虹膜测量约束的眼宽公共调用](FUNC-074-measured-eye-width-public-contract.md)
 - [FUNC-075 Rust 内存前后材质分层合成](FUNC-075-body-layered-compositor.md)
+- [FUNC-076 源轮廓混色与背景上下文配对修正（隔离实拍候选）](FUNC-076-source-optical-context-repair.md)
