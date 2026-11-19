@@ -36,7 +36,8 @@ pub use eye_source::{prepare_eye_closure, prepare_eye_closure_source, EyeSourceG
 pub use geometry::eye_closure_field::{prepare_eye_closure_field,
     eye_closure_params_from_landmarks, EyeClosureField};
 pub use model_inpaint::{composite_model_inpaint, prepare_model_inpaint, InpaintMasks};
-pub use face::{ObservationRegion as FaceObservationRegion, SourceLayers as FaceSourceLayers};
+pub use face::{ObservationRegion as FaceObservationRegion, SourceLayers as FaceSourceLayers,
+    FaceSourceCache, FaceSourceCacheStats};
 pub use body::SourceLayers as BodySourceLayers;
 pub use body_layered_compositor::{
     composite_body_source_layers, composite_body_source_layers_with_reconstruction,
@@ -55,6 +56,20 @@ pub fn adjust_face_with_source_layers(
 ) -> Result<RgbaImage, ImageError> {
     validate_layer_operation("face.adjust", params)?;
     face::adjust_with_source_layers(source, params, layers)
+}
+
+/// The same face operation with caller-owned, single-entry source reuse.
+/// Validates each request normally. Only an exactly matching background
+/// reconstruction and initial pairing may be reused; scene application,
+/// requested geometry, field solving and sampling still run for every edit.
+pub fn adjust_face_with_source_cache(
+    source: &RgbaImage,
+    params: &serde_json::Value,
+    layers: &FaceSourceLayers<'_>,
+    cache: &mut FaceSourceCache,
+) -> Result<RgbaImage, ImageError> {
+    validate_layer_operation("face.adjust", params)?;
+    face::adjust_with_source_cache(source, params, layers, cache)
 }
 
 /// Edit an observed body material layer independently of its anatomical

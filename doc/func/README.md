@@ -121,3 +121,4 @@ FUNC-编号-功能短名.md
 - [FUNC-077 显式字节量化源重建（普通Rust入口，瑜伽轻度收腰验证）](FUNC-077-quantized-source-reconstruction.md)
 - [FUNC-078 眼部源材料人工修正（独立算法，自动识别失败仍保留）](FUNC-078-eye-source-material-correction.md)
 - [FUNC-079 普通 Rust 眼部轻闭合（源准备一次、整数轻档候选，迁移待验收）](FUNC-079-native-eye-closure.md)
+- [FUNC-080 同源瘦脸背景重建复用（保持RGBA，重复调用约5.40→2.43秒）](FUNC-080-source-background-cache.md)

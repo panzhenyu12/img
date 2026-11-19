@@ -62,6 +62,10 @@ mod source_plate;
 mod source_layers;
 pub use source_layers::{ObservationRegion, SourceLayers};
 
+#[path = "face_source_cache.rs"]
+mod source_cache;
+pub use source_cache::{FaceSourceCache, FaceSourceCacheStats};
+
 #[path = "face_optical_domain.rs"]
 mod optical_domain;
 
@@ -1765,22 +1769,35 @@ fn validate_motion_interface(source: &RgbaImage, params: &Value, interface: Opti
 }
 
 pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, ImageError> {
-    adjust_impl(source, params, None)
+    adjust_impl(source, params, None, None)
 }
 
 pub(crate) fn adjust_with_source_layers(
     source: &RgbaImage, params: &Value, layers: &SourceLayers<'_>,
+) -> Result<RgbaImage, ImageError> {
+    adjust_with_source_cache_impl(source, params, layers, None)
+}
+
+pub(crate) fn adjust_with_source_cache(
+    source: &RgbaImage, params: &Value, layers: &SourceLayers<'_>, cache: &mut FaceSourceCache,
+) -> Result<RgbaImage, ImageError> {
+    adjust_with_source_cache_impl(source, params, layers, Some(cache))
+}
+
+fn adjust_with_source_cache_impl(
+    source: &RgbaImage, params: &Value, layers: &SourceLayers<'_>, cache: Option<&mut FaceSourceCache>,
 ) -> Result<RgbaImage, ImageError> {
     layers.validate(source)?;
     validate_motion_interface(source, params, layers.motion_interface)?;
     if percent(params.get("adjustments").unwrap_or(params), "symmetry").abs() > 1e-6 {
         return Err(invalid("source-layer contour editing requires symmetry as a separate source preparation step"));
     }
-    adjust_impl(source, params, Some(layers))
+    adjust_impl(source, params, Some(layers), cache)
 }
 
 fn adjust_impl(
     source: &RgbaImage, params: &Value, source_layers: Option<&SourceLayers<'_>>,
+    mut source_cache: Option<&mut FaceSourceCache>,
 ) -> Result<RgbaImage, ImageError> {
     #[cfg(not(target_arch = "wasm32"))]
     let mut profile_start = std::time::Instant::now();
@@ -1944,7 +1961,7 @@ fn adjust_impl(
             // matting and source-forward transport path. The only change is
             // the observed shared hair/skin band; no output pixels are painted
             // by the candidate itself.
-            return adjust_impl(source, &prepared, source_layers);
+            return adjust_impl(source, &prepared, source_layers, source_cache);
         }
     }
     let manual = semantic_outline.is_none();
@@ -1987,7 +2004,7 @@ fn adjust_impl(
             }
             lower_params["opacity"] = json!(100);
             lower_params["blendMode"] = json!("normal");
-            let lower = adjust_impl(source, &lower_params, source_layers)?;
+            let lower = adjust_impl(source, &lower_params, source_layers, source_cache.as_deref_mut())?;
             let rendered = hairline.render(&lower);
             let mut composite_params = support_params.into_owned();
             if composite_params
@@ -2934,6 +2951,7 @@ fn adjust_impl(
             *alpha = 0.0;
         }
     }
+    mark!("source material ownership");
     // Establish a stationary scene estimate from the unedited photograph.
     // The decoded edge can carry a skin/shadow contribution even where every
     // semantic mask has already reached zero. Such a contribution must travel
@@ -3034,6 +3052,7 @@ fn adjust_impl(
             e.background.clone()
         }
     });
+    mark!("source scene evidence");
     let mut color_layers = if stable_source_layers && joint_neck {
         optical_domain::estimate(&crop, &color_alpha)
     } else {
@@ -3102,21 +3121,22 @@ fn adjust_impl(
         let source_holes: Vec<_> = (0..count)
             .map(|i| color_alpha[i] > 1e-6 && !frozen[i])
             .collect();
-        paired_background = reconstruct_source_background(
-            &crop,
-            &source_holes,
-            &color_alpha,
-            &donor_frozen,
-            &donor_excluded,
-            &known_layer,
-            color_layers.as_ref().map(|(_, b)| b),
-            reconstruction_scene.as_deref(),
-            independent_scene_color,
-        )?;
-        layer_pair::pair(&crop, &color_alpha, &mut paired_background)
+        let input = source_cache::BackgroundInput {
+            source: &crop, holes: &source_holes, alpha: &color_alpha,
+            donor_frozen: &donor_frozen, donor_excluded: &donor_excluded,
+            known_layer: &known_layer, estimated_background: color_layers.as_ref().map(|(_, b)| b),
+            reconstruction_scene: reconstruction_scene.as_deref(), independent_scene_color,
+        };
+        let (background, foreground) = match source_cache.as_deref_mut() {
+            Some(cache) => cache.reconstruct_and_pair(input)?,
+            None => source_cache::reconstruct_and_pair(input)?,
+        };
+        paired_background = background;
+        foreground
     } else {
         None
     };
+    mark!("source background reconstruction and pair");
     #[cfg(test)]
     if let Some(path) = params.get("__sourcePlatePrior").and_then(Value::as_str) {
         if paired_foreground.is_none() {
@@ -3135,6 +3155,7 @@ fn adjust_impl(
         }
         layers.apply_scene(&crop, &mut color_alpha, &mut paired_background, &frozen, (left, top))?;
     }
+    mark!("source scene prior");
     let foreground = paired_foreground
         .as_ref()
         .or_else(|| color_layers.as_ref().map(|(f, _)| f))
@@ -3228,6 +3249,7 @@ fn adjust_impl(
         )
         .map_err(|error| invalid(&error.to_string()))?;
     }
+    mark!("motion domain");
     let velocity = if joint_neck {
         // One source-forward velocity authority. No nearest-segment/MLS
         // inverse offset enters the velocity. Positive control weights avoid RBF
@@ -3703,6 +3725,7 @@ fn adjust_impl(
             ch,
             vec![(0.0, 0.0); count],
         );
+        mark!("motion controls and support");
         #[cfg(test)]
         let mut control_diagnostics = Vec::new();
         for iteration in 0..5 {
@@ -3850,6 +3873,7 @@ fn adjust_impl(
     } else {
         None
     };
+    mark!("velocity grid solve");
     let mut grid =
         (!joint_neck).then(|| ContourGrid::new((left as f32 + 0.5, top as f32 + 0.5), cw, ch));
     let mut samples = vec![([0.0; 4], 0.0); count];

@@ -1,7 +1,7 @@
 //! Tests linked to the ordinary rlib: cfg(test) research switches are absent.
 use image_core::{
-    adjust_body_with_source_layers, adjust_face_with_source_layers, BodySourceLayers,
-    FaceObservationRegion, FaceSourceLayers, RgbaImage,
+    adjust_body_with_source_layers, adjust_face_with_source_cache, adjust_face_with_source_layers,
+    BodySourceLayers, FaceObservationRegion, FaceSourceCache, FaceSourceLayers, RgbaImage,
 };
 use serde_json::json;
 
@@ -218,4 +218,107 @@ fn ordinary_face_api_moves_the_contour_both_ways_and_honors_user_protection() {
         );
     }
     assert_eq!(source, original);
+}
+
+#[test]
+fn face_source_cache_preserves_both_directions_and_rebuilds_for_protection_changes() {
+    let (source, scene, alpha, mut params) = analytic_portrait();
+    let layers = FaceSourceLayers {
+        observed_source: &source,
+        optical_alpha: &alpha,
+        observation: FaceObservationRegion {
+            left: 0,
+            top: 0,
+            width: source.width,
+            height: source.height,
+        },
+        scene: &scene,
+        motion_interface: None,
+        moving_attachment_support: None,
+    };
+    let mut cache = FaceSourceCache::default();
+    for value in [0, 30, -30, 60, -60, 30] {
+        params["adjustments"]["faceWidth"] = json!(value);
+        let expected = adjust_face_with_source_layers(&source, &params, &layers).unwrap();
+        let actual = adjust_face_with_source_cache(&source, &params, &layers, &mut cache).unwrap();
+        assert_eq!(actual, expected, "RGBA parity at faceWidth {value}");
+        if value == 0 {
+            assert_eq!(cache.stats().misses, 0);
+        }
+    }
+    assert_eq!(cache.stats().misses, 1);
+    assert_eq!(cache.stats().hits, 4);
+
+    params["protectMask"] =
+        json!({"shape":"rect","region":{"x":0.25,"y":0.35,"width":0.125,"height":0.25}});
+    let expected = adjust_face_with_source_layers(&source, &params, &layers).unwrap();
+    let actual = adjust_face_with_source_cache(&source, &params, &layers, &mut cache).unwrap();
+    assert_eq!(actual, expected);
+    assert_eq!(
+        cache.stats().misses,
+        2,
+        "changed source protection must not reuse the old reconstruction"
+    );
+    for y in 45..76 {
+        for x in 24..36 {
+            let i = (y * 96 + x) * 4;
+            assert_eq!(&actual.pixels[i..i + 4], &source.pixels[i..i + 4]);
+        }
+    }
+}
+
+#[test]
+fn face_source_cache_never_skips_source_validation_or_later_scene_application() {
+    let (source, scene, alpha, mut params) = analytic_portrait();
+    let mut layers = FaceSourceLayers {
+        observed_source: &source,
+        optical_alpha: &alpha,
+        observation: FaceObservationRegion {
+            left: 0,
+            top: 0,
+            width: source.width,
+            height: source.height,
+        },
+        scene: &scene,
+        motion_interface: None,
+        moving_attachment_support: None,
+    };
+    let mut cache = FaceSourceCache::default();
+    let original_scene_result =
+        adjust_face_with_source_cache(&source, &params, &layers, &mut cache).unwrap();
+    let before = cache.stats();
+    let mut unrelated = source.clone();
+    unrelated.pixels[0] += 1;
+    assert!(adjust_face_with_source_cache(&unrelated, &params, &layers, &mut cache).is_err());
+    let bad_alpha = vec![f32::NAN; alpha.len()];
+    layers.optical_alpha = &bad_alpha;
+    assert!(adjust_face_with_source_cache(&source, &params, &layers, &mut cache).is_err());
+    layers.optical_alpha = &alpha;
+    params["__physicalAlpha"] = json!("forbidden");
+    assert!(adjust_face_with_source_cache(&source, &params, &layers, &mut cache).is_err());
+    params.as_object_mut().unwrap().remove("__physicalAlpha");
+    assert_eq!(
+        cache.stats(),
+        before,
+        "validation errors cannot consume a cached source result"
+    );
+
+    // This external scene prior is applied AFTER the cached pure stage. Its
+    // change must remain visible to the ordinary compositor on a cache hit.
+    let mut revised_scene = scene.clone();
+    for y in 35..80 {
+        for x in 20..30 {
+            revised_scene.pixels[(y * 96 + x) * 4] = 65;
+        }
+    }
+    layers.scene = &revised_scene;
+    let expected = adjust_face_with_source_layers(&source, &params, &layers).unwrap();
+    assert_ne!(
+        expected, original_scene_result,
+        "scene-prior mutation must affect this fixture's actual output"
+    );
+    let actual = adjust_face_with_source_cache(&source, &params, &layers, &mut cache).unwrap();
+    assert_eq!(actual, expected);
+    assert_eq!(cache.stats().hits, before.hits + 1);
+    assert_eq!(cache.stats().misses, before.misses);
 }

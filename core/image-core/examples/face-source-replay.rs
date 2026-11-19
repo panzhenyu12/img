@@ -3,7 +3,8 @@
 
 use clap::Parser;
 use image_core::{
-    adjust_face_with_source_layers, EditGraph, FaceObservationRegion, FaceSourceLayers, RgbaImage,
+    adjust_face_with_source_cache, adjust_face_with_source_layers, EditGraph,
+    FaceObservationRegion, FaceSourceCache, FaceSourceLayers, RgbaImage,
 };
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{json, Map, Value};
@@ -21,6 +22,10 @@ struct Args {
     /// Override the specification's outputDir; the directory must not exist.
     #[arg(long)]
     output_dir: Option<PathBuf>,
+    /// Reuse the source background solve across requests for each case.
+    /// The first nonzero request populates the cache; all motion is recomputed.
+    #[arg(long)]
+    cache_source: bool,
 }
 
 #[derive(Deserialize)]
@@ -341,9 +346,10 @@ fn run(args: Args) -> Result<(), String> {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     fs::create_dir(&output).map_err(|e| e.to_string())?;
-    let mut report = json!({"api":"image_core::adjust_face_with_source_layers","cfgTest":false,
+    let mut report = json!({"api":if args.cache_source {"image_core::adjust_face_with_source_cache"} else {"image_core::adjust_face_with_source_layers"},"cfgTest":false,
         "spec":spec_path,"outputDir":output,"imageCoreVersion":env!("CARGO_PKG_VERSION"),
         "timingScope":"native algorithm call only; excludes input decoding and PNG encoding",
+        "sourceCache":args.cache_source,"cachePreparation":"lazy; included in the first nonzero render, not separate model preparation",
         "resized":false,"modelInference":false,"aestheticAcceptanceEstablished":false,"cases":[]});
     let mut failures = 0;
     for case in &spec.cases {
@@ -367,14 +373,22 @@ fn run(args: Args) -> Result<(), String> {
             moving_attachment_support: prepared.moving_attachment_support.as_ref(),
         };
         let mut outputs = Vec::new();
+        let mut source_cache = FaceSourceCache::default();
         for (index, &amount) in case.amounts.iter().enumerate() {
             let mut params = prepared.params.clone();
             params["adjustments"] = Value::Object(case.extra_adjustments.clone());
             params["adjustments"][&case.adjustment] = json!(amount);
             let start = Instant::now();
-            let result = adjust_face_with_source_layers(&prepared.source, &params, &layers);
+            let result = if args.cache_source {
+                adjust_face_with_source_cache(&prepared.source, &params, &layers, &mut source_cache)
+            } else {
+                adjust_face_with_source_layers(&prepared.source, &params, &layers)
+            };
             let milliseconds = start.elapsed().as_secs_f64() * 1000.0;
             let mut item = json!({"amount":amount,"adjustments":params["adjustments"],"milliseconds":milliseconds});
+            if args.cache_source {
+                item["sourceCacheStats"] = json!(source_cache.stats());
+            }
             let saved = result.map_err(|e| e.to_string()).and_then(|image| {
                 if image.width != prepared.source.width || image.height != prepared.source.height {
                     return Err("algorithm changed source dimensions".into());
