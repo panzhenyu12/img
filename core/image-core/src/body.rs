@@ -1151,13 +1151,96 @@ fn default_material_alpha(source: &RgbaImage, params: &Value, subject_mask: &Val
     );
     if let Some(part) = params.get("partMask").filter(|value| value.is_object()) {
         let raw = rasterize_mask(part, source.width, source.height);
-        return raw
+        let bounded = raw
             .into_iter()
             .zip(subject)
             .map(|(part, subject)| part.min(subject))
-            .collect();
+            .collect::<Vec<_>>();
+        let body_part = params
+            .get("bodyPart")
+            .and_then(Value::as_str)
+            .unwrap_or("full-body");
+        // Limb masks often abut a different visible foreground (for example
+        // a sleeve against the torso). Their exact uncovered context is part
+        // of the occlusion contract, so keep those masks binary. The coarse
+        // detector staircase is a torso/waist failure mode and is safe to
+        // soften only for those connected garment domains.
+        if !matches!(body_part, "full-body" | "torso" | "waist" | "hips") {
+            return bounded;
+        }
+        // Detector masks are usually 256--512 px while the photograph can be
+        // several megapixels.  A binary edge transported through a subpixel
+        // field therefore becomes a staircase even though the field itself is
+        // continuous.  Add a one-pixel, source-bounded coverage transition to
+        // the fallback material domain.  This is intentionally skipped for an
+        // explicit opticalAlpha layer: caller-provided source ownership is
+        // authoritative and must remain byte-for-byte reproducible.
+        let subject_alpha = rasterize_mask(subject_mask, source.width, source.height);
+        return soften_material_boundary(source, &bounded, &subject_alpha);
     }
     geometry_target(source, params, subject_mask)
+}
+
+/// Convert coarse semantic material edges into coverage rather than a hard
+/// binary cut.  The blur is limited to a 3x3 footprint and to the observed
+/// subject silhouette, so it cannot invent foreground in the scene.  Keeping
+/// the original alpha in the interior preserves fabric texture and avoids
+/// changing the selected material area away from its boundary.
+fn soften_material_boundary(source: &RgbaImage, alpha: &[f32], subject: &[f32]) -> Vec<f32> {
+    let width = source.width as usize;
+    let height = source.height as usize;
+    if alpha.len() != width * height || subject.len() != alpha.len() {
+        return alpha.to_vec();
+    }
+    let mut result = alpha.to_vec();
+    for y in 0..height {
+        for x in 0..width {
+            let i = y * width + x;
+            let edge = alpha[i] > 1e-4 && alpha[i] < 1.0 - 1e-4
+                || neighbors(i, width, height).any(|n| (alpha[n] - alpha[i]).abs() > 0.20);
+            if !edge {
+                continue;
+            }
+            let mut weighted = 0.0;
+            let mut total = 0.0;
+            for (dy, spatial_y) in [(-1_i32, 1.0_f32), (0, 2.0), (1, 1.0)] {
+                for (dx, spatial_x) in [(-1_i32, 1.0_f32), (0, 2.0), (1, 1.0)] {
+                    let xx = x as i32 + dx;
+                    let yy = y as i32 + dy;
+                    if xx < 0 || yy < 0 || xx >= width as i32 || yy >= height as i32 {
+                        continue;
+                    }
+                    let j = yy as usize * width + xx as usize;
+                    // Do not blur outside the observed subject.  The source
+                    // subject mask remains the hard ownership boundary.
+                    if subject[j] <= 1e-3 {
+                        continue;
+                    }
+                    let colour_distance = (0..3)
+                        .map(|c| {
+                            let d = source.pixels[i * 4 + c] as f32
+                                - source.pixels[j * 4 + c] as f32;
+                            d * d
+                        })
+                        .sum::<f32>();
+                    // A small bilateral factor keeps a high-contrast coat or
+                    // hand from bleeding into a shirt while still smoothing
+                    // the low-contrast antialiasing fringe of the same cloth.
+                    let colour = 1.0 / (1.0 + colour_distance / (72.0 * 72.0));
+                    let weight = spatial_x * spatial_y * colour;
+                    weighted += alpha[j] * weight;
+                    total += weight;
+                }
+            }
+            if total > 1e-6 {
+                result[i] = (weighted / total).clamp(0.0, subject[i]);
+            }
+        }
+    }
+    for (value, &bound) in result.iter_mut().zip(subject) {
+        *value = value.min(bound).clamp(0.0, 1.0);
+    }
+    result
 }
 
 struct BodyMotionControls {
@@ -1728,6 +1811,49 @@ pub(crate) fn adjust_with_source_layers(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn coarse_material_boundary_gets_a_bounded_antialias_transition() {
+        let source = RgbaImage::new(
+            7,
+            7,
+            (0..49)
+                .flat_map(|i| {
+                    let x = i % 7;
+                    if x < 3 {
+                        [220, 220, 220, 255]
+                    } else {
+                        [25, 35, 40, 255]
+                    }
+                })
+                .collect(),
+        )
+        .unwrap();
+        let mut alpha = vec![0.0; 49];
+        for y in 0..7 {
+            for x in 0..3 {
+                alpha[y * 7 + x] = 1.0;
+            }
+        }
+        let subject = vec![1.0; 49];
+        let smoothed = soften_material_boundary(&source, &alpha, &subject);
+        // The material edge receives a fractional transition instead of a
+        // binary jump, while the scene side remains bounded and the interior
+        // remains opaque.
+        assert!(smoothed[3] > 0.0 && smoothed[3] < 1.0);
+        assert_eq!(smoothed[1], 1.0);
+        assert!(smoothed.iter().all(|a| (0.0..=1.0).contains(a)));
+    }
+
+    #[test]
+    fn material_boundary_never_exceeds_subject_ownership() {
+        let source = RgbaImage::new(3, 3, vec![120; 3 * 3 * 4]).unwrap();
+        let alpha = vec![1.0; 9];
+        let subject = vec![0.0; 9];
+        let smoothed = soften_material_boundary(&source, &alpha, &subject);
+        assert!(smoothed.iter().all(|&a| a == 0.0));
+    }
+
     #[test]
     #[ignore = "explicit local photograph trace; inputs supplied by environment"]
     fn trace_frozen_ordinary_body_material_stages() {
