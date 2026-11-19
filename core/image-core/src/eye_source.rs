@@ -45,9 +45,21 @@ pub struct EyeMaterialStroke {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "shape", rename_all = "lowercase", deny_unknown_fields)]
 pub enum EyeMaterialShape {
-    Rect { region: EyeMaterialRect },
-    Polygon { points: Vec<EyeMaterialPoint> },
-    Brush { strokes: Vec<EyeMaterialStroke> },
+    Rect {
+        region: EyeMaterialRect,
+    },
+    Polygon {
+        points: Vec<EyeMaterialPoint>,
+    },
+    Brush {
+        strokes: Vec<EyeMaterialStroke>,
+    },
+    /// A categorical capsule corridor in original pixel-index coordinates.
+    /// Radius identifies material support; it is not opacity or feathering.
+    Polyline {
+        points: Vec<EyeMaterialPoint>,
+        radius: f64,
+    },
 }
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -743,6 +755,50 @@ fn rasterize(shapes: &[EyeMaterialShape], w: usize, h: usize) -> Result<Vec<bool
     for shape in shapes {
         let mut part = vec![false; w * h];
         match shape {
+            EyeMaterialShape::Polyline { points, radius } => {
+                if points.len() < 2
+                    || !radius.is_finite()
+                    || *radius <= 0.
+                    || points.iter().any(|p| {
+                        !p.x.is_finite()
+                            || !p.y.is_finite()
+                            || p.x - radius < 0.
+                            || p.y - radius < 0.
+                            || p.x + radius > (w - 1) as f64
+                            || p.y + radius > (h - 1) as f64
+                    })
+                    || !points
+                        .windows(2)
+                        .any(|p| p[0].x != p[1].x || p[0].y != p[1].y)
+                {
+                    return Err(invalid(
+                        "material polyline requires a nonempty bounded source corridor",
+                    ));
+                }
+                for segment in points.windows(2) {
+                    let (a, b) = (&segment[0], &segment[1]);
+                    let dx = b.x - a.x;
+                    let dy = b.y - a.y;
+                    let length2 = dx * dx + dy * dy;
+                    let x0 = (a.x.min(b.x) - radius).ceil() as usize;
+                    let x1 = (a.x.max(b.x) + radius).floor() as usize;
+                    let y0 = (a.y.min(b.y) - radius).ceil() as usize;
+                    let y1 = (a.y.max(b.y) + radius).floor() as usize;
+                    for y in y0..=y1 {
+                        for x in x0..=x1 {
+                            let t = if length2 > 0. {
+                                (((x as f64 - a.x) * dx + (y as f64 - a.y) * dy) / length2)
+                                    .clamp(0., 1.)
+                            } else {
+                                0.
+                            };
+                            part[y * w + x] |= (x as f64 - a.x - t * dx).powi(2)
+                                + (y as f64 - a.y - t * dy).powi(2)
+                                <= radius * radius;
+                        }
+                    }
+                }
+            }
             EyeMaterialShape::Rect { region: r } => {
                 if [r.x, r.y, r.width, r.height].iter().any(|v| !v.is_finite())
                     || r.x < 0.

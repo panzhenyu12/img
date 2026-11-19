@@ -177,3 +177,75 @@ fn source_preparation_rejects_cross_eye_ownership_and_invalid_geometry_even_at_z
     assert!(prepare_eye_closure_source(&transparent, &[g], &BTreeMap::new()).is_err());
     assert!(serde_json::from_value::<EyeMaterialLabels>(json!({"ocularAnchors":[{"shape":"rect","region":{"x":1,"y":1,"width":2,"height":2},"opacity":0.5}]})).is_err());
 }
+
+#[test]
+fn continuous_ocular_stroke_keeps_interior_glint_without_freezing_the_lid() {
+    let (source, geometry) = fixture();
+    let labels: EyeMaterialLabels = serde_json::from_value(json!({"ocularAnchors":[{
+        "shape":"polyline","points":[{"x":30,"y":20},{"x":42,"y":20}],"radius":1.0}]}))
+    .unwrap();
+    let prepared = prepare_eye_closure_source(
+        &source,
+        &[geometry],
+        &BTreeMap::from([("leftEye".into(), labels)]),
+    )
+    .unwrap();
+    let mut field = identity(&source);
+    for y in 16..27 {
+        for x in 30..43 {
+            field.inverse[y * 80 + x][1] -= 0.75;
+        }
+    }
+    let result = prepared.render_field(&field).unwrap();
+    let glint = (20 * 80 + 36) * 4; // Halfway between the two drawn vertices.
+    assert_eq!(
+        &result.pixels[glint..glint + 3],
+        &source.pixels[glint..glint + 3]
+    );
+    assert!(
+        (16..19).any(|y| (30..43).any(|x| {
+            let i = (y * 80 + x) * 4;
+            result.pixels[i..i + 3] != source.pixels[i..i + 3]
+        })),
+        "a source identity stroke must not disable eyelid movement"
+    );
+    assert_eq!(prepared.render_field(&identity(&source)).unwrap(), source);
+}
+
+#[test]
+fn continuous_unknown_stroke_checks_its_interior_and_rejects_invalid_corridors() {
+    let (source, geometry) = fixture();
+    let shape = json!({"shape":"polyline","points":[{"x":30,"y":20},{"x":42,"y":20}],"radius":0.6});
+    let labels: EyeMaterialLabels =
+        serde_json::from_value(json!({"unknown":[shape.clone()]})).unwrap();
+    let prepared = prepare_eye_closure_source(
+        &source,
+        &[geometry.clone()],
+        &BTreeMap::from([("leftEye".into(), labels)]),
+    )
+    .unwrap();
+    let mut field = identity(&source);
+    field.inverse[21 * 80 + 36][1] = 20.75;
+    assert!(prepared
+        .render_field(&field)
+        .unwrap_err()
+        .to_string()
+        .contains("unknown source material"));
+    for (points, radius) in [
+        (json!([{"x":30,"y":20}]), 1.0),
+        (json!([{"x":30,"y":20},{"x":30,"y":20}]), 1.0),
+        (json!([{"x":0,"y":20},{"x":42,"y":20}]), 1.0),
+        (json!([{"x":30,"y":20},{"x":42,"y":20}]), 0.0),
+    ] {
+        let label: EyeMaterialLabels = serde_json::from_value(
+            json!({"unknown":[{"shape":"polyline","points":points,"radius":radius}]}),
+        )
+        .unwrap();
+        assert!(prepare_eye_closure_source(
+            &source,
+            &[geometry.clone()],
+            &BTreeMap::from([("leftEye".into(), label)])
+        )
+        .is_err());
+    }
+}
