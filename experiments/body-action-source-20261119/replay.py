@@ -39,8 +39,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('directory', type=Path)
     parser.add_argument('--output-name', default='ordinary')
+    parser.add_argument('--magnitude', type=int, default=30, help='Symmetric diagnostic slider amount (1..100)')
     parser.add_argument('--graph', type=Path, help='Source-only ownership/support candidate from rebuild_graph.mjs')
     args = parser.parse_args()
+    if not 1 <= args.magnitude <= 100:
+        raise ValueError('magnitude must be within 1..100')
     directory = args.directory.resolve()
     report = json.loads((directory / 'report.json').read_text())
     scope_path=directory.parent/'source-scope.json'
@@ -81,7 +84,7 @@ def main():
     protocol = dict(source=report['source'], originalSourceSHA256=report['sourceSHA256'],
         canonicalSourceSHA256=report['canonicalSourceSHA256'], graphSHA256=report['graphSHA256'],
         dimensions=[w, h], target=scope['target'],
-        amounts=[0, -30, 30], key='waist', reviewCrop=scope['reviewCrop'],
+        amounts=[0, -args.magnitude, args.magnitude], key='waist', reviewCrop=scope['reviewCrop'],
         sourceOcclusions=scope['sourceOcclusions'],sourceScopeSHA256=sha(scope_path),
         partMaskMeaning='automatic garment/body ownership, not optical alpha truth',
         successRequires=scope['successRequires'],
@@ -144,14 +147,14 @@ def main():
         x0, y0, x1, y1 = protocol['reviewCrop']
         cw, ch = x1 - x0, y1 - y0
         sheet = Image.new('RGB', (cw * 3, ch + 30), '#222')
-        for index, amount in enumerate([0, -30, 30]):
+        for index, amount in enumerate(protocol['amounts']):
             sheet.paste(images[amount].crop((x0, y0, x1, y1)), (index * cw, 30))
             ImageDraw.Draw(sheet).text((index * cw + 8, 8), f'waist {amount:+d}', fill='white')
         sheet.save(output / 'waist-native-triptych.png')
         for name,box in scope['crops'].items():
             cw,ch=box[2]-box[0],box[3]-box[1]
             sheet=Image.new('RGB',(cw*3,ch+25),'#222');draw=ImageDraw.Draw(sheet)
-            for index,amount in enumerate([0,-30,30]):
+            for index,amount in enumerate(protocol['amounts']):
                 sheet.paste(images[amount].crop(box),(index*cw,25));draw.text((index*cw+5,5),f'{amount:+d}',fill='white')
             sheet.save(output/(name+'-triptych.png'))
     print(json.dumps(dict(directory=str(output), results=[{k:v for k,v in r.items() if k not in ['command','stdout','stderr']} for r in results])))

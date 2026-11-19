@@ -126,3 +126,4 @@ FUNC-编号-功能短名.md
 - [FUNC-082 固定附件侧脸曲线的数值可行性（真实双向失败修复）](FUNC-082-face-curve-source-witness.md)
 - [FUNC-083 身形源材料分层与同场因果对照（人工单图轻档通过，自动归属仍失败）](FUNC-083-body-source-material-control.md)
 - [FUNC-084 遮挡中轴与两侧身形曲线解耦（修复持物人像双峰，自动源提案仍需泛化）](FUNC-084-body-occluded-axis-contours.md)
+- [FUNC-085 源光学层与形变材料身份一致性（侧身人工源纠正，有限轻档通过）](FUNC-085-source-motion-identity-consistency.md)
