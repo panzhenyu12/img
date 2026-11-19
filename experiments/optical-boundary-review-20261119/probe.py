@@ -36,7 +36,7 @@ def demote_outer_background(trimap):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-case', required=True,
-                        choices=['portrait-614810', 'portrait-762020'])
+                        choices=['portrait-614810', 'portrait-762020', 'user-original'])
     args = parser.parse_args()
     base = ROOT/'test/results/face-generalization-20261118'/args.source_case
     proposal = base/'source-preparation/head-proposal'

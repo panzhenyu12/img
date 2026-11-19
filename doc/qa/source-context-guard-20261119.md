@@ -63,6 +63,16 @@ new-pair 相对 old-matte 的四档像素变化为：+30 2,346px/max17；+60 2,9
 
 额外审查材料保存在该图 `optical-boundary-review-20261119/` 的 `independent-neck-shoulder-*.png`、`independent-right-neck-3x-*.png`、`independent-762020-diff.json`，未新增模型推理或修改算法。
 
+### 用户原图防回归（同规则、无新检测）
+
+使用用户原图 `test/results/user-face-contour-20261014/768/canonical-source.png`，SHA256 `0076be94ee7650c06bdf5f7850e7ae92e0f95305af790351e8f103df66739397`。核对 `user-head-neural-scene/report.json` 后确认它绑定 `user-head-observed-scale-full-source`，完整 768² 源 crop、trimap>0 与源补全 mask 一致。新目录 `test/results/face-generalization-20261118/user-original/` 仅以 symlink 适配历史布局，`adaptation.json` 记录绑定；没有重跑检测、更换源图或改几何/运动许可。
+
+按同规则仅运行一次新 unknown MEMatte，以及 25 个固定 256/128 tile 的 guard4 扩展 target 捕获；接受原内 32px 的 65,882px 与外 4px 的 9,486px，覆盖无空洞，接受域外 scene 0 改。耗时为 MEMatte 3.05s、局部场景 40.07s，仅为本机一次前置准备。没有 guard0 模型重复推理。
+
+普通 API 比较“原指定 paired-alpha/B”与“新 unknown alpha + guarded B”两臂各 0/±30/±60。原 baseline 四档与历史 48-photo 普通回放逐 RGBA 相同，两臂零档恒等。新旧四档差异 +30 4,317px/max25、+60 5,808px/max47、-30 3,210px/max28、-60 3,446px/max60。原 paired alpha 与原 official 已存在覆盖修正差异，此处仅是候选相对上一版的防回归，不是纯 alpha/B 因果分离。
+
+已逐一看四档 face-neck、左右边缘，±60 原尺寸整图与左颈最大变化点三倍最近邻裁剪；未检出新裂缝、分离残线、耳饰断裂或肩颈色块。最大变化在左颈软边，+60 `(299,458)` 与 -60 `(295,456)`；局部保持连续。所有档 y≥590 对上一版 0 改动。可判该用户图通过本轮明显新增退化检查；这不重新验收既有脸型曲线，不代表所有强度/功能已达 8 分。结果在 `paired-regression-20261119/`。
+
 - `test/results/face-generalization-20261118/<case>/context-guard-valid-20261119/`：冻结协议、tile、两组五档普通入口回放与视觉对照。
 - `.../<case>/context-guard-outer-capture-20261119/`：量化预测、外圈覆盖、配对 descriptor、逐 tile 数值一致性。
 - `test/results/optical-boundary-static-line-20261119/`：真值 alpha/B/F、原输入、两份 trimap、两次模型结果和风险示意。

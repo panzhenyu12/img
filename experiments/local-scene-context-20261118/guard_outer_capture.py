@@ -9,7 +9,7 @@ from pathlib import Path
 import argparse, hashlib, json, sys, time
 import numpy as np
 from PIL import Image, ImageDraw
-from scipy.ndimage import binary_dilation
+from scipy.ndimage import binary_dilation, distance_transform_edt
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'services/background-worker'))
@@ -20,10 +20,91 @@ def sha(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def dump(path, data): Path(path).write_text(json.dumps(data, indent=2, allow_nan=False) + '\n')
 def read(path): return np.asarray(Image.open(path).convert('RGBA'))
 
+def direct_capture(source_case):
+    """One guard4 run for a regression fixture without cached guard0/guard4.
+
+    This is a paired-candidate regression, never the matched context ablation.
+    Preserve the previous paired scene outside inner32 plus outer4 support.
+    """
+    base = ROOT/'test/results/face-generalization-20261118'/source_case
+    neural = base/'source-preparation/head-neural-scene'
+    out = base/'context-guard-direct-20261119'
+    out.mkdir(exist_ok=False)
+    binding = json.loads((neural/'report.json').read_text())
+    spec = json.loads((base/'ordinary-rlib-spec.json').read_text())
+    case = spec['cases'][0]
+    assert sha(case['source']) == binding['sourceSHA256']
+    assert sha(neural/'source-crop.png') == binding['inputSHA256']['source-crop.png']
+    assert sha(neural/'source-inpaint-mask.png') == binding['inputSHA256']['source-inpaint-mask.png']
+    assert sha(DEFAULT_MODEL) == EXPECTED_SHA256
+    source = read(neural/'source-crop.png')
+    mask = np.asarray(Image.open(neural/'source-inpaint-mask.png').convert('L')) > 0
+    assert (source[:,:,3] == 255).all()
+    h,w = mask.shape
+    inner = mask & (distance_transform_edt(mask) <= 32)
+    expanded = binary_dilation(mask,iterations=4)
+    outer = expanded & ~mask
+    accepted = inner | outer
+    starts = lambda extent: sorted(set([*range(0,max(1,extent-256+1),128),max(0,extent-256)]))
+    selected=[];excluded=[];weights=np.zeros((h,w),float)
+    for y in starts(h):
+        for x in starts(w):
+            r,b=min(w,x+256),min(h,y+256)
+            m=mask[y:b,x:r]
+            if not m.any() or m.all() or not inner[y:b,x:r].any(): continue
+            target=binary_dilation(m,iterations=4)
+            box=[x,y,r,b]
+            if target.all():
+                excluded.append({'box':box,'reason':'no readable context after fixed guard'})
+                continue
+            selected.append(box)
+            weights[y:b,x:r] += weight(box)*target
+    uncovered=accepted&(weights==0)
+    report=dict(sourceCase=source_case,status='frozen before inference',sourceSHA256=sha(case['source']),
+        sourceCropSHA256=sha(neural/'source-crop.png'),maskSHA256=sha(neural/'source-inpaint-mask.png'),
+        tileSize=256,stride=128,sourceInnerBand=32,outerBand=4,modelMaskDilation=0,threads=2,
+        selected=selected,excluded=excluded,innerPixels=int(inner.sum()),outerPixels=int(outer.sum()),
+        uncoveredAcceptedPixels=int(uncovered.sum()),inferenceCount=len(selected),
+        scope='one paired candidate for regression; no zero-guard ablation',
+        sourceOnly=True,geometryChanged=False,motionPermissionChanged=False,modelExpectedSHA256=EXPECTED_SHA256)
+    dump(out/'protocol.json',report)
+    if uncovered.any(): raise RuntimeError('Frozen direct guard cannot cover inner32+outer4')
+    worker=LamaWorker(threads=2);accum=np.zeros((h,w,3),float);rows=[];start=time.monotonic()
+    for i,box in enumerate(selected):
+        x,y,r,b=box;m=mask[y:b,x:r];target=binary_dilation(m,iterations=4)
+        generated,meta=worker.inpaint(Image.fromarray(source[y:b,x:r]),target,
+            max_side=256,mask_dilation=0,context_mode='full',seam_blend='none')
+        a=np.asarray(generated.convert('RGBA'))
+        assert np.array_equal(a[~target],source[y:b,x:r][~target])
+        accum[y:b,x:r] += a[:,:,:3]*(weight(box)*target)[:,:,None]
+        Image.fromarray(a).save(out/f'expanded-tile-{i:02}.png')
+        rows.append({'box':box,'model':meta});dump(out/'partial-execution.json',rows)
+        print(json.dumps({'tile':i+1,'count':len(selected)}),flush=True)
+    desc=json.loads(Path(case['sourcePlatePrior']).read_text())
+    full=read(desc['image']).copy();old=full.copy()
+    x,y,r,b=binding['sourceCropBox']
+    crop=full[y:b,x:r]
+    crop[accepted,:3]=np.round(accum[accepted]/weights[accepted,None]).astype(np.uint8)
+    full_mask=np.zeros(full.shape[:2],bool);full_mask[y:b,x:r]=accepted
+    assert np.array_equal(full[~full_mask],old[~full_mask])
+    Image.fromarray(full).save(out/'guard4-full-scene.png')
+    Image.fromarray(crop).save(out/'guard4-scene.png')
+    Image.fromarray(np.uint8(full_mask)*255).save(out/'accepted-full-mask.png')
+    Image.fromarray(np.uint8(outer)*255).save(out/'outer-mask.png')
+    desc['image']=str(out/'guard4-full-scene.png');dump(out/'guard4-descriptor.json',desc)
+    report.update(status='completed; regression replay pending',rows=rows,elapsedSeconds=time.monotonic()-start,
+        outsideAcceptedPixelsChanged=0,outputSHA256=sha(out/'guard4-full-scene.png'))
+    dump(out/'report.json',report)
+    print(json.dumps({k:v for k,v in report.items() if k not in ['rows','selected','excluded']}),flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source-case', required=True, choices=['portrait-614810', 'portrait-762020'])
+    parser.add_argument('--source-case', required=True, choices=['portrait-614810', 'portrait-762020', 'user-original'])
+    parser.add_argument('--direct', action='store_true', help='Single fixed paired-candidate regression without cached guard ablation')
     args = parser.parse_args()
+    if args.direct:
+        direct_capture(args.source_case)
+        return
     base = ROOT / 'test/results/face-generalization-20261118' / args.source_case
     previous = base / 'context-guard-valid-20261119'
     neural = base / 'source-preparation/head-neural-scene'
