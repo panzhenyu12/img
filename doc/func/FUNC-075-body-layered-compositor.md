@@ -2,6 +2,8 @@
 
 状态：**普通 Rust 已有完整 body.adjust 参数到分层成片入口。2026-11-19 修复真实衬衣上的位移硬截止裂口，但独立复审发现原检测 graph 的 +30 在左袖下仍有新折角，曲线未通过验收；显式人工后层几何对照消除了该折角。+100 仍被翻折检查拒绝。未接入系统，不据此宣布自动分层、隐藏躯干补全或通用收腰达到8分。**
 
+后续隔离的源可见边/PCHIP 几何候选已消除 fashion-standing 的这个左折角，独立复审接受该冻结源样片 ±30 的有限可用结果；下文保留原 graph 失败记录，避免把候选结果归给尚未修正的检测输入。
+
 ## 能力与边界
 
 公开 `BodyLayeredSource` 和 `composite_body_source_layers(source, layers, inverse_displacement)`。调用者传入完整分辨率的静止前层与可动后层，不把袖子和躯干混成一个图层，不再将含旧袖子的原图搬动后重新贴一次袖子。
@@ -54,6 +56,20 @@ f64 源层保留混合边缘的精确源重构，避免把后层先存成 RGBA8 
 独立复审进一步发现：原 graph 的 `partMask` 在 y425–439 左缘是 x192→186，真实后层衣缘却约在 x170；同处 subject 覆盖为1、protect为0。退场区仍穿过真实衣物，使原 graph 在 (172,437) 附近产生新平台/折角，虽然没有翻折或分离白条，也不能认作自然曲线。人工后层 polygon 使用同一算法和冻结源层消除了此平台，说明还需要**源可见衣边的独立几何证据**，不能继续靠扩大尾宽修补错误轮廓。当前只把该人工几何对照作为**这一既有源准备样片 ±30 的有限可用候选**；原检测 graph 曲线仍未通过，更未证明新照片自动分层成功。
 
 本地证据：`test/results/body-current-adjust-20261119/fashion-standing/final-shared-field/report.json`、`original-comparison.png`、`right-edge-review.png`、`waist-review.png`。照片、数组和输出不提交。
+
+## 源可见边几何候选：证据与计算支撑分开
+
+隔离代码 `experiments/body-internal-aperture-20261117/visible_rear_geometry.py`，未改变 Rust core、未重跑模型。固定原 waist 解剖轴和范围，从原 part 种子沿法向追踪第一个可见 rear 连通段，用冻结 rear alpha 的0.5交界测量衣边；遇到 front 或 protect 就记录 unknown，不能继续读取遮挡后的 rear 形状来假称可见测量。subject、selection、protect、landmarks 和全部源光学层保持原样，仅补原分辨率 part.data 中有依据的缺失几何。连通不能证明器官身份，缺少袖子等归属信息时仍存在不可辨识限制。
+
+V1 直接把可见区补到实测边、unknown 区留旧 mask，导致折角移到更上方，已拒绝。独立评估使用源图预先固定的 RGB 亮度阈值和 y425–450 范围，源轮廓最大行间位移为0.643px，原 graph +30为2.941px，V1 +30反而为5.632px；没有更改观察窗口隐藏失败。
+
+V2 使用已有 SciPy PCHIP：可见测量为插值 knots；被遮挡的域端只用原 part 轮廓作明确标记的计算先验锚点。raw evidence 的 unknown 不变，`computationalSupport` 单独记录先验来源、域和 knots。无外推；不能覆盖整个原 waist 域的某一侧直接报 insufficient-support 并保留该侧原数据。保护像素和未更新像素逐值保留，包括128.4等研究 mask 的小数值。PCHIP 仅保证自身分段无过冲和 C¹，不能把 max(旧part,计算支撑)、subject裁剪后的完整形状也宣称为 C¹，因此仍以普通接口成片验证。
+
+fashion-standing V2 只由原源/graph/冻结 alpha 得出，不读取滑杆档位或成片。0/±30/±60 全部输出，四角 Jacobian 均正，不透明前袖和远背景改动均0；y470 腰宽仍为原175.9867px、−30时188.2255px、+30时163.9924px、+60时151.88px，未以削弱主腰响应换取平滑。原固定 RGB 窗下 +30 最大行间位移降至0.621px、二阶差0.311px；+60为0.594/0.444px。独立视觉检查整图、左右边、上下接界和褶皱，接受该既有冻结源 ±30 的有限可用，±60未见新结构损坏但仍不据此给通用美体评分。
+
+同一函数与参数复核 fullbody-skirt 0/±30：两侧沿外缘测量均先遇前层袖子，证据不足，未添加任何几何。输出与该图原 graph 逐 RGBA 相同。它是“证据不足安全保留”的负控，**不是第二张成功纠边的泛化样本**，没有增加照片特例或放松可见性规则。
+
+独立反例测试在同目录 `test_visible_rear_geometry.py`，覆盖接触的同色袖子、保护/前层遮挡、隐藏 rear 换形而可见证据不变、未知端缺少先验锚点、非均匀 knots 的有界插值，以及实际栅格的未知/已知接界。实拍记录在 `test/results/body-visible-rear-geometry-20261119/pchip-v2/` 和 `fullbody-skirt/`；V1失败材料仍保留。该候选尚依赖已正确准备的前后层角色，未完成未知照片自动准备验收或系统接入。
 
 ## 算法合同
 
