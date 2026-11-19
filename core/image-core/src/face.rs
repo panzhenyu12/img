@@ -276,7 +276,11 @@ fn signed_distance(p: Point, polygon: &[Point]) -> f32 {
         }
         distance = distance.min(closest(p, a, b).0);
     }
-    if inside { distance } else { -distance }
+    if inside {
+        distance
+    } else {
+        -distance
+    }
 }
 
 fn alpha_with_feather(p: Point, polygon: &[Point], feather: f32) -> f32 {
@@ -464,6 +468,26 @@ fn smooth_lateral_limit(value: f32, limit: f32) -> f32 {
         return 0.0;
     }
     limit * libm::tanhf(value / limit)
+}
+
+/// Return the scalar motion-domain taper used around fixed attachments.
+///
+/// The source-paired compositor has an explicit material boundary (hair/ear,
+/// accessory or user protection).  Its contour must enter that boundary with
+/// a shallow tangent; a short taper spends the requested displacement in one
+/// or two raster rows and reads as a platform.  Keep the legacy envelope for
+/// the legacy compositor, and widen only the source-paired path.  The full
+/// cheek remains at unit gain beyond this band, so the requested face-width
+/// response is preserved.
+fn motion_domain_taper(frame_width: f32, continuous_source_domain: bool) -> f32 {
+    if !frame_width.is_finite() || frame_width <= 0.0 {
+        return if continuous_source_domain { 10.0 } else { 6.0 };
+    }
+    if continuous_source_domain {
+        (frame_width * 0.16).clamp(10.0, 36.0)
+    } else {
+        (frame_width * 0.12).clamp(6.0, 24.0)
+    }
 }
 
 fn target_contour(polygon: &[Point], frame: Frame, values: &Value) -> Vec<Point> {
@@ -1117,11 +1141,7 @@ fn repair_exposed_face_background(
     }
     let clean_background: Vec<f32> = (0..count)
         .map(|i| {
-            if color_alpha[i] <= 0.04
-                && !frozen[i]
-                && !donor_excluded[i]
-                && known_layer[i] == 0
-            {
+            if color_alpha[i] <= 0.04 && !frozen[i] && !donor_excluded[i] && known_layer[i] == 0 {
                 1.0
             } else {
                 0.0
@@ -1144,21 +1164,14 @@ fn repair_exposed_face_background(
         }
         let mut nearest = (f32::MAX, 0, 0.0);
         for j in 0..polygon.len() {
-            let (distance, t) = closest(
-                p,
-                polygon[j],
-                polygon[(j + 1) % polygon.len()],
-            );
+            let (distance, t) = closest(p, polygon[j], polygon[(j + 1) % polygon.len()]);
             if distance < nearest.0 {
                 nearest = (distance, j, t);
             }
         }
         let (_, edge, t) = nearest;
         let next = (edge + 1) % polygon.len();
-        let boundary = add(
-            scale(polygon[edge], 1.0 - t),
-            scale(polygon[next], t),
-        );
+        let boundary = add(scale(polygon[edge], 1.0 - t), scale(polygon[next], t));
         let normal = neck_normal(polygon, edge, t, 6.0);
         if dot(normal, normal) <= 1e-6 {
             continue;
@@ -1785,30 +1798,65 @@ fn validate_isoline(
     Ok(())
 }
 
-fn validate_motion_interface(source: &RgbaImage, params: &Value, interface: Option<&Value>) -> Result<(), ImageError> {
+fn validate_motion_interface(
+    source: &RgbaImage,
+    params: &Value,
+    interface: Option<&Value>,
+) -> Result<(), ImageError> {
     let (w, h) = (source.width as f32, source.height as f32);
     let semantics = params.get("semanticMasks");
     if let Some(interface) = interface {
         let error = || invalid("invalid source motion interface; no optical-contour fallback");
         let matte = interface.get("mask").ok_or_else(error)?;
         let hair = semantics.and_then(|m| m.get("hair")).ok_or_else(error)?;
-        let mw = matte.get("width").and_then(Value::as_u64).ok_or_else(error)?;
-        let mh = matte.get("height").and_then(Value::as_u64).ok_or_else(error)?;
-        let data = matte.get("data").and_then(Value::as_array).ok_or_else(error)?;
+        let mw = matte
+            .get("width")
+            .and_then(Value::as_u64)
+            .ok_or_else(error)?;
+        let mh = matte
+            .get("height")
+            .and_then(Value::as_u64)
+            .ok_or_else(error)?;
+        let data = matte
+            .get("data")
+            .and_then(Value::as_array)
+            .ok_or_else(error)?;
         if matte.get("shape").and_then(Value::as_str) != Some("raster")
-            || mw == 0 || mh == 0 || mw.checked_mul(mh) != Some(data.len() as u64)
-            || matte.get("width") != hair.get("width") || matte.get("height") != hair.get("height")
-            || data.iter().any(|v| !v.as_f64().is_some_and(|n| n.is_finite() && (0.0..=255.0).contains(&n))) {
+            || mw == 0
+            || mh == 0
+            || mw.checked_mul(mh) != Some(data.len() as u64)
+            || matte.get("width") != hair.get("width")
+            || matte.get("height") != hair.get("height")
+            || data.iter().any(|v| {
+                !v.as_f64()
+                    .is_some_and(|n| n.is_finite() && (0.0..=255.0).contains(&n))
+            })
+        {
             return Err(error());
         }
         let outline = interface.get("contour").ok_or_else(error)?;
-        let vertices = outline.get("points").and_then(Value::as_array).ok_or_else(error)?;
-        if outline.get("shape").and_then(Value::as_str) != Some("polygon") || vertices.len() < 3
-            || vertices.iter().any(|v| ["x", "y"].iter().any(|key|
-                !v.get(*key).and_then(Value::as_f64).is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n)))) {
+        let vertices = outline
+            .get("points")
+            .and_then(Value::as_array)
+            .ok_or_else(error)?;
+        if outline.get("shape").and_then(Value::as_str) != Some("polygon")
+            || vertices.len() < 3
+            || vertices.iter().any(|v| {
+                ["x", "y"].iter().any(|key| {
+                    !v.get(*key)
+                        .and_then(Value::as_f64)
+                        .is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n))
+                })
+            })
+        {
             return Err(error());
         }
-        validate_isoline(matte, &points(outline, w, h), source, "sourceMotionInterface")?;
+        validate_isoline(
+            matte,
+            &points(outline, w, h),
+            source,
+            "sourceMotionInterface",
+        )?;
     }
     Ok(())
 }
@@ -1818,30 +1866,42 @@ pub(crate) fn adjust(source: &RgbaImage, params: &Value) -> Result<RgbaImage, Im
 }
 
 pub(crate) fn adjust_with_source_layers(
-    source: &RgbaImage, params: &Value, layers: &SourceLayers<'_>,
+    source: &RgbaImage,
+    params: &Value,
+    layers: &SourceLayers<'_>,
 ) -> Result<RgbaImage, ImageError> {
     adjust_with_source_cache_impl(source, params, layers, None)
 }
 
 pub(crate) fn adjust_with_source_cache(
-    source: &RgbaImage, params: &Value, layers: &SourceLayers<'_>, cache: &mut FaceSourceCache,
+    source: &RgbaImage,
+    params: &Value,
+    layers: &SourceLayers<'_>,
+    cache: &mut FaceSourceCache,
 ) -> Result<RgbaImage, ImageError> {
     adjust_with_source_cache_impl(source, params, layers, Some(cache))
 }
 
 fn adjust_with_source_cache_impl(
-    source: &RgbaImage, params: &Value, layers: &SourceLayers<'_>, cache: Option<&mut FaceSourceCache>,
+    source: &RgbaImage,
+    params: &Value,
+    layers: &SourceLayers<'_>,
+    cache: Option<&mut FaceSourceCache>,
 ) -> Result<RgbaImage, ImageError> {
     layers.validate(source)?;
     validate_motion_interface(source, params, layers.motion_interface)?;
     if percent(params.get("adjustments").unwrap_or(params), "symmetry").abs() > 1e-6 {
-        return Err(invalid("source-layer contour editing requires symmetry as a separate source preparation step"));
+        return Err(invalid(
+            "source-layer contour editing requires symmetry as a separate source preparation step",
+        ));
     }
     adjust_impl(source, params, Some(layers), cache)
 }
 
 fn adjust_impl(
-    source: &RgbaImage, params: &Value, source_layers: Option<&SourceLayers<'_>>,
+    source: &RgbaImage,
+    params: &Value,
+    source_layers: Option<&SourceLayers<'_>>,
     mut source_cache: Option<&mut FaceSourceCache>,
 ) -> Result<RgbaImage, ImageError> {
     #[cfg(not(target_arch = "wasm32"))]
@@ -1961,10 +2021,22 @@ fn adjust_impl(
     }
     #[cfg(test)]
     if source_layers.is_none() && params.get("__sourceMotionInterface").is_some() {
-        let mode = params.get("experimentalFaceProfile").and_then(Value::as_str);
-        if !mode.is_some_and(|m| ["shared-cheek-v1", "shared-cheek-curve-v4",
-            "shared-cheek-ear-v1", "shared-cheek-ear-periodic-v1", "source-domain-continuous-v1"].contains(&m)) {
-            return Err(invalid("invalid source motion interface; no optical-contour fallback"));
+        let mode = params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str);
+        if !mode.is_some_and(|m| {
+            [
+                "shared-cheek-v1",
+                "shared-cheek-curve-v4",
+                "shared-cheek-ear-v1",
+                "shared-cheek-ear-periodic-v1",
+                "source-domain-continuous-v1",
+            ]
+            .contains(&m)
+        }) {
+            return Err(invalid(
+                "invalid source motion interface; no optical-contour fallback",
+            ));
         }
         validate_motion_interface(source, params, params.get("__sourceMotionInterface"))?;
     }
@@ -1998,10 +2070,15 @@ fn adjust_impl(
             != Some(true)
         && params.get("__legacyUpperShared").and_then(Value::as_bool) != Some(true)
     {
-        if let Some(prepared) =
-            upper_width::promote_with_source(params, &polygon, frame, source.width, source.height,
-                source_layers.is_some(), source_layers.and_then(|l| l.motion_interface))
-        {
+        if let Some(prepared) = upper_width::promote_with_source(
+            params,
+            &polygon,
+            frame,
+            source.width,
+            source.height,
+            source_layers.is_some(),
+            source_layers.and_then(|l| l.motion_interface),
+        ) {
             // Keep the candidate entirely inside the established ownership,
             // matting and source-forward transport path. The only change is
             // the observed shared hair/skin band; no output pixels are painted
@@ -2049,7 +2126,12 @@ fn adjust_impl(
             }
             lower_params["opacity"] = json!(100);
             lower_params["blendMode"] = json!("normal");
-            let lower = adjust_impl(source, &lower_params, source_layers, source_cache.as_deref_mut())?;
+            let lower = adjust_impl(
+                source,
+                &lower_params,
+                source_layers,
+                source_cache.as_deref_mut(),
+            )?;
             let rendered = hairline.render(&lower);
             let mut composite_params = support_params.into_owned();
             if composite_params
@@ -2107,10 +2189,10 @@ fn adjust_impl(
         .get("experimentalFaceProfile")
         .and_then(Value::as_str)
         == Some("segmented-lateral-v1")
-            || params
-                .get("experimentalFaceProfile")
-                .and_then(Value::as_str)
-                == Some("adaptive-lateral-v2")
+        || params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str)
+            == Some("adaptive-lateral-v2")
     {
         let frame_tuple = (
             frame.origin,
@@ -2126,12 +2208,15 @@ fn adjust_impl(
             .and_then(Value::as_str);
         if mode == Some("adaptive-lateral-v2") {
             crate::face_profile::target_contour_adaptive(
-                &polygon, frame_tuple, semantics, w, h, values,
+                &polygon,
+                frame_tuple,
+                semantics,
+                w,
+                h,
+                values,
             )
         } else {
-            crate::face_profile::target_contour(
-                &polygon, frame_tuple, semantics, w, h, values,
-            )
+            crate::face_profile::target_contour(&polygon, frame_tuple, semantics, w, h, values)
         }
         .map_err(invalid)?
     } else {
@@ -2333,8 +2418,18 @@ fn adjust_impl(
     let ear_material = semantics.and_then(|m| m.get("ears"));
     let flexible_ears = source_layers.is_some();
     #[cfg(test)]
-    let flexible_ears = flexible_ears || params.get("experimentalFaceProfile")
-        .and_then(Value::as_str).is_some_and(|mode| ["shared-cheek-ear-v1", "shared-cheek-ear-periodic-v1", "source-domain-continuous-v1"].contains(&mode));
+    let flexible_ears = flexible_ears
+        || params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str)
+            .is_some_and(|mode| {
+                [
+                    "shared-cheek-ear-v1",
+                    "shared-cheek-ear-periodic-v1",
+                    "source-domain-continuous-v1",
+                ]
+                .contains(&mode)
+            });
     let observed_ear_motion = if flexible_ears
         && stable_source_layers
         && joint_neck
@@ -2358,12 +2453,16 @@ fn adjust_impl(
     // only after tracing leaves an obsolete disconnected-ear lock behind it.
     let attachment_support = source_layers.and_then(|l| l.moving_attachment_support);
     #[cfg(test)]
-    let attachment_support = attachment_support.or_else(|| params.get("__sourceMovingAttachmentSupport"));
+    let attachment_support =
+        attachment_support.or_else(|| params.get("__sourceMovingAttachmentSupport"));
     let moving_attachment_mask = if let Some(mask) = attachment_support {
-        let valid_data = mask.get("data").and_then(Value::as_array).is_some_and(|data| {
-            data.len() == source.width as usize * source.height as usize
-                && data.iter().all(|v| matches!(v.as_u64(), Some(0 | 255)))
-        });
+        let valid_data = mask
+            .get("data")
+            .and_then(Value::as_array)
+            .is_some_and(|data| {
+                data.len() == source.width as usize * source.height as usize
+                    && data.iter().all(|v| matches!(v.as_u64(), Some(0 | 255)))
+            });
         if !observed_ear_motion.follows_joint_field()
             || mask.get("shape").and_then(Value::as_str) != Some("raster")
             || mask.get("width").and_then(Value::as_u64) != Some(source.width as u64)
@@ -2377,24 +2476,40 @@ fn adjust_impl(
         None
     };
     let attachment_feature_masks: Vec<_> = if moving_attachment_mask.is_some() {
-        ["leftEye", "rightEye", "leftBrow", "rightBrow", "nose", "lips", "teeth"]
-            .into_iter()
-            .filter_map(|key| semantics.and_then(|m| m.get(key)))
-            .map(PreparedMask::new)
-            .collect()
+        [
+            "leftEye",
+            "rightEye",
+            "leftBrow",
+            "rightBrow",
+            "nose",
+            "lips",
+            "teeth",
+        ]
+        .into_iter()
+        .filter_map(|key| semantics.and_then(|m| m.get(key)))
+        .map(PreparedMask::new)
+        .collect()
     } else {
         Vec::new()
     };
     let rigid_masks: Vec<_> = ["accessories", "ears"]
         .into_iter()
         .filter(|key| *key != "ears" || !observed_ear_motion.follows_joint_field())
-        .filter_map(|key| semantics.and_then(|m| m.get(key)).map(|m| (key, PreparedMask::new(m))))
+        .filter_map(|key| {
+            semantics
+                .and_then(|m| m.get(key))
+                .map(|m| (key, PreparedMask::new(m)))
+        })
         .collect();
     let output_mask = support_params.get("mask").map(PreparedMask::new);
     let fixed_masks: Vec<_> = ["accessories", "ears", "hair"]
         .into_iter()
         .filter(|key| *key != "ears" || !observed_ear_motion.follows_joint_field())
-        .filter_map(|key| semantics.and_then(|m| m.get(key)).map(|m| (key, PreparedMask::new(m))))
+        .filter_map(|key| {
+            semantics
+                .and_then(|m| m.get(key))
+                .map(|m| (key, PreparedMask::new(m)))
+        })
         .collect();
     let mut input = source.clone();
     if symmetry > 1e-6 {
@@ -2463,26 +2578,29 @@ fn adjust_impl(
                 && rear_hair_mask.as_ref().is_some_and(|m| {
                     m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
                 });
-            let planned_attachment = moving_attachment_mask.as_ref().is_some_and(|m| {
-                m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
-            });
-            if planned_attachment && (protected > 0.0 || hair
-                || garment_mask.as_ref().is_some_and(|m| {
-                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.0
-                })
-                || attachment_feature_masks.iter().any(|m| {
-                    m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
-                })) {
+            let planned_attachment = moving_attachment_mask
+                .as_ref()
+                .is_some_and(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            if planned_attachment
+                && (protected > 0.0
+                    || hair
+                    || garment_mask.as_ref().is_some_and(|m| {
+                        m.coverage(p.0 / w, p.1 / h, source.width, source.height) > 0.0
+                    })
+                    || attachment_feature_masks
+                        .iter()
+                        .any(|m| m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5))
+            {
                 return Err(invalid("source moving attachment support conflicts with protected material; recompute the source plan"));
             }
             moving_attachment.push(planned_attachment);
             if planned_attachment {
                 *donor_excluded.last_mut().expect("current pixel") = true;
             }
-            let rigid_attachment = rigid_masks
-                .iter()
-                .any(|(name, m)| (*name != "accessories" || !planned_attachment)
-                    && m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            let rigid_attachment = rigid_masks.iter().any(|(name, m)| {
+                (*name != "accessories" || !planned_attachment)
+                    && m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
+            });
             let accessory = (hair && !rear_hair) || rigid_attachment;
             attachment_fixed.push(accessory);
             neck_membership.push(
@@ -2757,10 +2875,10 @@ fn adjust_impl(
                 continue;
             }
             let p = ((left + i % cw) as f32 + 0.5, (top + i / cw) as f32 + 0.5);
-            let rigid_attachment = rigid_masks
-                .iter()
-                .any(|(name, m)| (*name != "accessories" || !moving_attachment[i])
-                    && m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5);
+            let rigid_attachment = rigid_masks.iter().any(|(name, m)| {
+                (*name != "accessories" || !moving_attachment[i])
+                    && m.coverage(p.0 / w, p.1 / h, source.width, source.height) >= 0.5
+            });
             inferred_person_fixed[i] = false;
             frozen[i] = protection[i] >= 1.0 - 1e-6 || attachment_fixed[i] || material_fixed[i];
             donor_frozen[i] = protection[i] >= 1.0 - 1e-6 || rigid_attachment || material_fixed[i];
@@ -2852,10 +2970,10 @@ fn adjust_impl(
                 frozen[i]
                     || inferred_person_fixed[i]
                     || protection[i] > 1e-6
-                    || fixed_masks
-                        .iter()
-                        .any(|(name, m)| (*name != "accessories" || !moving_attachment[i])
-                            && m.coverage(nx, ny, source.width, source.height) > 1e-6),
+                    || fixed_masks.iter().any(|(name, m)| {
+                        (*name != "accessories" || !moving_attachment[i])
+                            && m.coverage(nx, ny, source.width, source.height) > 1e-6
+                    }),
             );
         }
         color_alpha = crate::face_matting::recover_connected_portrait_fringe(
@@ -2877,10 +2995,10 @@ fn adjust_impl(
                 protection[i] > 1e-6
                     || material_fixed[i]
                     || (frozen[i] && !inferred_person_fixed[i])
-                    || fixed_masks
-                        .iter()
-                        .any(|(name, m)| (*name != "accessories" || !moving_attachment[i])
-                            && m.coverage(nx, ny, source.width, source.height) > 1e-6)
+                    || fixed_masks.iter().any(|(name, m)| {
+                        (*name != "accessories" || !moving_attachment[i])
+                            && m.coverage(nx, ny, source.width, source.height) > 1e-6
+                    })
             })
             .collect();
         let recover_fringe = true;
@@ -2911,18 +3029,27 @@ fn adjust_impl(
     }
     if let Some(layers) = source_layers {
         if !stable_source_layers || !joint_neck {
-            return Err(invalid("face source layers require a connected face and neck material domain"));
+            return Err(invalid(
+                "face source layers require a connected face and neck material domain",
+            ));
         }
         for i in 0..count {
             let x = left + i % cw;
             let y = top + i / cw;
-            if !layers.contains(x, y) { continue; }
-            color_alpha[i] = if material_fixed[i] { 0.0 } else {
+            if !layers.contains(x, y) {
+                continue;
+            }
+            color_alpha[i] = if material_fixed[i] {
+                0.0
+            } else {
                 layers.optical_alpha[y * source.width as usize + x]
             };
-            if color_alpha[i] > 1e-6 && inferred_person_fixed[i]
-                && !attachment_fixed[i] && !material_fixed[i]
-                && protection[i] < 1.0 - 1e-6 {
+            if color_alpha[i] > 1e-6
+                && inferred_person_fixed[i]
+                && !attachment_fixed[i]
+                && !material_fixed[i]
+                && protection[i] < 1.0 - 1e-6
+            {
                 frozen[i] = false;
             }
         }
@@ -3199,10 +3326,15 @@ fn adjust_impl(
             .map(|i| color_alpha[i] > 1e-6 && !frozen[i])
             .collect();
         let input = source_cache::BackgroundInput {
-            source: &crop, holes: &source_holes, alpha: &color_alpha,
-            donor_frozen: &donor_frozen, donor_excluded: &donor_excluded,
-            known_layer: &known_layer, estimated_background: color_layers.as_ref().map(|(_, b)| b),
-            reconstruction_scene: reconstruction_scene.as_deref(), independent_scene_color,
+            source: &crop,
+            holes: &source_holes,
+            alpha: &color_alpha,
+            donor_frozen: &donor_frozen,
+            donor_excluded: &donor_excluded,
+            known_layer: &known_layer,
+            estimated_background: color_layers.as_ref().map(|(_, b)| b),
+            reconstruction_scene: reconstruction_scene.as_deref(),
+            independent_scene_color,
         };
         let (background, foreground) = match source_cache.as_deref_mut() {
             Some(cache) => cache.reconstruct_and_pair(input)?,
@@ -3217,20 +3349,36 @@ fn adjust_impl(
     #[cfg(test)]
     if let Some(path) = params.get("__sourcePlatePrior").and_then(Value::as_str) {
         if paired_foreground.is_none() {
-            return Err(invalid("source plate prior requires paired opaque source layers"));
+            return Err(invalid(
+                "source plate prior requires paired opaque source layers",
+            ));
         }
         // Apply after physical pairing. Re-pairing afterwards would project
         // signed contrast back into the stationary plate and undo the edit.
         source_plate::apply_cached(
-            source, &crop, &mut color_alpha, &mut paired_background, &frozen,
-            (left, top), std::path::Path::new(path),
-        ).map_err(|e| invalid(&e))?;
+            source,
+            &crop,
+            &mut color_alpha,
+            &mut paired_background,
+            &frozen,
+            (left, top),
+            std::path::Path::new(path),
+        )
+        .map_err(|e| invalid(&e))?;
     }
     if let Some(layers) = source_layers {
         if paired_foreground.is_none() {
-            return Err(invalid("face source layers require complete face, skin and neck raster evidence"));
+            return Err(invalid(
+                "face source layers require complete face, skin and neck raster evidence",
+            ));
         }
-        layers.apply_scene(&crop, &mut color_alpha, &mut paired_background, &frozen, (left, top))?;
+        layers.apply_scene(
+            &crop,
+            &mut color_alpha,
+            &mut paired_background,
+            &frozen,
+            (left, top),
+        )?;
     }
     mark!("source scene prior");
     let foreground = paired_foreground
@@ -3246,12 +3394,13 @@ fn adjust_impl(
     // transition that is used by the source compositor. It is deliberately
     // opt-in; the default path keeps the accepted legacy falloffs until this
     // candidate passes real-photo image review.
-    let source_domain_profile = source_layers.is_some() || params
-        .get("experimentalFaceProfile")
-        .and_then(Value::as_str)
-        .is_some_and(|profile| {
-            matches!(profile, "source-domain-v1" | "source-domain-continuous-v1")
-        });
+    let source_domain_profile = source_layers.is_some()
+        || params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str)
+            .is_some_and(|profile| {
+                matches!(profile, "source-domain-v1" | "source-domain-continuous-v1")
+            });
     // The continuous candidate inherits the observed skin/adjacent-hair
     // material domain prepared above. Its flow extends beyond the old optical
     // coverage, while unshared hair, fixed attachments and user protection
@@ -3262,12 +3411,12 @@ fn adjust_impl(
     // acceptance for the supplied source layers and requested operation.
     let continuous_source_domain = source_layers.is_some();
     #[cfg(test)]
-    let continuous_source_domain = continuous_source_domain || params
-        .get("experimentalFaceProfile")
-        .and_then(Value::as_str)
-        == Some("source-domain-continuous-v1");
-    let source_domain = if source_domain_profile && joint_neck
-    {
+    let continuous_source_domain = continuous_source_domain
+        || params
+            .get("experimentalFaceProfile")
+            .and_then(Value::as_str)
+            == Some("source-domain-continuous-v1");
+    let source_domain = if source_domain_profile && joint_neck {
         let active: Vec<bool> = (0..count)
             .map(|i| {
                 joint_owned[i]
@@ -3283,24 +3432,36 @@ fn adjust_impl(
                     // neighbouring shared hair band has already been admitted
                     // by promote_interface and is absent from attachment_fixed.
                     // Scene and other-person output locks remain separate.
-                    material_fixed[i]
-                        || attachment_fixed[i]
-                        || protection[i] >= 1.0 - 1e-6
+                    material_fixed[i] || attachment_fixed[i] || protection[i] >= 1.0 - 1e-6
                 } else {
                     frozen[i] || material_fixed[i] || attachment_fixed[i]
                 }
             })
             .collect();
         let origin = (left as f32 + 0.5, top as f32 + 0.5);
-        let taper = (frame.width() * 0.12).clamp(6.0, 24.0);
+        // A short barrier taper makes the first contour samples outside a
+        // fixed hair/ear attachment jump from almost zero gain to full cheek
+        // gain over only a few pixels.  The resulting transported silhouette
+        // is numerically valid, but its tangent develops a visible platform
+        // at the jaw/neck join.  Keep the motion domain itself authoritative
+        // and widen only this scalar transition for the source paired path;
+        // the legacy path keeps its historical envelope.  The cheek interior
+        // is already beyond the taper, so requested face width is unchanged.
+        let taper = motion_domain_taper(frame.width(), continuous_source_domain);
         if continuous_source_domain {
             // The optical source coverage is not the domain of exp(v).
             // Reserve both directions of travel beyond the old silhouette;
             // this only permits evaluation of the foreground flow there.
             // Actual foreground/background ownership stays in the compositor.
-            let travel = polygon.iter().zip(&target)
-                .map(|(&p, &q)| { let d = sub(q, p); dot(d, d).sqrt() })
-                .fold(0.0_f32, f32::max) * 2.0;
+            let travel = polygon
+                .iter()
+                .zip(&target)
+                .map(|(&p, &q)| {
+                    let d = sub(q, p);
+                    dot(d, d).sqrt()
+                })
+                .fold(0.0_f32, f32::max)
+                * 2.0;
             joint_domain::MotionDomain::build_with_motion_halo(
                 cw, ch, origin, &active, &blocked, travel, taper,
             )
@@ -3828,7 +3989,8 @@ fn adjust_impl(
                     let raw = if positive_kernel {
                         positive_interpolator.evaluate(&velocity_values, p)
                     } else {
-                        rbf.as_ref().expect("RBF mode has a solver")
+                        rbf.as_ref()
+                            .expect("RBF mode has a solver")
                             .evaluate(coefficients.as_ref().expect("RBF mode has coefficients"), p)
                     };
                     scale(raw, support_weights[i])
@@ -4479,34 +4641,58 @@ mod tests {
         params["semanticMasks"]["accessories"] = mask(accessory.clone());
         params["experimentalFaceProfile"] = json!("shared-cheek-ear-periodic-v1");
         params["adjustments"] = json!({"faceWidth":30});
-        params["__faceProbePoints"] = json!([[37.5,150.5],[37.5,131.5]]);
-        let root = std::env::temp_dir().join(format!("face-moving-attachment-{}", std::process::id()));
+        params["__faceProbePoints"] = json!([[37.5, 150.5], [37.5, 131.5]]);
+        let root =
+            std::env::temp_dir().join(format!("face-moving-attachment-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
         let render = |name: &str, p: &Value| {
             let mut p = p.clone();
             let path = root.join(name);
             p["__faceFieldTrace"] = json!(path);
             let result = adjust(&source, &p).unwrap();
-            let probes: Value = serde_json::from_slice(&std::fs::read(path.join("render-probes.json")).unwrap()).unwrap();
+            let probes: Value =
+                serde_json::from_slice(&std::fs::read(path.join("render-probes.json")).unwrap())
+                    .unwrap();
             (result, probes)
         };
         let (baseline, old) = render("fixed", &params);
-        assert_eq!(old[0]["frozen"], true, "counterexample must reproduce the stale lower-ear lock");
+        assert_eq!(
+            old[0]["frozen"], true,
+            "counterexample must reproduce the stale lower-ear lock"
+        );
         assert_eq!(old[0]["jointOwned"], false);
         let mut zero = params.clone();
         zero["__sourceMovingAttachmentSupport"] = mask(vec![0; size]);
         let (no_plan_motion, _) = render("empty-plan", &zero);
-        assert_eq!(baseline, no_plan_motion, "an empty plan must preserve existing behavior");
+        assert_eq!(
+            baseline, no_plan_motion,
+            "an empty plan must preserve existing behavior"
+        );
         let mut planned = params.clone();
         planned["__sourceMovingAttachmentSupport"] = mask(accessory.clone());
         let (_, new) = render("planned", &planned);
-        assert_eq!(new[0]["frozen"], false, "planned stud must not cut off the attached ear below it");
+        assert_eq!(
+            new[0]["frozen"], false,
+            "planned stud must not cut off the attached ear below it"
+        );
         assert_eq!(new[0]["jointOwned"], true);
-        assert_eq!(new[1]["jointOwned"], true, "permission must bridge the parser class gap");
+        assert_eq!(
+            new[1]["jointOwned"], true,
+            "permission must bridge the parser class gap"
+        );
         assert_eq!(old[1]["jointAlpha"], 0.0);
-        assert_eq!(new[1]["jointAlpha"], 0.0, "motion support must not be promoted into opacity");
-        assert_eq!(new[1]["donorExcluded"], true, "moving adornment is never a backdrop donor");
-        assert_eq!(new[1]["donorFrozen"], false, "old stud must not be pinned into the backdrop plate");
+        assert_eq!(
+            new[1]["jointAlpha"], 0.0,
+            "motion support must not be promoted into opacity"
+        );
+        assert_eq!(
+            new[1]["donorExcluded"], true,
+            "moving adornment is never a backdrop donor"
+        );
+        assert_eq!(
+            new[1]["donorFrozen"], false,
+            "old stud must not be pinned into the backdrop plate"
+        );
         for conflict in ["user", "hair", "feature", "garment"] {
             let mut blocked = planned.clone();
             match conflict {
@@ -4517,7 +4703,10 @@ mod tests {
                 _ => unreachable!(),
             }
             let result = adjust(&source, &blocked);
-            assert!(result.is_err(), "planned attachment must reject {conflict} protection rather than remove it");
+            assert!(
+                result.is_err(),
+                "planned attachment must reject {conflict} protection rather than remove it"
+            );
         }
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -5217,6 +5406,18 @@ mod tests {
         let right_slope = (values[4] - values[3]) / 0.001;
         assert!(left_slope > 0.25 && right_slope > 0.25);
         assert!(values.iter().all(|value| value.abs() < limit));
+    }
+
+    #[test]
+    fn source_paired_motion_domain_uses_a_wider_attachment_taper() {
+        let legacy = motion_domain_taper(220.0, false);
+        let paired = motion_domain_taper(220.0, true);
+        assert_eq!(legacy, 24.0);
+        assert_eq!(paired, 35.2);
+        assert!(paired > legacy);
+        // Small and very large faces stay within bounded raster-safe bands.
+        assert_eq!(motion_domain_taper(1.0, true), 10.0);
+        assert_eq!(motion_domain_taper(1000.0, true), 36.0);
     }
 
     #[test]
