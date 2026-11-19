@@ -1176,7 +1176,14 @@ fn default_material_alpha(source: &RgbaImage, params: &Value, subject_mask: &Val
         // explicit opticalAlpha layer: caller-provided source ownership is
         // authoritative and must remain byte-for-byte reproducible.
         let subject_alpha = rasterize_mask(subject_mask, source.width, source.height);
-        return soften_material_boundary(source, &bounded, &subject_alpha);
+        // The parser boundary is a semantic raster, so its first transition
+        // can be one or two pixels away from the photographed garment edge.
+        // Run the same source-colour constrained trimap refinement used for
+        // the subject matte before the small bilateral coverage pass.  This
+        // snaps only uncertain edge texels to an observed colour line; fully
+        // owned shirt pixels and the scene remain byte-for-byte unchanged.
+        let refined = crate::face_matting::refine_alpha(source, &bounded);
+        return soften_material_boundary(source, &refined, &subject_alpha);
     }
     geometry_target(source, params, subject_mask)
 }
@@ -1713,7 +1720,41 @@ fn build_motion_field(
         let scale = if length > cap { cap / length } else { 1.0 };
         *d = [displacement.0 * scale, displacement.1 * scale];
     }
-    validate_inverse_field(&field, width, height)?;
+    // A semantic mask can meet a protected garment at a sub-pixel corner.
+    // The local boundary cap above prevents most folds, but multiple
+    // anatomical profiles can still add enough shear to make one cell
+    // invert.  Rejecting the whole edit makes an ordinary slider unusable.
+    // Instead perform a bounded line search on the already computed field:
+    // retain its direction and relative smoothness, and take the largest
+    // globally safe step whose bilinear Jacobian remains positive.  This is
+    // the same positivity constraint used by the validator, applied as a
+    // trust-region step rather than an error-only gate.
+    if validate_inverse_field(&field, width, height).is_err() {
+        let original = field.clone();
+        let mut low = 0.0f32;
+        let mut high = 1.0f32;
+        for _ in 0..16 {
+            let scale = (low + high) * 0.5;
+            let candidate: Vec<[f32; 2]> = original
+                .iter()
+                .map(|d| [d[0] * scale, d[1] * scale])
+                .collect();
+            if validate_inverse_field(&candidate, width, height).is_ok() {
+                low = scale;
+            } else {
+                high = scale;
+            }
+        }
+        if low <= 1e-3 {
+            return Err(ImageError::InvalidOperation(
+                "body geometry folds even at the minimum safe step; adjust the selection or protection mask".into(),
+            ));
+        }
+        for (value, base) in field.iter_mut().zip(original) {
+            value[0] = base[0] * low;
+            value[1] = base[1] * low;
+        }
+    }
     Ok(field)
 }
 
