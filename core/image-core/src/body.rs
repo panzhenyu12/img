@@ -1483,12 +1483,15 @@ pub(crate) fn adjust_with_layered_source(
     source: &RgbaImage,
     params: &Value,
     layers: &crate::BodyLayeredSource<'_>,
+    reconstruction: crate::SourceReconstruction,
 ) -> Result<RgbaImage, ImageError> {
     // Validate before reading source pixels in the geometric matte refinement,
     // and also for zero requests. Invalid prepared material is never ignored.
-    layers.validate_source(source)?;
+    layers.validate_source_with_reconstruction(source, reconstruction)?;
     let field = prepare_inverse_displacement(source, params)?;
-    let mut result = crate::composite_body_source_layers(source, layers, &field)?;
+    let mut result = crate::composite_body_source_layers_with_reconstruction(
+        source, layers, &field, reconstruction,
+    )?;
     finish_body_blend(source, &mut result, params);
     Ok(result)
 }

@@ -1,6 +1,6 @@
 use image_core::{
-    adjust_body_with_layered_source, prepare_body_inverse_displacement, BodyLayeredSource,
-    RgbaImage,
+    adjust_body_with_layered_source, adjust_body_with_layered_source_with_reconstruction,
+    prepare_body_inverse_displacement, BodyLayeredSource, RgbaImage, SourceReconstruction,
 };
 use serde_json::{json, Value};
 
@@ -151,6 +151,51 @@ fn explicit_protection_and_zero_opacity_are_honored() {
         adjust_body_with_layered_source(&f.source, &params, &f.layers()).unwrap(),
         f.source
     );
+}
+
+#[test]
+fn explicit_quantized_adjustment_keeps_zero_front_protection_and_outside_byte_exact() {
+    let mut f = BodyFixture::new();
+    // All actual latent colors have a .4 fractional component while the
+    // observed byte photograph is unchanged. The geometry still sees C.
+    for value in f.front.iter_mut().chain(&mut f.rear).chain(&mut f.scene) {
+        *value += 0.4;
+    }
+    let source_before = f.source.clone();
+    assert!(adjust_body_with_layered_source(&f.source, &f.params(0), &f.layers()).is_err());
+    let original_width = observed_waist_width(&f.source);
+    for amount in [0, -30, 30] {
+        let mut params = f.params(amount);
+        params["protectMask"] =
+            json!({"shape":"rect","region":{"x":0.15,"y":0.4,"width":0.2,"height":0.2}});
+        let output = adjust_body_with_layered_source_with_reconstruction(
+            &f.source, &params, &f.layers(), SourceReconstruction::NearestByte,
+        ).unwrap();
+        if amount == 0 {
+            assert_eq!(output, f.source);
+        } else if amount > 0 {
+            assert!(observed_waist_width(&output) < original_width);
+        } else {
+            assert!(observed_waist_width(&output) > original_width);
+        }
+        for y in 0..160 {
+            for x in 0..120 {
+                let i = y * 120 + x;
+                let protected = (65..95).contains(&y) && (19..41).contains(&x);
+                if protected || f.front_alpha[i] == 1.0 || x < 5 || x > 114 {
+                    assert_eq!(&output.pixels[i * 4..i * 4 + 4],
+                        &f.source.pixels[i * 4..i * 4 + 4]);
+                }
+            }
+        }
+    }
+    assert_eq!(f.source, source_before);
+    // Even an identity request must reject a nonphysical prepared scene.
+    f.scene[0] += 1.0;
+    let error = adjust_body_with_layered_source_with_reconstruction(
+        &f.source, &f.params(0), &f.layers(), SourceReconstruction::NearestByte,
+    ).unwrap_err();
+    assert!(error.to_string().contains("bounded material"));
 }
 
 #[test]

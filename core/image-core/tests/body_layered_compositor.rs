@@ -1,4 +1,134 @@
-use image_core::{composite_body_source_layers, BodyLayeredSource, RgbaImage};
+use image_core::{
+    composite_body_source_layers, composite_body_source_layers_with_reconstruction,
+    BodyLayeredSource, RgbaImage, SourceReconstruction,
+};
+
+#[test]
+fn quantized_transparent_source_does_not_transport_rounding_error_with_the_field() {
+    let source = RgbaImage::new(2, 1, vec![10, 10, 10, 255, 11, 11, 11, 255]).unwrap();
+    let scene = [10.49, 10.49, 10.49, 10.51, 10.51, 10.51];
+    let layers = BodyLayeredSource {
+        width: 2,
+        height: 1,
+        front_alpha: &[0.0; 2],
+        front_rgb: &[0.0; 6],
+        rear_alpha: &[0.0; 2],
+        rear_source_rgb: &scene,
+        scene_rgb: &scene,
+    };
+    assert!(composite_body_source_layers(&source, &layers, &[[0.0, 0.0]; 2]).is_err(),
+        "the existing exact-source contract must remain strict");
+    for dx in [0.0, -1.0, -0.5, -0.00001, 0.00001, 0.5, 1.0] {
+        let result = composite_body_source_layers_with_reconstruction(
+            &source, &layers, &[[dx, 0.0]; 2], SourceReconstruction::NearestByte,
+        ).unwrap();
+        // There is no moving material. P=0 and the destination B stays put.
+        // Using observed C instead of latent S would move +/-0.49 rounding
+        // residuals and change x0 from10 to11 under a one-pixel shift.
+        assert_eq!(result, source, "quantization noise moved at dx={dx}");
+    }
+}
+
+#[test]
+fn quantized_material_transport_uses_latent_premultiplication_without_rounding_residuals() {
+    let source = RgbaImage::new(2, 1, vec![50, 50, 50, 255, 100, 100, 100, 255]).unwrap();
+    let scene = [0.0, 0.0, 0.0, (100.4 - 10.6) / 0.75,
+        (100.4 - 10.6) / 0.75, (100.4 - 10.6) / 0.75];
+    let lower = [50.4, 50.4, 50.4, 100.4, 100.4, 100.4];
+    let layers = BodyLayeredSource {
+        width: 2, height: 1, front_alpha: &[0.0; 2], front_rgb: &[0.0; 6],
+        rear_alpha: &[1.0, 0.25], rear_source_rgb: &lower, scene_rgb: &scene,
+    };
+    let out = composite_body_source_layers_with_reconstruction(
+        &source, &layers, &[[1.0, 0.0], [0.0, 0.0]], SourceReconstruction::NearestByte,
+    ).unwrap();
+    // The supplied source material is P=10.6 over a black destination, so
+    // the result must be11. Using observed C to recover P gives10.2; adding
+    // destination C-S=-.4 after transport also gives10.2. Both wrongly yield10.
+    assert_eq!(&out.pixels[..4], &[11, 11, 11, 255]);
+    assert_eq!(&out.pixels[4..], &source.pixels[4..]);
+
+    let source = RgbaImage::new(2, 1, vec![0, 0, 0, 255, 100, 100, 100, 255]).unwrap();
+    let lower = [0.0, 0.0, 0.0, 100.4, 100.4, 100.4];
+    let scene = [0.0, 0.0, 0.0, 100.4 / 0.75, 100.4 / 0.75, 100.4 / 0.75];
+    let layers = BodyLayeredSource {
+        width: 2, height: 1, front_alpha: &[0.0; 2], front_rgb: &[0.0; 6],
+        rear_alpha: &[0.0, 0.25], rear_source_rgb: &lower, scene_rgb: &scene,
+    };
+    // P=0 is valid on a bright source and remains bounded on a black scene;
+    // substituting rounded C would incorrectly infer P=-.4.
+    let out = composite_body_source_layers_with_reconstruction(
+        &source, &layers, &[[1.0, 0.0], [0.0, 0.0]], SourceReconstruction::NearestByte,
+    ).unwrap();
+    assert_eq!(out, source);
+}
+
+#[test]
+fn quantized_reconstruction_cells_are_half_open_and_never_extend_the_color_domain() {
+    for (byte, latent, accepted) in [
+        (100, 99.5, true), (100, 100.499999, true),
+        (100, 100.5, false), (100, 99.499999, false),
+        (0, 0.0, true), (0, 0.499999, true), (0, 0.5, false),
+        (0, -0.1, false), (255, 254.5, true), (255, 255.0, true),
+        (255, 255.1, false), (255, 255.5, false),
+        (100, f64::NAN, false),
+    ] {
+        let source = RgbaImage::new(1, 1, vec![byte, byte, byte, 255]).unwrap();
+        let lower = [latent; 3];
+        let layers = BodyLayeredSource {
+            width: 1, height: 1, front_alpha: &[0.0], front_rgb: &[0.0; 3],
+            rear_alpha: &[1.0], rear_source_rgb: &lower, scene_rgb: &[0.0; 3],
+        };
+        let output = composite_body_source_layers_with_reconstruction(
+            &source, &layers, &[[0.0, 0.0]], SourceReconstruction::NearestByte,
+        );
+        assert_eq!(output.is_ok(), accepted, "C={byte}, S={latent}");
+        if accepted { assert_eq!(output.unwrap(), source); }
+    }
+}
+
+#[test]
+fn quantized_soft_front_composes_before_validation_and_tiny_motion_jumps_at_most_one_byte() {
+    for lower_at_zero in [100.4, 100.999999] {
+        let source = RgbaImage::new(2, 1, vec![70, 70, 70, 255, 90, 90, 90, 255]).unwrap();
+        let lower = [lower_at_zero, lower_at_zero, lower_at_zero, 108.4, 108.4, 108.4];
+        let layers = BodyLayeredSource {
+            width: 2, height: 1, front_alpha: &[0.5, 1.0],
+            front_rgb: &[40.0, 40.0, 40.0, 90.4, 90.4, 90.4],
+            rear_alpha: &[1.0; 2], rear_source_rgb: &lower, scene_rgb: &[0.0; 6],
+        };
+        let mut previous = source.clone();
+        for dx in [-0.00001, 0.0, 0.00001] {
+            let out = composite_body_source_layers_with_reconstruction(
+                &source, &layers, &[[dx, 0.0]; 2], SourceReconstruction::NearestByte,
+            ).unwrap();
+            // The first source is Q(.5*40+.5*100.4)=70, not Q(rear)=100.
+            // The second legitimately crosses a rounding threshold under a
+            // tiny motion: continuity of latent RGB allows a one-byte step.
+            let expected = if lower_at_zero > 100.9 && dx > 0.0 { 71 } else { 70 };
+            assert_eq!(&out.pixels[..4], &[expected, expected, expected, 255]);
+            assert_eq!(&out.pixels[4..], &source.pixels[4..], "opaque front moved");
+            assert!(out.pixels.iter().zip(&previous.pixels)
+                .all(|(&a, &b)| a.abs_diff(b) <= 1));
+            previous = out;
+        }
+    }
+}
+
+#[test]
+fn quantized_zero_motion_still_rejects_a_physically_impossible_scene() {
+    let source = RgbaImage::new(1, 1, vec![100, 100, 100, 255]).unwrap();
+    let layers = BodyLayeredSource {
+        width: 1, height: 1, front_alpha: &[0.0], front_rgb: &[0.0; 3],
+        rear_alpha: &[0.0], rear_source_rgb: &[100.4; 3], scene_rgb: &[100.5; 3],
+    };
+    let error = composite_body_source_layers_with_reconstruction(
+        &source, &layers, &[[0.0, 0.0]], SourceReconstruction::NearestByte,
+    ).unwrap_err();
+    // Both colors independently round to plausible bytes, but P=-.1 is not
+    // material. Quantization tolerance must never relax the physical bound.
+    assert!(error.to_string().contains("bounded material"));
+}
 
 struct Fixture {
     source: RgbaImage,

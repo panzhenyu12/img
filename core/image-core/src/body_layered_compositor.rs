@@ -6,15 +6,32 @@
 
 use crate::{ImageError, RgbaImage};
 
+/// Contract between the prepared floating source and the observed RGB8 photo.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SourceReconstruction {
+    /// The floating composition equals the observed byte, apart from the
+    /// existing bound for accumulated IEEE-754 arithmetic error.
+    Exact,
+    /// The bounded floating composition S produces the observed byte C by
+    /// C=floor(S+0.5). This is lower-closed/upper-open, not |S-C|<=0.5.
+    /// Rounding error C-S is not material and is never transported or added.
+    NearestByte,
+}
+
 /// A prepared two-material source, in the photograph's encoded RGB values.
 /// RGB slices are interleaved, three f64 values per pixel in [0,255]. Coverage
 /// slices contain one f64 value per pixel in [0,1]. No intermediate RGBA8 layer
 /// is introduced: rounding a mixed-edge underlay would break source identity.
 ///
 /// `rear_source_rgb` is the complete lower image before motion, including its
-/// own stationary scene contribution. The observed source must reconstruct as
-/// `front_alpha*front_rgb + (1-front_alpha)*rear_source_rgb`. The lower image
-/// must also admit a bounded foreground at `rear_alpha` over `scene_rgb`.
+/// own stationary scene contribution. The floating source reconstructs as
+/// `front_alpha*front_rgb + (1-front_alpha)*rear_source_rgb`; the default API
+/// requires equality with the observed photo. The explicit `NearestByte` API
+/// instead requires that this composition rounds to each observed byte.
+/// `rear_source_rgb` always contains the actual floating lower image, never
+/// its rounded observation or a source-rounding residual. The lower image
+/// must admit a bounded foreground at `rear_alpha` over `scene_rgb` under both
+/// contracts, with only the same IEEE-754 arithmetic allowance.
 pub struct BodyLayeredSource<'a> {
     pub width: u32,
     pub height: u32,
@@ -37,7 +54,11 @@ fn arithmetic_error(scale: f64) -> f64 {
 }
 
 impl BodyLayeredSource<'_> {
-    pub(crate) fn validate_source(&self, source: &RgbaImage) -> Result<usize, ImageError> {
+    pub(crate) fn validate_source_with_reconstruction(
+        &self,
+        source: &RgbaImage,
+        reconstruction: SourceReconstruction,
+    ) -> Result<usize, ImageError> {
         let count = (source.width as usize)
             .checked_mul(source.height as usize)
             .filter(|&n| n > 0)
@@ -96,12 +117,26 @@ impl BodyLayeredSource<'_> {
                 let lower = (1.0 - front) * self.rear_source_rgb[k];
                 let observed = source.pixels[i * 4 + c] as f64;
                 let reconstructed = foreground + lower;
-                if (reconstructed - observed).abs()
-                    > arithmetic_error(foreground.abs() + lower.abs() + observed.abs())
-                {
-                    return Err(invalid(
-                        "prepared front and lower layers do not reconstruct this source",
-                    ));
+                match reconstruction {
+                    SourceReconstruction::Exact => {
+                        if (reconstructed - observed).abs()
+                            > arithmetic_error(foreground.abs() + lower.abs() + observed.abs())
+                        {
+                            return Err(invalid(
+                                "prepared front and lower layers do not reconstruct this source",
+                            ));
+                        }
+                    }
+                    SourceReconstruction::NearestByte => {
+                        // No epsilon widens the quantization cell. Bounded
+                        // layer colors/coverage above also bound this convex
+                        // composition; no latent RGB clipping is performed.
+                        if (reconstructed + 0.5).floor() != observed {
+                            return Err(invalid(
+                                "prepared front and lower layers do not quantize to this source",
+                            ));
+                        }
+                    }
                 }
                 let background = (1.0 - rear) * self.scene_rgb[k];
                 let residual = self.rear_source_rgb[k] - background;
@@ -132,7 +167,26 @@ pub fn composite_body_source_layers(
     layers: &BodyLayeredSource<'_>,
     inverse_displacement: &[[f32; 2]],
 ) -> Result<RgbaImage, ImageError> {
-    let count = layers.validate_source(source)?;
+    composite_body_source_layers_with_reconstruction(
+        source,
+        layers,
+        inverse_displacement,
+        SourceReconstruction::Exact,
+    )
+}
+
+/// Composite using an explicit source reconstruction contract. Only source
+/// validation differs from the exact API: both transport the same bounded
+/// premultiplied material `rear_source_rgb - (1-rear_alpha)*scene_rgb`.
+/// The observed byte's rounding error is never transported or added back.
+/// Zero field and opaque front remain byte-exact after source validation.
+pub fn composite_body_source_layers_with_reconstruction(
+    source: &RgbaImage,
+    layers: &BodyLayeredSource<'_>,
+    inverse_displacement: &[[f32; 2]],
+    reconstruction: SourceReconstruction,
+) -> Result<RgbaImage, ImageError> {
+    let count = layers.validate_source_with_reconstruction(source, reconstruction)?;
     if inverse_displacement.len() != count
         || inverse_displacement.iter().flatten().any(|v| !v.is_finite())
     {

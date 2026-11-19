@@ -29,7 +29,10 @@ pub use engine::{apply_graph, apply_graph_json, EditGraph, GraphOperation};
 pub use model_inpaint::{composite_model_inpaint, prepare_model_inpaint, InpaintMasks};
 pub use face::{ObservationRegion as FaceObservationRegion, SourceLayers as FaceSourceLayers};
 pub use body::SourceLayers as BodySourceLayers;
-pub use body_layered_compositor::{composite_body_source_layers, BodyLayeredSource};
+pub use body_layered_compositor::{
+    composite_body_source_layers, composite_body_source_layers_with_reconstruction,
+    BodyLayeredSource, SourceReconstruction,
+};
 
 /// Edit a portrait with explicit, frozen source material evidence. This uses
 /// the continuous source motion domain in ordinary native builds as well as
@@ -68,7 +71,21 @@ pub fn adjust_body_with_layered_source(
     layers: &BodyLayeredSource<'_>,
 ) -> Result<RgbaImage, ImageError> {
     validate_layer_operation("body.adjust", params)?;
-    body::adjust_with_layered_source(source, params, layers)
+    body::adjust_with_layered_source(source, params, layers, SourceReconstruction::Exact)
+}
+
+/// Apply ordinary body adjustments with an explicit floating-source contract.
+/// `NearestByte` admits bounded latent layers that quantize to the observed
+/// source. It changes no geometry or selection policy and never treats the
+/// photo's rounding error as moving material. Validation also runs at zero.
+pub fn adjust_body_with_layered_source_with_reconstruction(
+    source: &RgbaImage,
+    params: &serde_json::Value,
+    layers: &BodyLayeredSource<'_>,
+    reconstruction: SourceReconstruction,
+) -> Result<RgbaImage, ImageError> {
+    validate_layer_operation("body.adjust", params)?;
+    body::adjust_with_layered_source(source, params, layers, reconstruction)
 }
 
 /// Prepare the ordinary anatomical inverse field in source-pixel coordinates,

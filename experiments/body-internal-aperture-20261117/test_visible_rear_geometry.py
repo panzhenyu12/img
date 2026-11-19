@@ -207,6 +207,40 @@ class VisibleRearGeometryTests(unittest.TestCase):
         # These bounds apply to the actual computational curve helper. They
         # do not establish C1 after mask union, clipping, or native resampling.
 
+    def test_rotating_source_and_anatomy_rotates_the_same_continuation(self):
+        # A horizontal torso must not silently fall back to image rows. A
+        # quarter turn is an exact pixel permutation, requiring no new image
+        # interpolation or material estimates to explain away a discrepancy.
+        params,front,rear=fixture(coarse=True)
+        front[56:104,78:120]=1
+        original,report=self.checked_call(params,front,rear,continuation='pchip')
+        turned=copy.deepcopy(params)
+        for key in ['subjectMask','partMask','protectMask']:
+            m=turned[key]
+            values=np.asarray(m['data']).reshape(m['height'],m['width'])
+            values=np.rot90(values,-1)
+            m.update(width=values.shape[1],height=values.shape[0],data=values.ravel().tolist())
+        for point in turned['landmarks']:
+            point['x'],point['y']=1-point['y'],point['x']
+        for r in [turned['region'],turned['mask']['region']]:
+            old=copy.deepcopy(r)
+            r.update(x=1-old['y']-old['height'],y=old['x'],
+                     width=old['height'],height=old['width'])
+        candidate,rotated_report=build_visible_rear_geometry(
+            turned,HEIGHT,WIDTH,np.rot90(front,-1),np.rot90(rear,-1),continuation='pchip')
+        expected=np.rot90(part_array(original),-1)
+        error=abs(part_array(candidate).astype(int)-expected.astype(int))
+        self.assertLessEqual(int(error.max()),1,
+            'source-only correction depends on canvas orientation instead of anatomical axis')
+        for a,b in zip(report['sections'],rotated_report['sections']):
+            for side in ['left','right']:
+                self.assertEqual(a[side]['status'],b[side]['status'])
+                self.assertEqual(a[side]['reason'],b[side]['reason'])
+                if a[side]['status']=='measured':
+                    self.assertAlmostEqual(a[side]['radius'],b[side]['radius'],places=9)
+        self.assertGreater(report['addedGeometryPixels'],0)
+        self.assertGreater(rotated_report['addedGeometryPixels'],0)
+
     def test_missing_endpoint_support_refuses_only_that_side_without_partial_splice(self):
         # A visible interior cannot authorize a partial PCHIP domain if an
         # unknown endpoint has no bounded original-part anchor. Otherwise its
