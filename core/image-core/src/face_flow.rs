@@ -369,6 +369,22 @@ pub(super) fn project_side_curve(
             }
         }
     }
+    // Penalize abrupt changes in *displacement* at a fixed-material
+    // attachment. The previous curvature-only term could still satisfy a
+    // hard zero at the hair/skin join and then spend the requested motion in
+    // the next one or two samples, creating a visible vertical platform.
+    // Scale by physical sample spacing so the result is stable when contour
+    // points are nonuniformly distributed.
+    for i in 0..n - 1 {
+        let h = (samples[i + 1].0 as f64 - samples[i].0 as f64).max(0.1);
+        let indices = [i, i + 1];
+        let coefficients = [-1.0 / h, 1.0 / h];
+        for (&a, &ca) in indices.iter().zip(&coefficients) {
+            for (&b, &cb) in indices.iter().zip(&coefficients) {
+                p[a][b] += 2.0 * 0.25 * h * ca * cb;
+            }
+        }
+    }
     let mut rows = Vec::<Vec<f64>>::new();
     let mut bounds = Vec::<f64>::new();
     let mut equalities = 0;
@@ -594,6 +610,25 @@ mod curve_tests {
             "clear lower jaw must retain meaningful requested expansion"
         );
     }
+
+    #[test]
+    fn fixed_attachment_transition_spreads_motion_without_a_platform() {
+        let samples = [
+            (0.0, 0.0, 0.0, 0.0, true),
+            (10.0, 0.0, 0.0, 0.0, true),
+            (20.0, 0.0, 10.0, 10.0, false),
+            (30.0, 0.0, 10.0, 10.0, false),
+            (40.0, 0.0, 10.0, 10.0, false),
+        ];
+        let q = project_side_curve(&samples).unwrap();
+        assert!(q[0].abs() < 1e-4 && q[1].abs() < 1e-4);
+        let first = q[2] - q[1];
+        let second = q[3] - q[2];
+        assert!(first <= 6.0, "motion still starts as a hard platform: {q:?}");
+        assert!(second >= first - 1e-4, "transition bends back toward the join: {q:?}");
+        assert!(q[4] >= 8.0, "the edit was over-smoothed away: {q:?}");
+    }
+
     #[test]
     fn source_pixel_irregularity_is_feasible_without_unsolicited_reshaping() {
         let samples = [
