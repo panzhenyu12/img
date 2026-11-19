@@ -64,3 +64,26 @@ test('双色与宽袖分区保持真实轮廓且相等路径不会反复灌入he
   expect(result.inner).toBeGreaterThan(127);
   expect(result.wideEdge).toBeGreaterThan(127);
 });
+
+test('同一top语义下的深色后挂衣物不会被躯干种子跨色边界吞入',async({page})=>{
+  await page.goto('/');
+  const result=await page.evaluate(async()=>{
+    const {deriveBodyLayers,BODY_CLASSES}=await import('/src/core/bodyParsing.ts');
+    const width=96,height=120,n=width*height,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d')!;ctx.fillStyle='#202a2e';ctx.fillRect(0,0,width,height);
+    // White shirt in the centre and a dark jacket on both sides. They share
+    // the model's `top` class, so only the observed colour boundary can keep
+    // the torso ownership from walking around the shirt hem.
+    ctx.fillStyle='#e4edf2';ctx.fillRect(32,28,34,68);
+    const classes=Object.fromEntries(BODY_CLASSES.map(name=>[name,{shape:'raster' as const,width,height,data:Array(n).fill(0)}]));
+    for(let y=28;y<96;y++)for(let x=10;x<86;x++){classes.top.data[y*width+x]=255;classes.background.data[y*width+x]=0;}
+    const points=Array.from({length:33},()=>({x:.5,y:.5,visibility:0}));
+    points[11]={x:.38,y:.18,visibility:1};points[12]={x:.62,y:.18,visibility:1};points[23]={x:.42,y:.84,visibility:1};points[24]={x:.58,y:.84,visibility:1};
+    const layers=deriveBodyLayers(canvas,points,classes),mask=layers.partMasks.waist;
+    const at=(x:number,y:number)=>mask.data[y*mask.width+x];
+    return {shirt:at(45,60),jacket:at(18,60),rightJacket:at(78,60)};
+  });
+  expect(result.shirt).toBeGreaterThan(127);
+  expect(result.jacket).toBe(0);
+  expect(result.rightJacket).toBe(0);
+});

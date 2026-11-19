@@ -69,6 +69,28 @@ export function deriveBodyLayers(source:HTMLCanvasElement,points:DetectionPoint[
   };
   if([11,12,23,24].every(i=>good(points[i])))add('torso',mid(points[11],points[12]),mid(points[23],points[24]));
   for(const [id,a,b,isLower] of [['left-upper-arm',11,13,false],['right-upper-arm',12,14,false],['left-forearm',13,15,false],['right-forearm',14,16,false],['left-thigh',23,25,true],['right-thigh',24,26,true],['left-calf',25,27,true],['right-calf',26,28,true]] as const)add(id,points[a],points[b],isLower);
+  // Pick the semantic material that actually occurs along the torso seed
+  // before growing the ownership map.  A pose seed may sit on bare neck
+  // pixels while the waist below is a shirt; allowing every upper-body class
+  // lets the geodesic cross that interface and claim a rear jacket.  Keeping
+  // the dominant seed class as a gate preserves a connected shirt while
+  // remaining usable for a genuinely bare torso.
+  const preferredClass=new Map<string,number>();
+  const classCandidates=(bone:Bone)=>bone.id==='torso'?[3,4,5,6,7,16]:bone.lower?[5,6,14]:[3,4,12,16];
+  const seedScores=(bone:Bone)=>{
+    const scores=new Map<number,number>();
+    for(const c of classCandidates(bone))scores.set(c,0);
+    const steps=Math.ceil(bone.length*2);
+    for(let step=0;step<=steps;step++){
+      const t=step/steps;if(bone.id!=='torso'&&(t<.12||t>.88))continue;
+      const x=Math.max(0,Math.min(w-1,Math.floor((bone.a.x+(bone.b.x-bone.a.x)*t)*w)));
+      const y=Math.max(0,Math.min(h-1,Math.floor((bone.a.y+(bone.b.y-bone.a.y)*t)*h)));
+      const i=y*w+x;if(foreground[i]<=.01||protectedPixels[i])continue;
+      for(const c of classCandidates(bone))scores.set(c,scores.get(c)!+probabilities[c][i]);
+    }
+    return [...scores.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0];
+  };
+  for(const bone of bones){const preferred=seedScores(bone);if(preferred!==undefined)preferredClass.set(bone.id,preferred);}
   // Heap costs are JS doubles. Rounding them into Float32 can round upward;
   // an equal path then compares as "shorter" indefinitely and floods the
   // heap on flat two-colour garments. Preserve the same precision as costs.
@@ -78,7 +100,9 @@ export function deriveBodyLayers(source:HTMLCanvasElement,points:DetectionPoint[
     // hip joint is below the garment waistband; excluding these classes
     // removes the actual waist while retaining only upper-shirt texture.
     const probability=bone.id==='torso'?[3,4,5,6,7,16].reduce((s,c)=>s+probabilities[c][i],0):bone.lower?lower[i]:upper[i];
-    return foreground[i]>.01&&!protectedPixels[i]&&probability>.25;
+    const preferred=preferredClass.get(bone.id);
+    const materialMatch=preferred===undefined||probabilities[preferred][i]>.20;
+    return foreground[i]>.01&&!protectedPixels[i]&&probability>.25&&materialMatch;
   };
   bones.forEach((bone,label)=>{
     const steps=Math.ceil(bone.length*2);
@@ -95,6 +119,15 @@ export function deriveBodyLayers(source:HTMLCanvasElement,points:DetectionPoint[
     for(const j of neighbors) {
       if(j<0||!allowed(j,bone))continue;
       let color=0;for(let c=0;c<3;c++)color+=(rgb[i*4+c]-rgb[j*4+c])**2;
+      // A semantic ``top`` class can contain several garments in one
+      // connected component (for example a white shirt and a dark jacket
+      // draped behind it).  Colour-aware geodesics used to walk around the
+      // shirt hem and eventually claim the jacket as torso material.  That
+      // made the waist warp move the rear garment and produced a visible
+      // stepped edge.  Keep a true garment boundary closed for the torso
+      // owner; small texture/fold changes stay below this threshold and can
+      // still be traversed around their one-pixel perimeter.
+      if(bone.id==='torso' && Math.sqrt(color)/255>.20)continue;
       const candidate=cost+1+Math.sqrt(color)/255*8;
       if(candidate<distance[j]){distance[j]=candidate;owner[j]=label;heap.push([candidate,j]);}
     }
