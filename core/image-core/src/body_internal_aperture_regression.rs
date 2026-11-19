@@ -38,6 +38,7 @@ fn profile(alpha: &[f32], amount: f32) -> ContourProfile {
         200,
         false,
         4.0,
+        &[],
     )
 }
 

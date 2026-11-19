@@ -521,6 +521,7 @@ impl ContourProfile {
         height: usize,
         limb: bool,
         fringe: f32,
+        occluders: &[bool],
     ) -> Self {
         let axis = warp.axis;
         let normal = axis.normal();
@@ -540,24 +541,38 @@ impl ContourProfile {
                 axis.origin.1 + axis.direction.1 * axis.length * t,
             );
             let mut sides = [0.0f32; 2];
-            // A missing bone core still anchors the section. Only the
-            // exterior ray measurement crosses enclosed off-axis apertures.
-            if read(alpha, center) >= 0.5 {
+            let occluded_core = !limb && center.0 >= 0.0 && center.1 >= 0.0
+                && center.0 < width as f32 && center.1 < height as f32
+                && occluders.get(center.1 as usize * width + center.0 as usize)
+                    .copied().unwrap_or(false);
+            // The skeleton may lie behind an observed foreground object.
+            // Its visibility does not decide whether the *opposite* visible
+            // side of the same selected material can move. Measure the first
+            // visible interval independently on each side. Pixel protection
+            // anchors the actual occluder later, without pinning a whole row.
+            // A bare open background gap is not occlusion evidence. Require
+            // explicit protection at a missing core or the existing enclosed
+            // aperture support; do not adopt a detached piece across a gap.
+            // Unparsed limbs still need their observed core.
+            let core = if limb { read(alpha, center) } else { read(&contour_alpha, center) };
+            if core >= 0.5 || occluded_core {
                 for (side, sign) in [-1.0f32, 1.0].into_iter().enumerate() {
                     let limit = (axis.radius * 2.0 + 8.0)
                         .min(width.max(height) as f32 * 0.6)
                         .ceil() as usize;
                     let mut previous = read(&contour_alpha, center);
+                    let mut entered = previous >= 0.5;
                     for d in 1..=limit {
                         let value = read(&contour_alpha, (
                             center.0 + normal.0 * sign * d as f32,
                             center.1 + normal.1 * sign * d as f32,
                         ));
-                        if value < 0.5 {
+                        if entered && value < 0.5 {
                             let fraction = (previous - 0.5) / (previous - value).max(1e-6);
                             sides[side] = d as f32 - 1.0 + fraction;
                             break;
                         }
+                        entered |= value >= 0.5;
                         previous = value;
                     }
                 }
@@ -599,12 +614,9 @@ impl ContourProfile {
                 }
             }
         }
-        // A fixed occluder can cross the bone core, leaving no measurable
-        // section while the visible shirt farther from the core continues.
-        // Switching the whole next section directly to identity tears an
-        // internal garment edge. Anchor continuously along the axis before
-        // these missing sections, while retaining the prescribed silhouette
-        // displacement on the other valid sections.
+        // If a side truly has no observed material, approach that missing
+        // section continuously. Bone-core visibility alone never creates a
+        // missing side; each side above was measured independently.
         let falloff = (sections.iter().map(|&(a, b)| a.max(b)).fold(0.0, f32::max)
             * warp.amount.abs()
             * 0.26
@@ -1143,6 +1155,7 @@ fn motion_controls(
                 height,
                 warp.limb && !has_part_mask,
                 fringe,
+                &user_protected,
             )
         })
         .collect();
@@ -1531,7 +1544,7 @@ mod tests {
             let profile = ContourProfile::new(Warp {
                 axis: Axis {origin:(50.0,10.0),direction:(0.0,1.0),length:80.0,radius:30.0},
                 amount, center:0.5, extent:0.55, limb:false,
-            }, &alpha, 100, 100, false, 4.0);
+            }, &alpha, 100, 100, false, 4.0, &[]);
             let radius = 20.0f32;
             let target = radius * (1.0 - amount * 0.26);
             let start = radius.max(target) + 4.0;
@@ -1556,7 +1569,7 @@ mod tests {
         assert!(validate_inverse_field(&[[0.0,0.0],[-0.6,0.6],[0.6,-0.6],[0.0,0.0]],2,2).is_err());
     }
     #[test]
-    fn an_occluder_crossing_the_bone_core_anchors_adjacent_sections_continuously() {
+    fn missing_bone_core_does_not_pin_visible_material_at_the_same_height() {
         let width = 100;
         let height = 180;
         let mut alpha = vec![0.0; width * height];
@@ -1585,11 +1598,13 @@ mod tests {
             height,
             false,
             4.0,
+            &[],
         );
         // The valid silhouette keeps a visible edit; this does not freeze
         // the whole shirt to conceal the broken transition.
         assert!(profile.displacement((80.0, 75.0)).0.abs() > 3.0);
-        assert_eq!(profile.displacement((80.0, 105.0)), (0.0, 0.0));
+        assert!(profile.displacement((80.0, 105.0)).0.abs() > 3.0,
+            "only actual fixed pixels anchor motion, not an occluded skeleton");
         let shifts: Vec<f32> = (85..126)
             .map(|y| profile.displacement((80.0, y as f32)).0)
             .collect();
@@ -2079,6 +2094,7 @@ mod tests {
             source.height as usize,
             true,
             3.0,
+            &[],
         )
         .displacement(mid(points[0], points[1]));
         assert_eq!(d, (0.0, 0.0));
