@@ -74,6 +74,64 @@ fn adaptive_local_width(half_width: f32, frame_width: f32) -> f32 {
     adaptive_radius_scale(2.0 * half_width / frame_width, 1.0) * frame_width
 }
 
+fn signed_area(points: &[Point]) -> f32 {
+    points
+        .iter()
+        .enumerate()
+        .map(|(i, a)| {
+            let b = points[(i + 1) % points.len()];
+            a.0 * b.1 - b.0 * a.1
+        })
+        .sum::<f32>()
+        * 0.5
+}
+
+/// Keep the requested contour inside a conservative injective envelope. The
+/// renderer has its own field checks, but a target edge that already folds or
+/// collapses can make any continuous raster field look torn at strong values.
+/// Blending toward the observed contour preserves the slider direction while
+/// removing the unsafe part of the request instead of emitting a folded target.
+fn topology_safe_target(source: &[Point], requested: Vec<Point>) -> Vec<Point> {
+    if source.len() != requested.len() || source.len() < 3 {
+        return source.to_vec();
+    }
+    let source_area = signed_area(source);
+    if !source_area.is_finite() || source_area.abs() <= 1e-4 {
+        return source.to_vec();
+    }
+    let safe = |lambda: f32| {
+        let candidate: Vec<_> = source
+            .iter()
+            .zip(&requested)
+            .map(|(&a, &b)| add(a, scale(sub(b, a), lambda)))
+            .collect();
+        let area = signed_area(&candidate);
+        if !area.is_finite() || area.signum() != source_area.signum() || area.abs() < source_area.abs() * 0.20 {
+            return None;
+        }
+        for i in 0..source.len() {
+            let next = (i + 1) % source.len();
+            let source_edge = sub(source[next], source[i]);
+            let target_edge = sub(candidate[next], candidate[i]);
+            let source_length = dot(source_edge, source_edge).sqrt();
+            let target_length = dot(target_edge, target_edge).sqrt();
+            if source_length <= 1e-4
+                || target_length < source_length * 0.20
+                || dot(source_edge, target_edge) < -0.15 * source_length * target_length
+            {
+                return None;
+            }
+        }
+        Some(candidate)
+    };
+    for lambda in [1.0, 0.75, 0.5, 0.25, 0.125, 0.0625, 0.03125] {
+        if let Some(candidate) = safe(lambda) {
+            return candidate;
+        }
+    }
+    source.to_vec()
+}
+
 /// Convert a measured section width into a bounded multiplier. Keeping this
 /// mapping separate makes the geometry contract testable without requiring a
 /// full image render and prevents invalid narrow/concave sections from
@@ -384,7 +442,7 @@ pub(crate) fn target_contour_adaptive(
         )
     };
     let normals = normal::outward_normals(polygon, (frame_width * 0.04).max(1.0))?;
-    Ok(polygon
+    let requested: Vec<_> = polygon
         .iter()
         .enumerate()
         .map(|(index, &point)| {
@@ -404,7 +462,8 @@ pub(crate) fn target_contour_adaptive(
                     - percent(values, "forehead") * 0.060 * (1.0 - smooth_c1(v / 0.30)));
             add(add(point, lateral_move), scale(down, vertical))
         })
-        .collect())
+        .collect();
+    Ok(topology_safe_target(polygon, requested))
 }
 
 #[cfg(test)]
@@ -757,6 +816,26 @@ mod tests {
         for amount in [-100, -60, 60, 100] {
             let target = target_contour_adaptive(&source, frame, None, 200.0, 240.0, &json!({"faceWidth": amount})).unwrap();
             assert_eq!(signed_area(&target).signum(), source_sign, "strong width flipped winding at {amount}");
+        }
+    }
+
+    #[test]
+    fn topology_guard_reduces_a_folded_target_to_the_nearest_safe_contour() {
+        let source = oval();
+        let mut folded = source.clone();
+        for (i, point) in folded.iter_mut().enumerate() {
+            if (16..=48).contains(&i) {
+                point.0 = 100.0 - (point.0 - 100.0) * 2.8;
+            }
+        }
+        let target = topology_safe_target(&source, folded);
+        assert_eq!(signed_area(&target).signum(), signed_area(&source).signum());
+        for i in 0..source.len() {
+            let next = (i + 1) % source.len();
+            let a = sub(source[next], source[i]);
+            let b = sub(target[next], target[i]);
+            assert!(dot(a, b) >= -0.15 * dot(a, a).sqrt() * dot(b, b).sqrt());
+            assert!(dot(b, b).sqrt() >= dot(a, a).sqrt() * 0.20);
         }
     }
 }
