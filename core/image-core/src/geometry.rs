@@ -3,6 +3,9 @@ use crate::mask::{PreparedMask, Region};
 use crate::{ImageError, RgbaImage};
 use serde_json::Value;
 
+#[path = "eye_closure_field.rs"]
+pub(crate) mod eye_closure_field;
+
 #[cfg(test)]
 #[path = "eye_material_admission.rs"]
 mod eye_material_admission;

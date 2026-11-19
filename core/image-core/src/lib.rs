@@ -8,6 +8,9 @@ mod body;
 mod body_layered_compositor;
 mod color;
 mod engine;
+mod eye_material;
+mod eye_source;
+mod eye_localize;
 mod face;
 pub(crate) mod face_matting;
 mod face_ownership;
@@ -26,6 +29,12 @@ mod validation;
 mod wasm;
 
 pub use engine::{apply_graph, apply_graph_json, EditGraph, GraphOperation};
+pub use eye_material::{estimate_explicit_materials, EyeMaterialInput, EyeMaterialLayers};
+pub use eye_source::{prepare_eye_closure, prepare_eye_closure_source, EyeSourceGeometry,
+    EyeMaterialLabels, EyeMaterialShape, EyeMaterialPoint, EyeMaterialRect, EyeMaterialStroke,
+    PreparedEyeClosure, PreparedEyeEdit, EyeSourceReport};
+pub use geometry::eye_closure_field::{prepare_eye_closure_field,
+    eye_closure_params_from_landmarks, EyeClosureField};
 pub use model_inpaint::{composite_model_inpaint, prepare_model_inpaint, InpaintMasks};
 pub use face::{ObservationRegion as FaceObservationRegion, SourceLayers as FaceSourceLayers};
 pub use body::SourceLayers as BodySourceLayers;

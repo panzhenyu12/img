@@ -20,6 +20,9 @@ libm = { version = "0.2.16", default-features = false }
 nalgebra = { version = "0.33", default-features = false, features = ["std"] }
 clarabel = { version = "0.10", default-features = false }
 
+[dev-dependencies]
+sha2 = "0.10"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clap = { version = "4", features = ["derive"] }
 
