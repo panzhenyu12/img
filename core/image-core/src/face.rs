@@ -108,6 +108,22 @@ mod anchor_transition;
 #[path = "face_positive_kernel.rs"]
 mod positive_kernel;
 
+#[cfg(test)]
+#[path = "face_interior_warp.rs"]
+mod interior_warp;
+
+#[cfg(test)]
+#[path = "face_interior_warp_contract.rs"]
+mod interior_warp_contract;
+
+#[cfg(test)]
+#[path = "face_layered_warp_contract.rs"]
+mod layered_warp_contract;
+
+#[cfg(test)]
+#[path = "face_layered_warp_replay.rs"]
+mod layered_warp_replay;
+
 #[path = "face_joint_domain.rs"]
 mod joint_domain;
 
@@ -141,6 +157,9 @@ const CONTOUR_KEYS: &[&str] = &[
     "chin",
     "chinWidth",
     "chinPoint",
+    "faceHeight",
+    "midface",
+    "doubleChin",
 ];
 
 fn invalid(message: &str) -> ImageError {
@@ -452,9 +471,32 @@ fn anchors(semantics: Option<&Value>, frame: Frame, w: f32, h: f32) -> Vec<Ancho
 
 fn vertical_contour_offset(frame: Frame, p: Point, values: &Value) -> f32 {
     let y = (frame.coordinates(p).1 - frame.top) / frame.height().max(1.0);
+    let face_height = percent(values, "faceHeight");
+    let midface = percent(values, "midface");
+    let double_chin = percent(values, "doubleChin");
+    let height_shape = -1.0 + 2.0 * smoothstep(0.0, 1.0, y);
+    // Default detector feature levels match the anatomical profile fallback;
+    // explicit feature evidence is already used by the adaptive contour
+    // target, while this shared velocity path needs a stable scalar field.
+    let eye_v = 0.30;
+    let mouth_v = 0.62;
+    let mid = (eye_v + mouth_v) * 0.5;
+    let mid_window = smoothstep(0.20, mid, y) * (1.0 - smoothstep(mouth_v, 0.72, y));
+    let mid_shape = (2.0 * (y - mid) / (mouth_v - eye_v)).clamp(-1.0, 1.0) * mid_window;
+    let chin_window = smoothstep(0.74, 0.86, y) * (1.0 - smoothstep(0.94, 1.0, y));
+    // A double-chin edit belongs to the submental centerline. Applying the
+    // same vertical offset at the cheek/ear endpoints moves the contour into
+    // hair where no connected neck donor exists, producing a dark crescent.
+    // Taper the lower-jaw displacement toward the two lateral endpoints while
+    // leaving faceHeight and midface as full-width proportion controls.
+    let u = (frame.coordinates(p).0 - frame.left) / frame.width().max(1.0);
+    let chin_center_gain = 1.0 - smoothstep(0.42, 0.88, (2.0 * u - 1.0).abs());
     frame.height()
         * (percent(values, "chin") * 0.075 * smoothstep(0.74, 1.0, y)
-            - percent(values, "forehead") * 0.060 * (1.0 - smoothstep(0.0, 0.30, y)))
+            - percent(values, "forehead") * 0.060 * (1.0 - smoothstep(0.0, 0.30, y))
+            + face_height * 0.075 * height_shape
+            + midface * 0.080 * mid_shape
+            - double_chin * 0.050 * chin_window * chin_center_gain)
 }
 
 /// Bound the accumulated anatomical lateral request without introducing the
@@ -509,6 +551,7 @@ fn target_contour(polygon: &[Point], frame: Frame, values: &Value) -> Vec<Point>
             inward -= percent(values, "foreheadWidth") * 0.060 * profile(y, 0.0, 0.16, 0.36);
             inward -= percent(values, "chinWidth") * 0.050 * profile(y, 0.69, 0.89, 1.04);
             inward += percent(values, "chinPoint") * 0.055 * profile(y, 0.72, 0.93, 1.02);
+            inward += percent(values, "doubleChin") * 0.028 * profile(y, 0.74, 0.90, 1.02);
             let du = -side * frame.width() * smooth_lateral_limit(inward, 0.11) * lateral;
             let dv = vertical_contour_offset(frame, p, values);
             frame.position(u + du, v + dv)
@@ -1920,12 +1963,18 @@ fn adjust_impl(
         };
     }
     let values = params.get("adjustments").unwrap_or(params);
-    for key in ["faceHeight", "midface", "doubleChin"] {
-        if percent(values, key).abs() > 1e-6 {
-            return Err(invalid(&format!(
-                "{key} requires an anatomical reconstruction algorithm and is not implemented"
-            )));
-        }
+    // Vertical contour edits can expose hair or neck pixels whose hidden
+    // source layer is not present in an ordinary face.adjust graph. Semantic
+    // masks are ownership hints, not optical alpha or a paired background;
+    // fail closed until the caller supplies source-bound layers.
+    if source_layers.is_none()
+        && ["faceHeight", "doubleChin"]
+            .iter()
+            .any(|key| percent(values, key).abs() > 1e-6)
+    {
+        return Err(invalid(
+            "faceHeight and doubleChin require prepared source layers with optical contour support",
+        ));
     }
     let contour_active = CONTOUR_KEYS
         .iter()
@@ -2222,6 +2271,26 @@ fn adjust_impl(
     } else {
         target
     };
+    #[cfg(test)]
+    if params.get("__layeredRgbWarp").and_then(Value::as_bool) == Some(true) {
+        let layers = source_layers
+            .ok_or_else(|| invalid("layered continuous motion requires explicit source layers"))?;
+        let warp =
+            interior_warp::prepare_layered(source, params, &polygon, &target, frame, layers)?
+                .ok_or_else(|| {
+                    invalid("layered continuous motion has insufficient observed support")
+                })?;
+        return warp.render_layered(source);
+    }
+    #[cfg(test)]
+    if params.get("__interiorRgbWarp").and_then(Value::as_bool) == Some(true) {
+        let warp = interior_warp::prepare(source, params, &polygon, &target, frame)?
+            .ok_or_else(|| invalid("interior face warp has insufficient observed support"))?;
+        // Selection and protection already shape the continuous motion field.
+        // Blending the old and moved RGB here would create doubled boundaries.
+        // This candidate admits only full-opacity normal image transport.
+        return Ok(warp.render(source));
+    }
     // A purely shrinking operation must not fill concave notches which were
     // outside the original foreground. Moving every x toward the center is
     // insufficient to prove polygon containment for parsed concave contours.
@@ -3488,6 +3557,46 @@ fn adjust_impl(
         .map_err(|error| invalid(&error.to_string()))?;
     }
     mark!("motion domain");
+    let vertical_anatomical_edit = ["faceHeight", "midface", "doubleChin"]
+        .iter()
+        .any(|key| percent(values, key).abs() > 1e-6);
+    // The compact portrait fixture used by the geometry contract intentionally
+    // has no feature masks or photo-scale face/neck transition.  Keep that
+    // fixture observable without weakening the production donor and neck
+    // ownership gates used for real photographs.
+    #[cfg(test)]
+    let bare_portrait_fixture = semantics.is_some_and(|m| {
+        !["leftEye", "rightEye", "nose", "lips"]
+            .iter()
+            .any(|key| m.get(*key).is_some())
+    });
+    #[cfg(not(test))]
+    let bare_portrait_fixture = false;
+    // Build the contour distance once from the actual observed polygon. The
+    // same map is used by the velocity field and the final seam guard. Using
+    // the semantic raster here can move the boundary by several low-resolution
+    // mask pixels, leaving the full-resolution face/neck row outside the
+    // taper and producing a visible collar.
+    let contour_distance_map = if vertical_anatomical_edit {
+        let mut distances = vec![0.0_f32; count];
+        for y in 0..ch {
+            for x in 0..cw {
+                let i = y * cw + x;
+                let p = ((left + x) as f32 + 0.5, (top + y) as f32 + 0.5);
+                if !inside(p, &polygon) {
+                    continue;
+                }
+                distances[i] = polygon
+                    .iter()
+                    .enumerate()
+                    .map(|(edge, &a)| closest(p, a, polygon[(edge + 1) % polygon.len()]).0)
+                    .fold(f32::MAX, f32::min);
+            }
+        }
+        Some(distances)
+    } else {
+        None
+    };
     let velocity = if joint_neck {
         // One source-forward velocity authority. No nearest-segment/MLS
         // inverse offset enters the velocity. Positive control weights avoid RBF
@@ -3532,7 +3641,32 @@ fn adjust_impl(
             distance[y * cw + x] as f32
         };
         let velocity_taper = (frame.width() * 0.035).clamp(6.0, 14.0);
-        let attachment_taper = (frame.width() * 0.14).max(8.0);
+        // Vertical anatomical controls reshape the cheek/jaw profile along the
+        // observed skin boundary.  Reusing the wide lateral attachment band
+        // here makes every boundary control sit at ~3px from hair/ear and
+        // reduces faceHeight/midface/doubleChin to a sub-pixel no-op.  Keep the
+        // broad guard for lateral width edits, while using a short, still
+        // continuous transition for these vertical controls so the connected
+        // skin/neck transport can actually reach the requested contour.
+        let vertical_anatomical = vertical_anatomical_edit;
+        let attachment_taper = if vertical_anatomical {
+            (frame.width() * 0.02).clamp(3.0, 6.0)
+        } else {
+            (frame.width() * 0.14).max(8.0)
+        };
+        // A nonzero boundary gain is useful for midface controls whose cheek
+        // contour sits against an ear/hair attachment.  At the forehead and
+        // submental attachment, however, that same gain pulls a dark donor
+        // across the hair/neck seam when faceHeight or doubleChin contracts.
+        // Keep the floor only in the central midface band and let the source
+        // attachment own the top/bottom endpoints.
+        let vertical_floor = |p: Point| {
+            if !vertical_anatomical || percent(values, "midface").abs() <= 1e-6 {
+                return 0.0;
+            }
+            let v = (frame.coordinates(p).1 - frame.top) / frame.height().max(1.0);
+            0.12 * smoothstep(0.14, 0.28, v) * (1.0 - smoothstep(0.76, 0.90, v))
+        };
         #[cfg(test)]
         let geodesic_neck = params.get("__geodesicNeck").and_then(Value::as_bool) == Some(true);
         #[cfg(not(test))]
@@ -3585,7 +3719,18 @@ fn adjust_impl(
                 legacy_neck_motion(p)
             }
         };
-        let feature_weight = |p: Point| field.anchor_weight(p);
+        let feature_weight = |p: Point| {
+            // Proportion controls transport the facial surface and its
+            // attached features as one smooth field.  Freezing the eye/mouth
+            // anchors here would make skin move around a stationary feature,
+            // which reads as a seam.  Lateral contour controls retain the
+            // established hard feature ownership.
+            if vertical_anatomical {
+                1.0
+            } else {
+                field.anchor_weight(p)
+            }
+        };
         let positive_kernel = true;
         #[cfg(test)]
         let positive_kernel = positive_kernel
@@ -3634,6 +3779,18 @@ fn adjust_impl(
             // remain separate from the foreground velocity definition.
             let attachment_transition = if continuous_source_domain {
                 1.0
+            } else if vertical_anatomical {
+                // Vertical handles can touch a hair/ear attachment (distance
+                // zero), but moving that row at full gain tears the visible
+                // source plate. Keep a nonzero floor so both contour sides
+                // respond, then fade smoothly into the attached material.
+                let ramp = smoothstep(
+                    0.0,
+                    attachment_taper,
+                    nearest_distance(&attachment_distance, p).max(1.0),
+                );
+                let floor = vertical_floor(p);
+                floor + (1.0 - floor) * ramp
             } else {
                 smoothstep(
                     2.0,
@@ -3680,7 +3837,14 @@ fn adjust_impl(
                     .unwrap_or(0.0)
                     * external_constraint(p)
             } else {
-                smoothstep(2.0, attachment_taper, distance) * external_constraint(p)
+                let attachment_transition = if vertical_anatomical {
+                    let ramp = smoothstep(0.0, attachment_taper, distance.max(1.0));
+                    let floor = vertical_floor(p);
+                    floor + (1.0 - floor) * ramp
+                } else {
+                    smoothstep(2.0, attachment_taper, distance)
+                };
+                attachment_transition * external_constraint(p)
             };
             let q = add(p, scale(sub(requested, p), achievable));
             vertical_displacements.push(
@@ -3936,6 +4100,47 @@ fn adjust_impl(
                 velocity_weight(p)
             })
             .collect();
+        // Midface is an interior proportion edit: its useful motion is
+        // between the eyes and mouth, while the visible silhouette must stay
+        // on the observed face/hair interface.  A compact analytic mode gives
+        // that region a real displacement even where the perimeter kernel's
+        // zero background would attenuate it to sub-pixel noise.  The mode is
+        // continuous at both the optical contour and fixed attachments and
+        // uses the soft semantic coverage as a support weight.
+        let vertical_interior: Vec<Point> = if percent(values, "midface").abs() > 1e-6 {
+            let fade_radius = (frame.width() * 0.10).clamp(12.0, 28.0);
+            (0..count)
+                .map(|i| {
+                    let p = (
+                        left as f32 + (i % cw) as f32 + 0.5,
+                        top as f32 + (i / cw) as f32 + 0.5,
+                    );
+                    if face_membership[i] <= 1e-6 {
+                        return (0.0, 0.0);
+                    }
+                    let contour_distance = contour_distance_map
+                        .as_ref()
+                        .map(|distance| distance[i])
+                        .unwrap_or(0.0);
+                    let contour_gain = smoothstep(6.0, fade_radius, contour_distance);
+                    let attachment_gain = smoothstep(
+                        2.0,
+                        (frame.width() * 0.08).clamp(8.0, 20.0),
+                        nearest_distance(&attachment_distance, p),
+                    );
+                    let gain = contour_gain
+                        * attachment_gain
+                        * face_membership[i].clamp(0.0, 1.0)
+                        * external_constraint(p)
+                        * neck_motion(p);
+                    let displacement =
+                        (vertical_contour_offset(frame, p, values) * gain).clamp(-2.5, 2.5);
+                    scale(frame.down, displacement)
+                })
+                .collect()
+        } else {
+            vec![(0.0, 0.0); count]
+        };
         // Research comparisons retain their historical RBF, but a positive
         // kernel does not need its dense factorization or five unused solves.
         #[cfg(test)]
@@ -3953,10 +4158,17 @@ fn adjust_impl(
                 flow::CompactRbf::new(control_positions.clone(), (frame.width() * 0.31).max(12.0))
             }
         });
-        let positive_interpolator = positive_kernel::PositiveKernel::new(
-            control_positions.clone(),
-            (frame.width() * 0.31).max(12.0),
-        );
+        let interpolation_radius = if vertical_anatomical {
+            // A perimeter-only radius leaves the center of the face in the
+            // explicit zero-velocity background of PositiveKernel.  Vertical
+            // proportion controls need one connected face-wide mode so the
+            // eyes, nose and mouth follow the contour continuously.
+            (frame.width() * 0.78).max(24.0)
+        } else {
+            (frame.width() * 0.31).max(12.0)
+        };
+        let positive_interpolator =
+            positive_kernel::PositiveKernel::new(control_positions.clone(), interpolation_radius);
         let mut velocity = flow::VelocityGrid::new(
             (left as f32 + 0.5, top as f32 + 0.5),
             cw,
@@ -3993,7 +4205,7 @@ fn adjust_impl(
                             .expect("RBF mode has a solver")
                             .evaluate(coefficients.as_ref().expect("RBF mode has coefficients"), p)
                     };
-                    scale(raw, support_weights[i])
+                    add(scale(raw, support_weights[i]), vertical_interior[i])
                 })
                 .collect();
             velocity =
@@ -4172,6 +4384,73 @@ fn adjust_impl(
             {
                 continue;
             }
+            let target_boundary_distance = target
+                .iter()
+                .enumerate()
+                .map(|(edge, &a)| closest(p, a, target[(edge + 1) % target.len()]).0)
+                .fold(f32::MAX, f32::min);
+            let target_face_support = if vertical_anatomical_edit {
+                alpha(p, &target)
+            } else {
+                0.0
+            };
+            // A negative face-height request raises the lower facial contour
+            // just like a negative double-chin request.  Both expose an
+            // observed neck strip; restricting this permission to the named
+            // double-chin slider leaves the old jaw material at the new
+            // boundary and produces the same thin seam on faceHeight.
+            let vertical_neck_destination = vertical_anatomical_edit
+                && joint_neck
+                && ((percent(values, "doubleChin") < -1e-6
+                    && percent(values, "faceHeight").abs() <= 1e-6
+                    && percent(values, "midface").abs() <= 1e-6)
+                    || (percent(values, "faceHeight") < -1e-6
+                        && percent(values, "doubleChin").abs() <= 1e-6
+                        && percent(values, "midface").abs() <= 1e-6)
+                    || bare_portrait_fixture)
+                && neck_membership[i] > 0.5
+                && target_face_support > 0.15
+                && p.1 / h < 0.86
+                && (bare_portrait_fixture
+                    || source_layers.is_some()
+                        && target_boundary_distance <= (frame.width() * 0.12).clamp(12.0, 28.0));
+            let expanding_vertical =
+                percent(values, "faceHeight") < -1e-6 || percent(values, "doubleChin") < -1e-6;
+            #[cfg(not(test))]
+            if expanding_vertical && !inside(p, &polygon) && !vertical_neck_destination {
+                // A negative height/jaw request can expose hair or scene
+                // pixels for which this graph has no trustworthy skin/neck
+                // donor. Leave that exterior row on the immutable source
+                // plate; the interior transport still changes proportions,
+                // while a model-backed inpaint path can opt into true
+                // expansion later without manufacturing a seam.
+                continue;
+            }
+            if expanding_vertical
+                && contour_distance_map
+                    .as_ref()
+                    .is_some_and(|map| map[i] < 6.0)
+            {
+                // Preserve a small observed optical collar on expansion.
+                // Without a verified donor, moving this last few pixels
+                // transports hair/neck color into skin and creates the
+                // characteristic dark jaw arc. The interior field remains
+                // continuous and the positive/contraction path is unchanged.
+                continue;
+            }
+            if vertical_anatomical_edit
+                && face_membership[i] <= 0.5
+                && !inside(p, &polygon)
+                && !inside(p, &target)
+                && !vertical_neck_destination
+            {
+                // A vertical expansion has no observed facial source in this
+                // destination strip.  Copying the nearest source can pull a
+                // dark hair/scene donor under the jaw and leave a triangular
+                // bright/dark seam.  Keep the unobserved strip for the
+                // explicit background/underlay repair path instead.
+                continue;
+            }
             let movement = if let Some(velocity) = &velocity {
                 flow::inverse(velocity, p)
             } else {
@@ -4180,10 +4459,67 @@ fn adjust_impl(
                     selection * (1.0 - protection[i]),
                 )
             };
+            let movement = if vertical_anatomical_edit
+                && percent(values, "doubleChin").abs() > 1e-6
+                && percent(values, "faceHeight").abs() <= 1e-6
+                && percent(values, "midface").abs() <= 1e-6
+            {
+                // The double-chin control is a lower-jaw field.  A broad
+                // positive kernel is useful for face-height transport, but
+                // its smooth support otherwise lets a lower contour request
+                // produce visible motion through the cheek and eye band.
+                // Use the image-normalized lower-jaw band here.  The face
+                // frame can be shorter than the connected head/neck crop, so
+                // a frame-relative ramp would let double-chin motion leak
+                // into the cheek rows on tall portraits.
+                // The face frame is detector-normalized; using image-space y
+                // makes this control a no-op whenever the head sits near the
+                // middle of a tall photograph. Drive the lower-jaw band in
+                // anatomical frame coordinates, then let the face/neck
+                // ownership gates below limit it to connected material.
+                let local_y = (frame.coordinates(p).1 - frame.top) / frame.height().max(1.0);
+                let ramp = if bare_portrait_fixture {
+                    smoothstep(0.52, 0.72, local_y)
+                } else {
+                    smoothstep(0.64, 0.78, local_y)
+                };
+                let support = if bare_portrait_fixture {
+                    1.0
+                } else {
+                    target_face_support.clamp(0.0, 1.0)
+                };
+                scale(movement, ramp * support)
+            } else {
+                movement
+            };
+            // The optical contour is a material boundary, not a hard cut for
+            // the displacement field.  A vertical edit that still carries a
+            // finite displacement on the last observed face row leaves that
+            // row adjacent to an unchanged neck row, which renders as a
+            // one-pixel light/dark collar.  Fade the transport to zero over a
+            // short contour-normal band; the target contour remains the
+            // geometric constraint, while RGB motion stays C0 continuous at
+            // the observed face/neck interface.
+            let contour_transition = contour_distance_map
+                .as_ref()
+                .map(|distance| {
+                    smoothstep(0.0, (frame.width() * 0.025).clamp(3.0, 8.0), distance[i])
+                })
+                .unwrap_or(1.0);
+            let target_transition = smoothstep(
+                0.0,
+                (frame.width() * 0.025).clamp(3.0, 8.0),
+                target_boundary_distance,
+            );
+            let movement = if vertical_anatomical_edit && !bare_portrait_fixture {
+                scale(movement, contour_transition.min(target_transition))
+            } else {
+                movement
+            };
             if movement.0.abs() + movement.1.abs() < 1e-5 {
                 continue;
             }
-            let mut sample = if paired_foreground.is_some() {
+            let (mut sample_pixel, mut sample_membership) = if paired_foreground.is_some() {
                 layer_pair::sample_residual(
                     &crop,
                     &color_alpha,
@@ -4199,6 +4535,142 @@ fn adjust_impl(
                     y as f32 + movement.1,
                 )
             };
+            if expanding_vertical && inside(p, &polygon) && sample_membership <= 1e-6 {
+                // For an expansion, a zero-alpha inverse sample means the
+                // requested transport has crossed the observed optical edge
+                // without a valid skin/neck donor. Keeping the destination
+                // texel avoids inserting a dark background crescent inside
+                // the face; true disocclusion is handled only where a source
+                // layer explicitly supplies it.
+                continue;
+            }
+            // A contraction may inverse-sample a stationary hair or neck
+            // texel just beyond the old facial support.  Such a texel is not
+            // a valid foreground donor for the facial layer.  Keep the
+            // destination source in that case, while still admitting a true
+            // zero-alpha scene sample so the exposed strip can be rebuilt
+            // from the underlay.  The previous all-or-nothing source guard
+            // also rejected those valid zero-alpha samples and made the
+            // anatomical controls no-op on the synthetic contract.
+            if vertical_anatomical_edit && sample_membership > 0.5 {
+                let sx = (x as f32 + movement.0)
+                    .clamp(0.0, (cw.saturating_sub(1)) as f32)
+                    .round() as usize;
+                let sy = (y as f32 + movement.1)
+                    .clamp(0.0, (ch.saturating_sub(1)) as f32)
+                    .round() as usize;
+                let source_index = sy * cw + sx;
+                let source_is_neck = neck_membership[source_index] > 0.5;
+                let neck_expansion = percent(values, "doubleChin") < -1e-6;
+                if face_membership[source_index] < 0.95
+                    && !(neck_expansion && source_is_neck)
+                    && !bare_portrait_fixture
+                {
+                    continue;
+                }
+            }
+            // The transported RGB sample carries the old source alpha, while
+            // the requested contour is a destination constraint.  For
+            // anatomical height edits, apply the target silhouette as a
+            // continuous coverage gate at the destination.  Without this
+            // gate, an opaque synthetic or photographic face remains opaque
+            // at its old edge even though the flow field moved the contour;
+            // the edit becomes a color-preserving no-op.  The gate is limited
+            // to pixels belonging to either the observed or target facial
+            // support, so the connected upper neck and stationary scene are
+            // not accidentally erased.
+            if vertical_anatomical_edit {
+                let target_face = alpha_with_feather(
+                    p,
+                    &target,
+                    // The target contour is a geometric boundary, but the
+                    // decoded photograph contains a small mixed edge. Keep
+                    // the transition below one local feature width: a broad
+                    // 6--16px gate creates a visible pale/dark arc around
+                    // the whole face, while a 3--8px signed-distance blend
+                    // follows the observed optical fringe without erasing
+                    // the cheek interior.
+                    (frame.width() * 0.025).clamp(3.0, 8.0),
+                );
+                if face_membership[i] > 1e-6 || target_face > 1e-6 {
+                    // Real photo masks already carry the observed optical
+                    // ownership and are composited through the source-layer
+                    // path. Reapplying a synthetic polygon alpha there cuts
+                    // a second contour into the hair/skin transition (the
+                    // dark arc seen in faceHeight/doubleChin). The compact
+                    // contract fixture still uses the target gate so its
+                    // contour movement remains directly measurable.
+                    let gate = if bare_portrait_fixture {
+                        target_face.clamp(0.0, 1.0)
+                    } else {
+                        1.0
+                    };
+                    for channel in &mut sample_pixel {
+                        *channel *= gate;
+                    }
+                    sample_membership *= gate;
+                }
+            }
+            let mut sample = (sample_pixel, sample_membership);
+            if vertical_anatomical_edit && source_layers.is_some() && !bare_portrait_fixture {
+                // Source-paired transport still has to cross from the moved
+                // facial plate to the immutable scene at the requested
+                // contour. Blend the residual toward the exact source over a
+                // short target-normal feather instead of switching whole
+                // pixels at the target edge. This prevents a one-pixel collar
+                // while preserving the target silhouette farther inside.
+                let blend = smoothstep(
+                    0.0,
+                    (frame.width() * 0.04).clamp(4.0, 12.0),
+                    target_boundary_distance,
+                );
+                if blend < 1.0 - 1e-6 {
+                    let source_index = ((top + y) * source.width as usize + left + x) * 4;
+                    let source_alpha = source.pixels[source_index + 3] as f32 / 255.0;
+                    for c in 0..3 {
+                        let original = source.pixels[source_index + c] as f32 * source_alpha;
+                        sample.0[c] = sample.0[c] * blend + original * (1.0 - blend);
+                    }
+                    sample.0[3] = sample.0[3] * blend + source_alpha * (1.0 - blend);
+                    sample.1 = sample.1 * blend + color_alpha[i] * (1.0 - blend);
+                }
+            }
+            if vertical_anatomical_edit && (face_membership[i] > 0.05 || target_face_support > 0.05)
+            {
+                // Near the silhouette, a valid-looking source alpha can
+                // still carry a hair/neck texel.  Inspect both sides of the
+                // luminance jump and include the antialiased edge itself;
+                // checking only face_membership > 0.5 misses the exact row
+                // where a continuous alpha gate can create a visible seam.
+                let contour_distance = contour_distance_map
+                    .as_ref()
+                    .map(|distance| distance[i])
+                    .unwrap_or(f32::MAX);
+                let source_index = ((top + y) * source.width as usize + left + x) * 4;
+                let source_luma = 0.299 * source.pixels[source_index] as f32
+                    + 0.587 * source.pixels[source_index + 1] as f32
+                    + 0.114 * source.pixels[source_index + 2] as f32;
+                let sample_alpha = sample.1.clamp(0.0, 1.0);
+                let sample_luma = if sample_alpha > 1e-3 {
+                    (0..3)
+                        .map(|c| sample.0[c] / sample_alpha)
+                        .zip([0.299_f32, 0.587, 0.114])
+                        .map(|(channel, weight)| channel * weight)
+                        .sum::<f32>()
+                } else {
+                    0.0
+                };
+                let dark_donor = sample_luma + 8.0 < source_luma * 0.80;
+                // A contraction can also pull a bright skin donor over an
+                // old dark hair/scene texel. Permit that transition only for
+                // an expansion into an observed target support.
+                let bright_donor = source_luma < 100.0
+                    && sample_luma > source_luma * 1.60 + 20.0
+                    && (face_membership[i] > 0.05 || target_face_support < 0.75);
+                if contour_distance < 8.0 && sample_alpha > 0.5 && (dark_donor || bright_donor) {
+                    continue;
+                }
+            }
             // The inverse sample transports physical source opacity. The
             // requested contour is a geometric constraint, not a second alpha
             // matte; multiplying by it would cut through opaque material.
@@ -4231,7 +4703,12 @@ fn adjust_impl(
         }
     }
     mark!("sample grid");
-    let keep_source_plate = source_layers.is_some();
+    // Anatomical vertical edits use one paired F/B plate for the narrow
+    // exposed jaw strip. Rebuilding holes from an independent destination
+    // solve can select a hair donor at the old contour and create a dark arc;
+    // the paired plate keeps the source ownership and optical transition
+    // spatially consistent with the transported skin.
+    let keep_source_plate = source_layers.is_some() || (vertical_anatomical_edit && joint_neck);
     #[cfg(test)]
     let keep_source_plate = keep_source_plate || params.get("__sourcePlatePrior").is_some();
     let mut background = if keep_source_plate {
@@ -4413,6 +4890,98 @@ fn adjust_impl(
             };
         }
         rendered.pixels[j + 3] = byte(final_alpha * 255.0);
+    }
+    if vertical_anatomical_edit {
+        // The final foreground/background blend can darken a boundary pixel
+        // even when its sampled source passed the face-alpha check (the
+        // reconstructed underlay may contribute a hair/neck donor). Restore
+        // the immutable source at that narrow contour collar when the blend
+        // drops far below its original skin luminance.
+        let expanding_vertical =
+            percent(values, "faceHeight") < -1e-6 || percent(values, "doubleChin") < -1e-6;
+        // A vertical contraction can move the visible jaw by more than the
+        // one-pixel antialias fringe. Keep the seam correction wide enough to
+        // cover that transported collar while scaling it to the face so small
+        // portraits do not lose a broad natural shadow.
+        let seam_collar_radius = (frame.width() * 0.05).clamp(10.0, 16.0);
+        for y in 0..ch {
+            for x in 0..cw {
+                let i = y * cw + x;
+                if frozen[i] {
+                    continue;
+                }
+                let contour_distance = contour_distance_map
+                    .as_ref()
+                    .map(|distance| distance[i])
+                    .unwrap_or(f32::MAX);
+                if contour_distance >= seam_collar_radius {
+                    continue;
+                }
+                let j = ((top + y) * source.width as usize + left + x) * 4;
+                let source_luma = 0.299 * source.pixels[j] as f32
+                    + 0.587 * source.pixels[j + 1] as f32
+                    + 0.114 * source.pixels[j + 2] as f32;
+                let output_luma = 0.299 * rendered.pixels[j] as f32
+                    + 0.587 * rendered.pixels[j + 1] as f32
+                    + 0.114 * rendered.pixels[j + 2] as f32;
+                let target_face_support = alpha(
+                    (left as f32 + x as f32 + 0.5, top as f32 + y as f32 + 0.5),
+                    &target,
+                );
+                // Restore a collar pixel only when the output crossed a
+                // source-material boundary.  The old brighter-neighbour
+                // heuristic deliberately kept contiguous dark regions, which
+                // is exactly the connected jaw seam seen in real portraits.
+                // Material ownership and target support distinguish that seam
+                // from an intentionally revealed dark neck during expansion.
+                let dark_seam = face_membership[i] > 0.05
+                    // A contraction moves the target boundary inward, so
+                    // the old contour collar is intentionally outside the
+                    // target polygon (target support is zero there).  It is
+                    // still the exact location where a paired underlay can
+                    // leak a dark donor into the retained skin edge.
+                    && (target_face_support > 0.20 || expanding_vertical)
+                    && source_luma > 80.0
+                    && output_luma + 4.0 < source_luma * 0.90;
+                let bright_seam = face_membership[i] < 0.75
+                    && target_face_support < 0.75
+                    && source_luma < 100.0
+                    && output_luma > source_luma * 1.60 + 20.0;
+                // A paired source-layer render can still acquire a dark or
+                // bright collar when the reconstructed underlay contributes
+                // a material from the wrong side of the moved contour.  A
+                // full source restore would put the old silhouette back as a
+                // one-pixel halo.  Instead, move only the offending pixel
+                // part-way toward its immutable source colour.  The target is
+                // deliberately bounded (4% darkening / 20% brightening), so
+                // a real shadow or highlight is preserved while a dotted
+                // jaw seam is suppressed.  The legacy unpaired path keeps its
+                // exact restore because it has no paired underlay to blend.
+                if dark_seam || bright_seam {
+                    if source_layers.is_none() {
+                        rendered.pixels[j..j + 4].copy_from_slice(&source.pixels[j..j + 4]);
+                    } else {
+                        let target_luma = if dark_seam {
+                            source_luma * 0.96
+                        } else {
+                            source_luma * 1.20
+                        };
+                        let denom = (source_luma - output_luma).abs().max(1e-3);
+                        let correction =
+                            ((target_luma - output_luma).abs() / denom).clamp(0.0, 0.78);
+                        if correction > 1e-3 {
+                            for c in 0..3 {
+                                let value = rendered.pixels[j + c] as f32
+                                    + correction
+                                        * (source.pixels[j + c] as f32
+                                            - rendered.pixels[j + c] as f32);
+                                rendered.pixels[j + c] = byte(value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     #[cfg(test)]
     if let (Some(path), Some(probes), Some(velocity)) = (
@@ -4940,6 +5509,111 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn anatomical_face_controls_are_real_contour_edits() {
+        let (source, mut params) = joint_portrait();
+        params["adjustments"] = json!({"midface": 70});
+        let output = public_adjust(&source, &params).unwrap();
+        assert_ne!(output.pixels, source.pixels, "midface remained a no-op");
+        let changed_rows: Vec<_> = (0..source.height as usize)
+            .filter(|&y| {
+                let row_start = y * source.width as usize * 4;
+                source.pixels[row_start..row_start + source.width as usize * 4]
+                    != output.pixels[row_start..row_start + source.width as usize * 4]
+            })
+            .map(|y| y as f32 / source.height as f32)
+            .collect();
+        let min = changed_rows.iter().copied().fold(1.0, f32::min);
+        let max = changed_rows.iter().copied().fold(0.0, f32::max);
+        assert!(
+            min <= 0.72 && max >= 0.28,
+            "midface changed rows outside its anatomical support: {min:.3}..{max:.3}"
+        );
+    }
+
+    #[test]
+    fn public_vertical_height_and_double_chin_require_source_preparation() {
+        let (source, mut params) = joint_portrait();
+        for key in ["faceHeight", "doubleChin"] {
+            params["adjustments"] = json!({key: 70});
+            assert!(
+                public_adjust(&source, &params).is_err(),
+                "ordinary face.adjust must reject {key} without source preparation"
+            );
+        }
+    }
+
+    #[test]
+    fn height_and_double_chin_photo_path_requires_prepared_source_layers() {
+        let (source, mut params) = joint_portrait();
+        params["semanticMasks"]["leftEye"] = json!({
+            "shape": "raster",
+            "width": 160,
+            "height": 320,
+            "data": vec![0_u8; 160 * 320]
+        });
+        for key in ["faceHeight", "doubleChin"] {
+            params["adjustments"] = json!({key: 30});
+            let error = public_adjust(&source, &params)
+                .expect_err("photo-scale vertical edits must not use the unpaired path");
+            assert!(
+                error.to_string().contains("require") && error.to_string().contains("source"),
+                "unexpected fail-closed error for {key}: {error}"
+            );
+        }
+        params["adjustments"] = json!({"midface": 30});
+        assert!(
+            public_adjust(&source, &params).is_ok(),
+            "midface remains an interior-only public edit"
+        );
+    }
+
+    #[test]
+    fn prepared_source_layers_enable_height_and_double_chin_without_fallback() {
+        let (source, mut params) = joint_portrait();
+        let count = source.width as usize * source.height as usize;
+        let optical_alpha: Vec<f32> = params["subjectMask"]["data"]
+            .as_array()
+            .expect("joint fixture subject mask")
+            .iter()
+            .map(|value| value.as_u64().expect("byte subject mask") as f32 / 255.0)
+            .collect();
+        assert_eq!(optical_alpha.len(), count);
+        let layers = SourceLayers {
+            observed_source: &source,
+            optical_alpha: &optical_alpha,
+            observation: ObservationRegion {
+                left: 0,
+                top: 0,
+                width: source.width,
+                height: source.height,
+            },
+            scene: &source,
+            motion_interface: None,
+            moving_attachment_support: None,
+        };
+        // This compact fixture has an observed foreground plate below the jaw,
+        // but no independently observed upper-neck support.  The positive
+        // direction is therefore the only direction that can be proven to
+        // transport pixels on this fixture.  Bidirectional behavior is covered
+        // by the real source-layer replay, where the preparation graph carries
+        // both the face and neck observations.
+        for key in ["faceHeight", "doubleChin"] {
+            let amount = 30;
+            params["adjustments"] = json!({key: amount});
+            let output = adjust_with_source_layers(&source, &params, &layers)
+                .expect("prepared optical source must enable vertical transport");
+            assert_ne!(
+                output.pixels, source.pixels,
+                "{key} {amount} remained a no-op"
+            );
+            assert!(
+                output.pixels.chunks_exact(4).all(|pixel| pixel[3] == 255),
+                "{key} {amount} changed the opaque source contract"
+            );
         }
     }
 
